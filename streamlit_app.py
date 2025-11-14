@@ -10,150 +10,244 @@ st.set_page_config(
     page_title="Bloomberg Terminal",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# CSS personnalisé style Bloomberg
+# CSS personnalisé STYLE BLOOMBERG AUTHENTIQUE
 st.markdown("""
 <style>
-    .main {background-color: #0a0a0a;}
-    .stApp {background-color: #0a0a0a;}
-    h1, h2, h3 {color: #ff8c00;}
-    .stMetric {background-color: #1a1a1a; padding: 10px; border-radius: 5px;}
-    div[data-testid="stMetricValue"] {font-size: 24px;}
+    /* Fond noir total */
+    .main {
+        background-color: #000000;
+        color: #ffffff;
+    }
+    .stApp {
+        background-color: #000000;
+    }
+    
+    /* Barre orange Bloomberg */
+    .bloomberg-header {
+        background: linear-gradient(90deg, #f47920 0%, #f8981d 100%);
+        padding: 12px 20px;
+        color: #000000;
+        font-weight: bold;
+        font-size: 24px;
+        margin-bottom: 0px;
+        letter-spacing: 2px;
+        border-bottom: 2px solid #f8981d;
+    }
+    
+    /* Titres orange */
+    h1, h2, h3, h4 {
+        color: #f47920 !important;
+        font-family: 'Arial', sans-serif;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    /* Metrics Bloomberg style */
+    [data-testid="stMetricValue"] {
+        font-size: 28px;
+        color: #ffffff;
+        font-weight: bold;
+        font-family: 'Courier New', monospace;
+    }
+    
+    [data-testid="stMetricLabel"] {
+        color: #f47920;
+        font-size: 13px;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+    
+    [data-testid="stMetricDelta"] {
+        font-size: 16px;
+        font-weight: bold;
+    }
+    
+    /* Cartes de données */
+    .market-card {
+        background-color: #1a1a1a;
+        padding: 15px;
+        border-left: 4px solid #f47920;
+        border-radius: 0px;
+        margin-bottom: 10px;
+    }
+    
+    /* News style Bloomberg */
+    .news-item {
+        background-color: #0a0a0a;
+        border-left: 3px solid #f47920;
+        padding: 12px 15px;
+        margin-bottom: 8px;
+        border-bottom: 1px solid #333;
+    }
+    
+    .news-title {
+        color: #ffffff;
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0;
+        line-height: 1.4;
+    }
+    
+    .news-meta {
+        color: #888888;
+        font-size: 12px;
+        margin-top: 5px;
+    }
+    
+    .news-category {
+        color: #f47920;
+        font-weight: bold;
+    }
+    
+    /* Boutons Bloomberg */
+    .stButton > button {
+        background-color: #f47920;
+        color: #000000;
+        font-weight: bold;
+        border: none;
+        padding: 10px 20px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        border-radius: 0px;
+        font-size: 13px;
+    }
+    
+    .stButton > button:hover {
+        background-color: #ff9933;
+        color: #000000;
+    }
+    
+    /* Barre de temps */
+    .time-bar {
+        background-color: #1a1a1a;
+        padding: 8px 20px;
+        color: #f47920;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        border-bottom: 1px solid #333;
+        text-align: right;
+    }
+    
+    /* Supprimer le padding par défaut */
+    .block-container {
+        padding-top: 0rem;
+        padding-bottom: 0rem;
+    }
+    
+    /* Sidebar sombre */
+    [data-testid="stSidebar"] {
+        background-color: #0a0a0a;
+    }
+    
+    /* Input boxes */
+    .stTextInput input {
+        background-color: #1a1a1a;
+        color: #ffffff;
+        border: 1px solid #f47920;
+        border-radius: 0px;
+    }
+    
+    /* Lignes de séparation */
+    hr {
+        border-color: #333333;
+        margin: 10px 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
+# AUTO-REFRESH toutes les 3 secondes
+st.markdown("""
+<script>
+    setTimeout(function() {
+        window.location.reload();
+    }, 3000);
+</script>
+""", unsafe_allow_html=True)
+
 # Fonction pour récupérer les données réelles
-@st.cache_data(ttl=60)  # Cache pendant 60 secondes pour éviter trop de requêtes
 def get_market_data(ticker):
     """Récupère les données réelles de Yahoo Finance"""
     try:
         stock = yf.Ticker(ticker)
-        
-        # Récupérer les données historiques des 5 derniers jours
         hist = stock.history(period='5d')
         
         if len(hist) < 2:
             return None, None, None
         
-        # Prix actuel (dernier close)
         current_price = hist['Close'].iloc[-1]
-        
-        # Prix de la veille
         previous_close = hist['Close'].iloc[-2]
-        
-        # Calcul du changement en %
         change_percent = ((current_price - previous_close) / previous_close) * 100
         
         return current_price, change_percent, hist
         
-    except Exception as e:
-        st.error(f"Erreur pour {ticker}: {str(e)}")
+    except:
         return None, None, None
 
 # Fonction pour récupérer les news réelles
-@st.cache_data(ttl=300)  # Cache pendant 5 minutes
 def get_real_news(ticker):
     """Récupère les vraies news de Yahoo Finance"""
     try:
         stock = yf.Ticker(ticker)
         news = stock.news
-        return news[:5] if news else []
+        return news[:8] if news else []
     except:
         return []
 
-# Header avec heure actuelle
-col1, col2, col3 = st.columns([2,4,2])
-with col1:
-    st.title("📊 BLOOMBERG")
-with col3:
-    # Affichage de l'heure en temps réel
-    placeholder_time = st.empty()
-    current_time = datetime.now()
-    placeholder_time.write(f"🕐 {current_time.strftime('%H:%M:%S')}")
-    st.write(f"📅 {current_time.strftime('%d %B %Y')}")
+# ===== HEADER BLOOMBERG =====
+st.markdown('<div class="bloomberg-header">⬛ BLOOMBERG TERMINAL</div>', unsafe_allow_html=True)
 
-st.markdown("---")
+# Barre de temps avec auto-update
+current_time = datetime.now()
+st.markdown(f'<div class="time-bar">🕐 {current_time.strftime("%H:%M:%S")} | 📅 {current_time.strftime("%A, %B %d, %Y").upper()} | LIVE DATA ●</div>', unsafe_allow_html=True)
 
-# Market Overview avec données RÉELLES
-st.header("📈 Market Overview - Live Data")
+st.markdown("<br>", unsafe_allow_html=True)
 
-# Bouton de refresh
-col_refresh, col_empty = st.columns([1, 5])
-with col_refresh:
-    if st.button("🔄 Refresh", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
+# ===== MARKET OVERVIEW =====
+st.markdown("### 📊 GLOBAL MARKETS")
 
-# Définition des marchés à suivre
 markets = {
     'S&P 500': '^GSPC',
     'NASDAQ': '^IXIC',
-    'DOW JONES': '^DJI',
+    'DOW': '^DJI',
     'EUR/USD': 'EURUSD=X'
 }
 
-# Affichage des métriques en temps réel
 cols = st.columns(4)
 
 for idx, (name, ticker) in enumerate(markets.items()):
     with cols[idx]:
-        with st.spinner(f"Loading {name}..."):
-            current, change, hist = get_market_data(ticker)
-            
-            if current is not None:
-                # Formatage selon le type d'actif
-                if 'USD' in ticker or 'EUR' in ticker:
-                    value_display = f"{current:.4f}"
-                else:
-                    value_display = f"{current:,.2f}"
-                
-                # Affichage avec delta coloré
-                st.metric(
-                    label=name,
-                    value=value_display,
-                    delta=f"{change:+.2f}%",
-                    delta_color="normal"
-                )
-                
-                # Mini graphique sparkline
-                if hist is not None and len(hist) > 0:
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(
-                        x=hist.index,
-                        y=hist['Close'],
-                        mode='lines',
-                        line=dict(color='#ff8c00', width=2),
-                        fill='tozeroy',
-                        fillcolor='rgba(255, 140, 0, 0.1)'
-                    ))
-                    fig.update_layout(
-                        height=100,
-                        margin=dict(l=0, r=0, t=0, b=0),
-                        showlegend=False,
-                        xaxis=dict(visible=False),
-                        yaxis=dict(visible=False),
-                        paper_bgcolor='rgba(0,0,0,0)',
-                        plot_bgcolor='rgba(0,0,0,0)'
-                    )
-                    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+        current, change, hist = get_market_data(ticker)
+        
+        if current is not None:
+            if 'USD' in ticker or 'EUR' in ticker:
+                value_display = f"{current:.4f}"
             else:
-                st.metric(label=name, value="N/A", delta="0%")
-                st.caption("⚠️ Données non disponibles")
+                value_display = f"{current:,.2f}"
+            
+            st.metric(
+                label=name,
+                value=value_display,
+                delta=f"{change:+.2f}%"
+            )
+        else:
+            st.metric(label=name, value="LOADING...", delta="0%")
 
 st.markdown("---")
 
-# Section des commodités et crypto
-st.subheader("💰 Commodities & Crypto - Live Data")
+# ===== COMMODITIES & CRYPTO =====
+st.markdown("### 💰 COMMODITIES & DIGITAL ASSETS")
 
 commodities = {
-    'Gold': 'GC=F',
-    'Silver': 'SI=F',
-    'Crude Oil': 'CL=F',
-    'Natural Gas': 'NG=F',
-    'Bitcoin': 'BTC-USD',
-    'Ethereum': 'ETH-USD'
+    'GOLD': 'GC=F',
+    'SILVER': 'SI=F',
+    'CRUDE OIL': 'CL=F',
+    'NAT GAS': 'NG=F',
+    'BITCOIN': 'BTC-USD',
+    'ETHEREUM': 'ETH-USD'
 }
 
 cols_comm = st.columns(6)
@@ -174,25 +268,23 @@ for idx, (name, ticker) in enumerate(commodities.items()):
                 delta=f"{change:+.2f}%"
             )
         else:
-            st.metric(label=name, value="N/A")
+            st.metric(label=name, value="LOADING...")
 
 st.markdown("---")
 
-# Main Content avec vraies news
-col_main, col_sidebar = st.columns([2, 1])
+# ===== MAIN CONTENT =====
+col_main, col_sidebar = st.columns([2.5, 1])
 
 with col_main:
-    st.subheader("📰 Latest Market News")
+    st.markdown("### 📰 MARKET NEWS & HEADLINES")
     
-    # Récupération des vraies news depuis Yahoo Finance
+    # Récupérer vraies news
     all_news = []
     for ticker in ['^GSPC', '^IXIC', '^DJI']:
         news = get_real_news(ticker)
         all_news.extend(news)
     
-    # Affichage des news ou placeholder si pas de news
     if all_news:
-        # Trier par date et prendre les 8 premières
         all_news = sorted(all_news, key=lambda x: x.get('providerPublishTime', 0), reverse=True)[:8]
         
         for item in all_news:
@@ -200,93 +292,85 @@ with col_main:
             publisher = item.get('publisher', 'Unknown')
             link = item.get('link', '#')
             
-            # Calcul du temps écoulé
             pub_time = item.get('providerPublishTime', 0)
             if pub_time:
                 time_ago = datetime.now() - datetime.fromtimestamp(pub_time)
                 hours_ago = int(time_ago.total_seconds() / 3600)
                 if hours_ago < 1:
-                    time_str = f"{int(time_ago.total_seconds() / 60)}m ago"
+                    time_str = f"{int(time_ago.total_seconds() / 60)}MIN"
                 elif hours_ago < 24:
-                    time_str = f"{hours_ago}h ago"
+                    time_str = f"{hours_ago}H"
                 else:
-                    time_str = f"{int(hours_ago / 24)}d ago"
+                    time_str = f"{int(hours_ago / 24)}D"
             else:
-                time_str = "Recently"
+                time_str = "NOW"
             
             st.markdown(f"""
-            <div style='background-color: #1a1a1a; padding: 15px; margin-bottom: 10px; border-left: 3px solid #ff8c00;'>
-                <h4 style='margin: 0; color: white;'>
-                    <a href='{link}' target='_blank' style='color: white; text-decoration: none;'>
-                        {title}
+            <div class="news-item">
+                <div class="news-title">
+                    <a href='{link}' target='_blank' style='color: #ffffff; text-decoration: none;'>
+                        ▸ {title}
                     </a>
-                </h4>
-                <p style='margin: 5px 0 0 0; color: #888;'>
-                    <span style='color: #ff8c00;'>{publisher}</span> • {time_str}
-                </p>
+                </div>
+                <div class="news-meta">
+                    <span class="news-category">{publisher.upper()}</span> • {time_str} AGO
+                </div>
             </div>
             """, unsafe_allow_html=True)
     else:
-        st.info("📡 Chargement des actualités en cours...")
-        # Fallback avec quelques news génériques
-        st.markdown("""
-        <div style='background-color: #1a1a1a; padding: 15px; margin-bottom: 10px; border-left: 3px solid #ff8c00;'>
-            <h4 style='margin: 0; color: white;'>Market Data Loading...</h4>
-            <p style='margin: 5px 0 0 0; color: #888;'>Actualisation des données en cours</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.info("📡 Loading market news...")
 
 with col_sidebar:
-    st.subheader("🛠️ Quick Tools")
+    st.markdown("### 🔍 QUICK TICKER SEARCH")
     
-    st.button("📊 Stock Screener", use_container_width=True, type="primary")
-    st.button("💼 Portfolio Tracker", use_container_width=True)
-    st.button("📅 Economic Calendar", use_container_width=True)
-    st.button("⭐ Watchlist", use_container_width=True)
-    st.button("📈 Market Analysis", use_container_width=True)
-    
-    st.markdown("---")
-    
-    # Section recherche de ticker personnalisé
-    st.subheader("🔍 Quick Search")
-    custom_ticker = st.text_input("Enter ticker (ex: AAPL, MSFT, TSLA)", "")
+    custom_ticker = st.text_input("", placeholder="Enter symbol (AAPL, MSFT...)", label_visibility="collapsed")
     
     if custom_ticker:
-        with st.spinner(f"Fetching {custom_ticker.upper()}..."):
-            current, change, hist = get_market_data(custom_ticker.upper())
+        current, change, hist = get_market_data(custom_ticker.upper())
+        
+        if current is not None:
+            st.metric(
+                label=custom_ticker.upper(),
+                value=f"${current:,.2f}",
+                delta=f"{change:+.2f}%"
+            )
             
-            if current is not None:
-                st.metric(
-                    label=custom_ticker.upper(),
-                    value=f"${current:,.2f}",
-                    delta=f"{change:+.2f}%"
+            if hist is not None and len(hist) > 0:
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=hist.index,
+                    y=hist['Close'],
+                    mode='lines',
+                    line=dict(color='#f47920', width=2),
+                    fill='tozeroy',
+                    fillcolor='rgba(244, 121, 32, 0.2)'
+                ))
+                fig.update_layout(
+                    height=150,
+                    margin=dict(l=0, r=0, t=0, b=0),
+                    showlegend=False,
+                    xaxis=dict(visible=False),
+                    yaxis=dict(visible=False),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)'
                 )
-                
-                if hist is not None and len(hist) > 0:
-                    fig = go.Figure()
-                    fig.add_trace(go.Candlestick(
-                        x=hist.index,
-                        open=hist['Open'],
-                        high=hist['High'],
-                        low=hist['Low'],
-                        close=hist['Close'],
-                        increasing_line_color='#00ff00',
-                        decreasing_line_color='#ff0000'
-                    ))
-                    fig.update_layout(
-                        height=200,
-                        margin=dict(l=0, r=0, t=0, b=0),
-                        showlegend=False,
-                        xaxis_rangeslider_visible=False,
-                        paper_bgcolor='rgba(0,0,0,0)',
-                        plot_bgcolor='#1a1a1a'
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.error(f"❌ Ticker '{custom_ticker.upper()}' non trouvé")
+                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+        else:
+            st.error(f"❌ SYMBOL NOT FOUND")
+    
+    st.markdown("---")
+    st.markdown("### 🛠️ TERMINAL FUNCTIONS")
+    st.button("📊 EQUITY SCREENER", use_container_width=True)
+    st.button("💼 PORTFOLIO", use_container_width=True)
+    st.button("📈 TECHNICAL ANALYSIS", use_container_width=True)
+    st.button("📅 ECO CALENDAR", use_container_width=True)
+    st.button("⭐ WATCHLIST", use_container_width=True)
 
-# Footer avec timestamp de dernière mise à jour
+# ===== FOOTER =====
 st.markdown("---")
 last_update = datetime.now().strftime('%H:%M:%S')
-st.caption(f"© 2025 Bloomberg Terminal Clone • Données Yahoo Finance • Dernière MàJ: {last_update}")
-st.caption("⚠️ Les données sont fournies à titre informatif uniquement. Actualisez pour obtenir les derniers cours.")
+st.markdown(f"""
+<div style='text-align: center; color: #666; font-size: 11px; padding: 10px;'>
+    © 2025 BLOOMBERG TERMINAL CLONE | DATA: YAHOO FINANCE | LAST UPDATE: {last_update} | AUTO-REFRESH: 3S
+</div>
+""", unsafe_allow_html=True)
