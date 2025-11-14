@@ -287,7 +287,7 @@ with col_nav2:
         cmd = search_command.upper().strip()
         
         if cmd == "PRICING" or cmd == "PRICE":
-            st.switch_page("pages/pricing.py")
+            st.switch_page("pages/pricing")
         elif cmd == "NEWS" or cmd == "N":
             st.info("📰 Page NEWS en construction...")
         elif cmd == "SCREENER" or cmd == "SCREEN":
@@ -468,7 +468,7 @@ with col_sidebar:
     st.markdown("### 🛠️ TERMINAL FUNCTIONS")
     
     if st.button("📊 OPTIONS PRICING", use_container_width=True, key="btn_pricing"):
-        st.switch_page("pages/pricing.py")
+        st.switch_page("pages/pricing")
     
     if st.button("📈 STOCK SCREENER", use_container_width=True, key="btn_screener"):
         st.info("Coming soon...")
