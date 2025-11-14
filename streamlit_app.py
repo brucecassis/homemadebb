@@ -13,123 +13,168 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS personnalisé STYLE BLOOMBERG AUTHENTIQUE
+# CSS personnalisé STYLE BLOOMBERG + HORLOGE EN TEMPS RÉEL
 st.markdown("""
 <style>
     /* Fond noir total */
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+    
     .main {
         background-color: #000000;
-        color: #ffffff;
+        color: #FFAA00;
     }
+    
     .stApp {
         background-color: #000000;
     }
     
     /* Barre orange Bloomberg */
     .bloomberg-header {
-        background: linear-gradient(90deg, #f47920 0%, #f8981d 100%);
-        padding: 12px 20px;
+        background: linear-gradient(90deg, #FFAA00 0%, #FF8C00 100%);
+        padding: 5px 20px;
         color: #000000;
         font-weight: bold;
-        font-size: 24px;
+        font-size: 16px;
+        font-family: 'Courier New', monospace;
         margin-bottom: 0px;
         letter-spacing: 2px;
-        border-bottom: 2px solid #f8981d;
+        border-bottom: 2px solid #FFAA00;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    /* Navigation / Commande */
+    .nav-section {
+        background: #000;
+        padding: 10px 20px;
+        border-bottom: 1px solid #333;
+        display: flex;
+        gap: 15px;
+        align-items: center;
+    }
+    
+    .nav-btn {
+        background: #333;
+        color: #FFAA00;
+        border: 1px solid #FFAA00;
+        padding: 6px 15px;
+        font-size: 11px;
+        cursor: pointer;
+        font-family: 'Courier New', monospace;
+        text-transform: uppercase;
+        font-weight: bold;
+    }
+    
+    .nav-btn:hover {
+        background: #FFAA00;
+        color: #000;
     }
     
     /* Titres orange */
     h1, h2, h3, h4 {
-        color: #f47920 !important;
-        font-family: 'Arial', sans-serif;
-        font-weight: bold;
-        text-transform: uppercase;
-        letter-spacing: 1px;
+        color: #FFAA00 !important;
+        font-family: 'Courier New', monospace !important;
+        font-weight: bold !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
+        font-size: 14px !important;
+        margin: 10px 0 !important;
     }
     
     /* Metrics Bloomberg style */
     [data-testid="stMetricValue"] {
-        font-size: 28px;
-        color: #ffffff;
-        font-weight: bold;
-        font-family: 'Courier New', monospace;
+        font-size: 24px !important;
+        color: #FFAA00 !important;
+        font-weight: bold !important;
+        font-family: 'Courier New', monospace !important;
     }
     
     [data-testid="stMetricLabel"] {
-        color: #f47920;
-        font-size: 13px;
-        font-weight: bold;
-        text-transform: uppercase;
+        color: #FFAA00 !important;
+        font-size: 11px !important;
+        font-weight: bold !important;
+        text-transform: uppercase !important;
+        font-family: 'Courier New', monospace !important;
     }
     
     [data-testid="stMetricDelta"] {
-        font-size: 16px;
-        font-weight: bold;
-    }
-    
-    /* Cartes de données */
-    .market-card {
-        background-color: #1a1a1a;
-        padding: 15px;
-        border-left: 4px solid #f47920;
-        border-radius: 0px;
-        margin-bottom: 10px;
+        font-size: 14px !important;
+        font-weight: bold !important;
+        font-family: 'Courier New', monospace !important;
     }
     
     /* News style Bloomberg */
     .news-item {
         background-color: #0a0a0a;
-        border-left: 3px solid #f47920;
-        padding: 12px 15px;
-        margin-bottom: 8px;
-        border-bottom: 1px solid #333;
+        border-left: 3px solid #FFAA00;
+        padding: 10px 12px;
+        margin-bottom: 6px;
+        border-bottom: 1px solid #222;
+        font-family: 'Courier New', monospace;
     }
     
     .news-title {
-        color: #ffffff;
-        font-size: 15px;
+        color: #FFAA00;
+        font-size: 12px;
         font-weight: 600;
         margin: 0;
         line-height: 1.4;
     }
     
     .news-meta {
-        color: #888888;
-        font-size: 12px;
-        margin-top: 5px;
+        color: #666;
+        font-size: 10px;
+        margin-top: 4px;
     }
     
     .news-category {
-        color: #f47920;
+        color: #FFAA00;
         font-weight: bold;
     }
     
     /* Boutons Bloomberg */
     .stButton > button {
-        background-color: #f47920;
-        color: #000000;
+        background-color: #333;
+        color: #FFAA00;
         font-weight: bold;
-        border: none;
-        padding: 10px 20px;
+        border: 1px solid #FFAA00;
+        padding: 8px 16px;
         text-transform: uppercase;
         letter-spacing: 1px;
         border-radius: 0px;
-        font-size: 13px;
+        font-size: 11px;
+        font-family: 'Courier New', monospace;
     }
     
     .stButton > button:hover {
-        background-color: #ff9933;
-        color: #000000;
+        background-color: #FFAA00;
+        color: #000;
     }
     
-    /* Barre de temps */
-    .time-bar {
-        background-color: #1a1a1a;
-        padding: 8px 20px;
-        color: #f47920;
+    /* Input boxes */
+    .stTextInput input {
+        background-color: #000;
+        color: #FFAA00;
+        border: 1px solid #FFAA00;
+        border-radius: 0px;
         font-family: 'Courier New', monospace;
-        font-size: 14px;
-        border-bottom: 1px solid #333;
-        text-align: right;
+        font-size: 12px;
+    }
+    
+    .stTextInput input:focus {
+        border-color: #FFF;
+        box-shadow: 0 0 3px #FFAA00;
+    }
+    
+    /* Lignes de séparation */
+    hr {
+        border-color: #333333;
+        margin: 8px 0;
     }
     
     /* Supprimer le padding par défaut */
@@ -138,33 +183,50 @@ st.markdown("""
         padding-bottom: 0rem;
     }
     
-    /* Sidebar sombre */
-    [data-testid="stSidebar"] {
-        background-color: #0a0a0a;
+    /* Horloge en temps réel */
+    .live-clock {
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        font-weight: bold;
+        color: #000;
     }
     
-    /* Input boxes */
-    .stTextInput input {
-        background-color: #1a1a1a;
-        color: #ffffff;
-        border: 1px solid #f47920;
-        border-radius: 0px;
-    }
-    
-    /* Lignes de séparation */
-    hr {
-        border-color: #333333;
+    /* Command line */
+    .command-line {
+        background: #000;
+        padding: 6px 12px;
+        border: 1px solid #FFAA00;
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+        color: #FFAA00;
         margin: 10px 0;
     }
+    
+    .prompt {
+        color: #FFAA00;
+        font-weight: bold;
+        margin-right: 8px;
+    }
 </style>
-""", unsafe_allow_html=True)
 
-# AUTO-REFRESH toutes les 3 secondes
-st.markdown("""
 <script>
-    setTimeout(function() {
-        window.location.reload();
-    }, 3000);
+    // Horloge en temps réel JavaScript
+    function updateClock() {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const timeString = hours + ':' + minutes + ':' + seconds + ' PARIS';
+        
+        const clockElements = document.querySelectorAll('.live-clock');
+        clockElements.forEach(el => {
+            el.textContent = timeString;
+        });
+    }
+    
+    // Mise à jour toutes les secondes
+    setInterval(updateClock, 1000);
+    updateClock();
 </script>
 """, unsafe_allow_html=True)
 
@@ -197,17 +259,61 @@ def get_real_news(ticker):
     except:
         return []
 
-# ===== HEADER BLOOMBERG =====
-st.markdown('<div class="bloomberg-header">⬛ BLOOMBERG TERMINAL</div>', unsafe_allow_html=True)
-
-# Barre de temps avec auto-update
+# ===== HEADER BLOOMBERG avec horloge =====
 current_time = datetime.now()
-st.markdown(f'<div class="time-bar">🕐 {current_time.strftime("%H:%M:%S")} | 📅 {current_time.strftime("%A, %B %d, %Y").upper()} | LIVE DATA ●</div>', unsafe_allow_html=True)
+st.markdown(f'''
+<div class="bloomberg-header">
+    <div>⬛ BLOOMBERG TERMINAL</div>
+    <div class="live-clock">{current_time.strftime("%H:%M:%S")} PARIS</div>
+</div>
+''', unsafe_allow_html=True)
 
-st.markdown("<br>", unsafe_allow_html=True)
+# ===== BARRE DE NAVIGATION / COMMANDE =====
+st.markdown("""
+<div class="command-line">
+    <span class="prompt">COMMAND></span>
+    <span style="color: #666;">Tapez une fonction: PRICING, NEWS, SCREENER, PORTFOLIO, HELP...</span>
+</div>
+""", unsafe_allow_html=True)
+
+# Barre de recherche avec navigation
+col_nav1, col_nav2, col_nav3 = st.columns([3, 1, 1])
+
+with col_nav1:
+    search_command = st.text_input("", placeholder="Entrez une commande (ex: PRICING, NEWS, SCREENER...)", label_visibility="collapsed", key="nav_search")
+
+with col_nav2:
+    if st.button("🔍 EXECUTER", use_container_width=True):
+        cmd = search_command.upper().strip()
+        
+        if cmd == "PRICING" or cmd == "PRICE":
+            st.switch_page("pages/pricing.py")
+        elif cmd == "NEWS" or cmd == "N":
+            st.info("📰 Page NEWS en construction...")
+        elif cmd == "SCREENER" or cmd == "SCREEN":
+            st.info("📊 Page SCREENER en construction...")
+        elif cmd == "PORTFOLIO" or cmd == "PORT":
+            st.info("💼 Page PORTFOLIO en construction...")
+        elif cmd == "HELP":
+            st.info("""
+            **Commandes disponibles:**
+            - PRICING : Options pricing calculator
+            - NEWS : Market news
+            - SCREENER : Stock screener
+            - PORTFOLIO : Portfolio tracker
+            - HELP : Afficher cette aide
+            """)
+        elif cmd:
+            st.warning(f"⚠️ Commande '{cmd}' non reconnue. Tapez HELP pour voir les commandes disponibles.")
+
+with col_nav3:
+    if st.button("🔄 REFRESH", use_container_width=True):
+        st.rerun()
+
+st.markdown("---")
 
 # ===== MARKET OVERVIEW =====
-st.markdown("### 📊 GLOBAL MARKETS")
+st.markdown("### 📊 GLOBAL MARKETS - LIVE DATA")
 
 markets = {
     'S&P 500': '^GSPC',
@@ -285,7 +391,7 @@ with col_main:
         all_news.extend(news)
     
     if all_news:
-        all_news = sorted(all_news, key=lambda x: x.get('providerPublishTime', 0), reverse=True)[:8]
+        all_news = sorted(all_news, key=lambda x: x.get('providerPublishTime', 0), reverse=True)[:10]
         
         for item in all_news:
             title = item.get('title', 'No title')
@@ -308,7 +414,7 @@ with col_main:
             st.markdown(f"""
             <div class="news-item">
                 <div class="news-title">
-                    <a href='{link}' target='_blank' style='color: #ffffff; text-decoration: none;'>
+                    <a href='{link}' target='_blank' style='color: #FFAA00; text-decoration: none;'>
                         ▸ {title}
                     </a>
                 </div>
@@ -323,7 +429,7 @@ with col_main:
 with col_sidebar:
     st.markdown("### 🔍 QUICK TICKER SEARCH")
     
-    custom_ticker = st.text_input("", placeholder="Enter symbol (AAPL, MSFT...)", label_visibility="collapsed")
+    custom_ticker = st.text_input("", placeholder="AAPL, MSFT, TSLA...", label_visibility="collapsed", key="ticker_search")
     
     if custom_ticker:
         current, change, hist = get_market_data(custom_ticker.upper())
@@ -341,9 +447,9 @@ with col_sidebar:
                     x=hist.index,
                     y=hist['Close'],
                     mode='lines',
-                    line=dict(color='#f47920', width=2),
+                    line=dict(color='#FFAA00', width=2),
                     fill='tozeroy',
-                    fillcolor='rgba(244, 121, 32, 0.2)'
+                    fillcolor='rgba(255, 170, 0, 0.2)'
                 ))
                 fig.update_layout(
                     height=150,
@@ -360,17 +466,27 @@ with col_sidebar:
     
     st.markdown("---")
     st.markdown("### 🛠️ TERMINAL FUNCTIONS")
-    st.button("📊 EQUITY SCREENER", use_container_width=True)
-    st.button("💼 PORTFOLIO", use_container_width=True)
-    st.button("📈 TECHNICAL ANALYSIS", use_container_width=True)
-    st.button("📅 ECO CALENDAR", use_container_width=True)
-    st.button("⭐ WATCHLIST", use_container_width=True)
+    
+    if st.button("📊 OPTIONS PRICING", use_container_width=True, key="btn_pricing"):
+        st.switch_page("pages/pricing.py")
+    
+    if st.button("📈 STOCK SCREENER", use_container_width=True, key="btn_screener"):
+        st.info("Coming soon...")
+    
+    if st.button("💼 PORTFOLIO", use_container_width=True, key="btn_portfolio"):
+        st.info("Coming soon...")
+    
+    if st.button("📅 ECO CALENDAR", use_container_width=True, key="btn_calendar"):
+        st.info("Coming soon...")
+    
+    if st.button("⭐ WATCHLIST", use_container_width=True, key="btn_watchlist"):
+        st.info("Coming soon...")
 
 # ===== FOOTER =====
 st.markdown("---")
 last_update = datetime.now().strftime('%H:%M:%S')
 st.markdown(f"""
-<div style='text-align: center; color: #666; font-size: 11px; padding: 10px;'>
-    © 2025 BLOOMBERG TERMINAL CLONE | DATA: YAHOO FINANCE | LAST UPDATE: {last_update} | AUTO-REFRESH: 3S
+<div style='text-align: center; color: #666; font-size: 10px; font-family: "Courier New", monospace; padding: 8px;'>
+    © 2025 BLOOMBERG TERMINAL CLONE | DATA: YAHOO FINANCE | LAST UPDATE: {last_update}
 </div>
 """, unsafe_allow_html=True)
