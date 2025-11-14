@@ -10,10 +10,10 @@ st.set_page_config(
     page_title="Bloomberg Terminal",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
-# CSS personnalisé STYLE BLOOMBERG + HORLOGE EN TEMPS RÉEL
+# CSS personnalisé STYLE BLOOMBERG AUTHENTIQUE
 st.markdown("""
 <style>
     /* Fond noir total */
@@ -21,6 +21,13 @@ st.markdown("""
         margin: 0;
         padding: 0;
         box-sizing: border-box;
+    }
+    
+    body {
+        font-family: 'Courier New', monospace;
+        background: #000;
+        color: #FFAA00;
+        font-size: 12px;
     }
     
     .main {
@@ -34,45 +41,18 @@ st.markdown("""
     
     /* Barre orange Bloomberg */
     .bloomberg-header {
-        background: linear-gradient(90deg, #FFAA00 0%, #FF8C00 100%);
+        background: #FFAA00;
         padding: 5px 20px;
         color: #000000;
         font-weight: bold;
-        font-size: 16px;
+        font-size: 14px;
         font-family: 'Courier New', monospace;
-        margin-bottom: 0px;
         letter-spacing: 2px;
         border-bottom: 2px solid #FFAA00;
         display: flex;
         justify-content: space-between;
         align-items: center;
-    }
-    
-    /* Navigation / Commande */
-    .nav-section {
-        background: #000;
-        padding: 10px 20px;
-        border-bottom: 1px solid #333;
-        display: flex;
-        gap: 15px;
-        align-items: center;
-    }
-    
-    .nav-btn {
-        background: #333;
-        color: #FFAA00;
-        border: 1px solid #FFAA00;
-        padding: 6px 15px;
-        font-size: 11px;
-        cursor: pointer;
-        font-family: 'Courier New', monospace;
-        text-transform: uppercase;
-        font-weight: bold;
-    }
-    
-    .nav-btn:hover {
-        background: #FFAA00;
-        color: #000;
+        margin-bottom: 5px;
     }
     
     /* Titres orange */
@@ -82,13 +62,15 @@ st.markdown("""
         font-weight: bold !important;
         text-transform: uppercase !important;
         letter-spacing: 1px !important;
-        font-size: 14px !important;
-        margin: 10px 0 !important;
+        font-size: 12px !important;
+        margin: 8px 0 !important;
+        border-bottom: 1px solid #333;
+        padding-bottom: 4px !important;
     }
     
     /* Metrics Bloomberg style */
     [data-testid="stMetricValue"] {
-        font-size: 24px !important;
+        font-size: 20px !important;
         color: #FFAA00 !important;
         font-weight: bold !important;
         font-family: 'Courier New', monospace !important;
@@ -96,14 +78,14 @@ st.markdown("""
     
     [data-testid="stMetricLabel"] {
         color: #FFAA00 !important;
-        font-size: 11px !important;
+        font-size: 10px !important;
         font-weight: bold !important;
         text-transform: uppercase !important;
         font-family: 'Courier New', monospace !important;
     }
     
     [data-testid="stMetricDelta"] {
-        font-size: 14px !important;
+        font-size: 12px !important;
         font-weight: bold !important;
         font-family: 'Courier New', monospace !important;
     }
@@ -112,24 +94,24 @@ st.markdown("""
     .news-item {
         background-color: #0a0a0a;
         border-left: 3px solid #FFAA00;
-        padding: 10px 12px;
-        margin-bottom: 6px;
+        padding: 8px 10px;
+        margin-bottom: 5px;
         border-bottom: 1px solid #222;
         font-family: 'Courier New', monospace;
     }
     
     .news-title {
         color: #FFAA00;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
         margin: 0;
-        line-height: 1.4;
+        line-height: 1.3;
     }
     
     .news-meta {
         color: #666;
-        font-size: 10px;
-        margin-top: 4px;
+        font-size: 9px;
+        margin-top: 3px;
     }
     
     .news-category {
@@ -143,11 +125,11 @@ st.markdown("""
         color: #FFAA00;
         font-weight: bold;
         border: 1px solid #FFAA00;
-        padding: 8px 16px;
+        padding: 6px 12px;
         text-transform: uppercase;
         letter-spacing: 1px;
         border-radius: 0px;
-        font-size: 11px;
+        font-size: 10px;
         font-family: 'Courier New', monospace;
     }
     
@@ -163,7 +145,7 @@ st.markdown("""
         border: 1px solid #FFAA00;
         border-radius: 0px;
         font-family: 'Courier New', monospace;
-        font-size: 12px;
+        font-size: 11px;
     }
     
     .stTextInput input:focus {
@@ -174,13 +156,15 @@ st.markdown("""
     /* Lignes de séparation */
     hr {
         border-color: #333333;
-        margin: 8px 0;
+        margin: 5px 0;
     }
     
     /* Supprimer le padding par défaut */
     .block-container {
         padding-top: 0rem;
         padding-bottom: 0rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
     }
     
     /* Horloge en temps réel */
@@ -191,21 +175,38 @@ st.markdown("""
         color: #000;
     }
     
-    /* Command line */
+    /* Command line style */
     .command-line {
         background: #000;
-        padding: 6px 12px;
-        border: 1px solid #FFAA00;
+        padding: 5px 10px;
+        border: 1px solid #333;
         font-family: 'Courier New', monospace;
         font-size: 11px;
         color: #FFAA00;
-        margin: 10px 0;
+        margin: 5px 0;
     }
     
     .prompt {
         color: #FFAA00;
         font-weight: bold;
         margin-right: 8px;
+    }
+    
+    /* Sidebar navigation */
+    [data-testid="stSidebar"] {
+        background-color: #000;
+        border-right: 2px solid #FFAA00;
+    }
+    
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+        color: #FFAA00;
+        font-family: 'Courier New', monospace;
+    }
+    
+    /* Terminal text style */
+    p, div, span {
+        font-family: 'Courier New', monospace !important;
+        font-size: 11px;
     }
 </style>
 
@@ -224,9 +225,13 @@ st.markdown("""
         });
     }
     
-    // Mise à jour toutes les secondes
     setInterval(updateClock, 1000);
     updateClock();
+    
+    // Auto-refresh toutes les 3 secondes
+    setTimeout(function() {
+        window.location.reload();
+    }, 3000);
 </script>
 """, unsafe_allow_html=True)
 
@@ -255,7 +260,7 @@ def get_real_news(ticker):
     try:
         stock = yf.Ticker(ticker)
         news = stock.news
-        return news[:8] if news else []
+        return news[:10] if news else []
     except:
         return []
 
@@ -263,57 +268,37 @@ def get_real_news(ticker):
 current_time = datetime.now()
 st.markdown(f'''
 <div class="bloomberg-header">
-    <div>⬛ BLOOMBERG TERMINAL</div>
+    <div>⬛ BLOOMBERG ENS® TERMINAL</div>
     <div class="live-clock">{current_time.strftime("%H:%M:%S")} PARIS</div>
 </div>
 ''', unsafe_allow_html=True)
 
-# ===== BARRE DE NAVIGATION / COMMANDE =====
+# ===== BARRE DE COMMANDE =====
 st.markdown("""
 <div class="command-line">
-    <span class="prompt">COMMAND></span>
-    <span style="color: #666;">Tapez une fonction: PRICING, NEWS, SCREENER, PORTFOLIO, HELP...</span>
+    <span class="prompt">NAV></span>
+    <span style="color: #666;">OPTIONS PRICING disponible dans le menu à gauche ←</span>
 </div>
 """, unsafe_allow_html=True)
 
-# Barre de recherche avec navigation
-col_nav1, col_nav2, col_nav3 = st.columns([3, 1, 1])
+col_nav1, col_nav2 = st.columns([4, 1])
 
 with col_nav1:
-    search_command = st.text_input("", placeholder="Entrez une commande (ex: PRICING, NEWS, SCREENER...)", label_visibility="collapsed", key="nav_search")
+    search_command = st.text_input("", placeholder="Commande: HELP pour aide", label_visibility="collapsed", key="nav_search")
 
 with col_nav2:
-    if st.button("🔍 EXECUTER", use_container_width=True):
+    if st.button("EXEC", use_container_width=True):
         cmd = search_command.upper().strip()
         
-        if cmd == "PRICING" or cmd == "PRICE":
-            st.switch_page("pages/pricing.py")
-        elif cmd == "NEWS" or cmd == "N":
-            st.info("📰 Page NEWS en construction...")
-        elif cmd == "SCREENER" or cmd == "SCREEN":
-            st.info("📊 Page SCREENER en construction...")
-        elif cmd == "PORTFOLIO" or cmd == "PORT":
-            st.info("💼 Page PORTFOLIO en construction...")
-        elif cmd == "HELP":
-            st.info("""
-            **Commandes disponibles:**
-            - PRICING : Options pricing calculator
-            - NEWS : Market news
-            - SCREENER : Stock screener
-            - PORTFOLIO : Portfolio tracker
-            - HELP : Afficher cette aide
-            """)
+        if cmd == "HELP":
+            st.info("📋 **COMMANDES:**\nUtilisez le menu à gauche pour OPTIONS PRICING\nTapez un ticker dans la recherche rapide")
         elif cmd:
-            st.warning(f"⚠️ Commande '{cmd}' non reconnue. Tapez HELP pour voir les commandes disponibles.")
+            st.warning(f"⚠️ '{cmd}' - Utilisez le menu latéral")
 
-with col_nav3:
-    if st.button("🔄 REFRESH", use_container_width=True):
-        st.rerun()
-
-st.markdown("---")
+st.markdown('<div style="border-bottom: 1px solid #333; margin: 5px 0;"></div>', unsafe_allow_html=True)
 
 # ===== MARKET OVERVIEW =====
-st.markdown("### 📊 GLOBAL MARKETS - LIVE DATA")
+st.markdown("### 📊 GLOBAL MARKETS - LIVE")
 
 markets = {
     'S&P 500': '^GSPC',
@@ -340,20 +325,20 @@ for idx, (name, ticker) in enumerate(markets.items()):
                 delta=f"{change:+.2f}%"
             )
         else:
-            st.metric(label=name, value="LOADING...", delta="0%")
+            st.metric(label=name, value="LOAD...", delta="0%")
 
-st.markdown("---")
+st.markdown('<div style="border-bottom: 1px solid #333; margin: 8px 0;"></div>', unsafe_allow_html=True)
 
-# ===== COMMODITIES & CRYPTO =====
-st.markdown("### 💰 COMMODITIES & DIGITAL ASSETS")
+# ===== COMMODITIES =====
+st.markdown("### 💰 COMMODITIES & CRYPTO")
 
 commodities = {
     'GOLD': 'GC=F',
     'SILVER': 'SI=F',
-    'CRUDE OIL': 'CL=F',
-    'NAT GAS': 'NG=F',
-    'BITCOIN': 'BTC-USD',
-    'ETHEREUM': 'ETH-USD'
+    'OIL': 'CL=F',
+    'GAS': 'NG=F',
+    'BTC': 'BTC-USD',
+    'ETH': 'ETH-USD'
 }
 
 cols_comm = st.columns(6)
@@ -374,24 +359,23 @@ for idx, (name, ticker) in enumerate(commodities.items()):
                 delta=f"{change:+.2f}%"
             )
         else:
-            st.metric(label=name, value="LOADING...")
+            st.metric(label=name, value="LOAD...")
 
-st.markdown("---")
+st.markdown('<div style="border-bottom: 1px solid #333; margin: 8px 0;"></div>', unsafe_allow_html=True)
 
 # ===== MAIN CONTENT =====
 col_main, col_sidebar = st.columns([2.5, 1])
 
 with col_main:
-    st.markdown("### 📰 MARKET NEWS & HEADLINES")
+    st.markdown("### 📰 MARKET NEWS")
     
-    # Récupérer vraies news
     all_news = []
-    for ticker in ['^GSPC', '^IXIC', '^DJI']:
+    for ticker in ['^GSPC', '^IXIC']:
         news = get_real_news(ticker)
         all_news.extend(news)
     
     if all_news:
-        all_news = sorted(all_news, key=lambda x: x.get('providerPublishTime', 0), reverse=True)[:10]
+        all_news = sorted(all_news, key=lambda x: x.get('providerPublishTime', 0), reverse=True)[:12]
         
         for item in all_news:
             title = item.get('title', 'No title')
@@ -403,7 +387,7 @@ with col_main:
                 time_ago = datetime.now() - datetime.fromtimestamp(pub_time)
                 hours_ago = int(time_ago.total_seconds() / 3600)
                 if hours_ago < 1:
-                    time_str = f"{int(time_ago.total_seconds() / 60)}MIN"
+                    time_str = f"{int(time_ago.total_seconds() / 60)}M"
                 elif hours_ago < 24:
                     time_str = f"{hours_ago}H"
                 else:
@@ -419,17 +403,17 @@ with col_main:
                     </a>
                 </div>
                 <div class="news-meta">
-                    <span class="news-category">{publisher.upper()}</span> • {time_str} AGO
+                    <span class="news-category">{publisher.upper()}</span> • {time_str}
                 </div>
             </div>
             """, unsafe_allow_html=True)
     else:
-        st.info("📡 Loading market news...")
+        st.info("📡 Loading...")
 
 with col_sidebar:
-    st.markdown("### 🔍 QUICK TICKER SEARCH")
+    st.markdown("### 🔍 TICKER SEARCH")
     
-    custom_ticker = st.text_input("", placeholder="AAPL, MSFT, TSLA...", label_visibility="collapsed", key="ticker_search")
+    custom_ticker = st.text_input("", placeholder="AAPL, TSLA...", label_visibility="collapsed", key="ticker_search")
     
     if custom_ticker:
         current, change, hist = get_market_data(custom_ticker.upper())
@@ -452,7 +436,7 @@ with col_sidebar:
                     fillcolor='rgba(255, 170, 0, 0.2)'
                 ))
                 fig.update_layout(
-                    height=150,
+                    height=120,
                     margin=dict(l=0, r=0, t=0, b=0),
                     showlegend=False,
                     xaxis=dict(visible=False),
@@ -462,31 +446,18 @@ with col_sidebar:
                 )
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
         else:
-            st.error(f"❌ SYMBOL NOT FOUND")
+            st.error(f"❌ NOT FOUND")
     
-    st.markdown("---")
-    st.markdown("### 🛠️ TERMINAL FUNCTIONS")
-    
-    if st.button("📊 OPTIONS PRICING", use_container_width=True, key="btn_pricing"):
-        st.switch_page("pages/pricing.py")
-    
-    if st.button("📈 STOCK SCREENER", use_container_width=True, key="btn_screener"):
-        st.info("Coming soon...")
-    
-    if st.button("💼 PORTFOLIO", use_container_width=True, key="btn_portfolio"):
-        st.info("Coming soon...")
-    
-    if st.button("📅 ECO CALENDAR", use_container_width=True, key="btn_calendar"):
-        st.info("Coming soon...")
-    
-    if st.button("⭐ WATCHLIST", use_container_width=True, key="btn_watchlist"):
-        st.info("Coming soon...")
+    st.markdown('<div style="border-top: 1px solid #333; margin: 10px 0; padding-top: 10px;"></div>', unsafe_allow_html=True)
+    st.markdown("### 🛠️ QUICK ACCESS")
+    st.markdown("**→ OPTIONS PRICING**")
+    st.caption("Voir menu latéral ←")
 
 # ===== FOOTER =====
-st.markdown("---")
+st.markdown('<div style="border-top: 1px solid #333; margin: 10px 0;"></div>', unsafe_allow_html=True)
 last_update = datetime.now().strftime('%H:%M:%S')
 st.markdown(f"""
-<div style='text-align: center; color: #666; font-size: 10px; font-family: "Courier New", monospace; padding: 8px;'>
-    © 2025 BLOOMBERG TERMINAL CLONE | DATA: YAHOO FINANCE | LAST UPDATE: {last_update}
+<div style='text-align: center; color: #666; font-size: 9px; font-family: "Courier New", monospace; padding: 5px;'>
+    © 2025 BLOOMBERG ENS® | YAHOO FINANCE | UPDATE: {last_update} | REFRESH: 3S
 </div>
 """, unsafe_allow_html=True)
