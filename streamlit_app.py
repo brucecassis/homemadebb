@@ -403,25 +403,19 @@ if selected_tickers:
     
     # Mise en forme du graphique
     fig.update_layout(
-        title=dict(
-            text=f"Performance Comparison - {timeframe.upper()}",
-            font=dict(color='#FFAA00', size=14, family='Courier New')
-        ),
+        title=f"Performance Comparison - {timeframe.upper()}",
         paper_bgcolor='#000',
         plot_bgcolor='#111',
-        font=dict(color='#FFAA00', family='Courier New', size=10),
+        font=dict(color='#FFAA00', size=10),
         xaxis=dict(
             gridcolor='#333',
             showgrid=True,
-            title="Date",
-            titlefont=dict(color='#FFAA00')
+            title="Date"
         ),
         yaxis=dict(
             gridcolor='#333',
             showgrid=True,
-            title="Performance (%)",
-            titlefont=dict(color='#FFAA00'),
-            ticksuffix='%'
+            title="Performance (%)"
         ),
         hovermode='x unified',
         legend=dict(
@@ -429,16 +423,18 @@ if selected_tickers:
             yanchor="bottom",
             y=1.02,
             xanchor="right",
-            x=1,
-            bgcolor='rgba(0,0,0,0.5)',
-            bordercolor='#FFAA00',
-            borderwidth=1
+            x=1
         ),
         height=500
     )
     
     # Ligne horizontale à 100%
-    fig.add_hline(y=100, line_dash="dash", line_color="#666", line_width=1)
+    fig.add_shape(
+        type="line",
+        x0=0, x1=1, xref="paper",
+        y0=100, y1=100,
+        line=dict(color="#666", width=1, dash="dash")
+    )
     
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': True})
     
