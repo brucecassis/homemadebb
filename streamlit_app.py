@@ -475,6 +475,9 @@ with st.form(key="nav_form", clear_on_submit=True):
         
         if cmd == "PRICE" or cmd == "PRICING":
             st.info("📊 Page PRICING : Cliquez sur le bouton dans la sidebar →")
+        elif cmd == "EDGAR" or cmd == "E":
+            st.info("📋 Page EDGAR : Cliquez sur 'EDGAR' dans la sidebar →")
+            st.page_link("pages/EDGAR.py", label="🔗 Ouvrir EDGAR", icon="📋")
         elif cmd == "NEWS" or cmd == "N":
             st.info("📰 Page NEWS en construction...")
         elif cmd == "SCREENER" or cmd == "SCREEN":
