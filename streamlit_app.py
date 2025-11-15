@@ -290,6 +290,74 @@ st.markdown(f'''
 </div>
 ''', unsafe_allow_html=True)
 
+# ===== MARKET OVERVIEW =====
+st.markdown("### 📊 GLOBAL MARKETS - LIVE")
+
+markets = {
+    'S&P 500': '^GSPC',
+    'NASDAQ': '^IXIC',
+    'DOW': '^DJI',
+    'EUR/USD': 'EURUSD=X'
+}
+
+cols = st.columns(4)
+
+for idx, (name, ticker) in enumerate(markets.items()):
+    with cols[idx]:
+        current, change, hist = get_market_data(ticker)
+        
+        if current is not None:
+            if 'USD' in ticker or 'EUR' in ticker:
+                value_display = f"{current:.4f}"
+            else:
+                value_display = f"{current:,.2f}"
+            
+            st.metric(
+                label=name,
+                value=value_display,
+                delta=f"{change:+.2f}%"
+            )
+        else:
+            st.metric(label=name, value="LOAD...", delta="0%")
+
+st.markdown('<div style="border-bottom: 1px solid #333; margin: 8px 0;"></div>', unsafe_allow_html=True)
+
+# ===== COMMODITIES =====
+st.markdown("### 💰 COMMODITIES & CRYPTO")
+
+commodities = {
+    'GOLD': 'GC=F',
+    'SILVER': 'SI=F',
+    'OIL': 'CL=F',
+    'GAS': 'NG=F',
+    'BTC': 'BTC-USD',
+    'ETH': 'ETH-USD'
+}
+
+cols_comm = st.columns(6)
+
+for idx, (name, ticker) in enumerate(commodities.items()):
+    with cols_comm[idx]:
+        current, change, _ = get_market_data(ticker)
+        
+        if current is not None:
+            if 'BTC' in ticker or 'ETH' in ticker:
+                value_display = f"${current:,.0f}"
+            else:
+                value_display = f"${current:,.2f}"
+            
+            st.metric(
+                label=name,
+                value=value_display,
+                delta=f"{change:+.2f}%"
+            )
+        else:
+            st.metric(label=name, value="LOAD...")
+
+st.markdown('<div style="border-bottom: 1px solid #333; margin: 8px 0;"></div>', unsafe_allow_html=True)
+
+
+
 # ===== BARRE DE RECHERCHE / NAVIGATION =====
 st.markdown("""
 <div class="command-line">
@@ -526,71 +594,7 @@ if selected_tickers:
 
 # ===== MAIN CONTENT =====
 
-# ===== MARKET OVERVIEW =====
-st.markdown("### 📊 GLOBAL MARKETS - LIVE")
 
-markets = {
-    'S&P 500': '^GSPC',
-    'NASDAQ': '^IXIC',
-    'DOW': '^DJI',
-    'EUR/USD': 'EURUSD=X'
-}
-
-cols = st.columns(4)
-
-for idx, (name, ticker) in enumerate(markets.items()):
-    with cols[idx]:
-        current, change, hist = get_market_data(ticker)
-        
-        if current is not None:
-            if 'USD' in ticker or 'EUR' in ticker:
-                value_display = f"{current:.4f}"
-            else:
-                value_display = f"{current:,.2f}"
-            
-            st.metric(
-                label=name,
-                value=value_display,
-                delta=f"{change:+.2f}%"
-            )
-        else:
-            st.metric(label=name, value="LOAD...", delta="0%")
-
-st.markdown('<div style="border-bottom: 1px solid #333; margin: 8px 0;"></div>', unsafe_allow_html=True)
-
-# ===== COMMODITIES =====
-st.markdown("### 💰 COMMODITIES & CRYPTO")
-
-commodities = {
-    'GOLD': 'GC=F',
-    'SILVER': 'SI=F',
-    'OIL': 'CL=F',
-    'GAS': 'NG=F',
-    'BTC': 'BTC-USD',
-    'ETH': 'ETH-USD'
-}
-
-cols_comm = st.columns(6)
-
-for idx, (name, ticker) in enumerate(commodities.items()):
-    with cols_comm[idx]:
-        current, change, _ = get_market_data(ticker)
-        
-        if current is not None:
-            if 'BTC' in ticker or 'ETH' in ticker:
-                value_display = f"${current:,.0f}"
-            else:
-                value_display = f"${current:,.2f}"
-            
-            st.metric(
-                label=name,
-                value=value_display,
-                delta=f"{change:+.2f}%"
-            )
-        else:
-            st.metric(label=name, value="LOAD...")
-
-st.markdown('<div style="border-bottom: 1px solid #333; margin: 8px 0;"></div>', unsafe_allow_html=True)
 
 
 with col_main:
