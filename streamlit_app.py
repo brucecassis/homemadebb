@@ -5,6 +5,45 @@ from datetime import datetime
 import yfinance as yf
 import time
 
+import requests
+
+# Configuration API CoinMarketCap
+CMC_API_KEY = "09e527de-bfea-4816-8afe-ae6a37bf5799"  # Remplacez par votre clé API
+
+@st.cache_data(ttl=3)  # Cache de 3 secondes
+def get_crypto_data_cmc(symbols):
+    """Récupère les données crypto depuis CoinMarketCap"""
+    try:
+        url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest'
+        
+        parameters = {
+            'symbol': ','.join(symbols),
+            'convert': 'USD'
+        }
+        
+        headers = {
+            'Accepts': 'application/json',
+            'X-CMC_PRO_API_KEY': CMC_API_KEY,
+        }
+        
+        response = requests.get(url, headers=headers, params=parameters)
+        data = response.json()
+        
+        crypto_data = {}
+        for symbol in symbols:
+            if symbol in data['data']:
+                quote = data['data'][symbol]['quote']['USD']
+                crypto_data[symbol] = {
+                    'price': quote['price'],
+                    'change_24h': quote['percent_change_24h']
+                }
+        
+        return crypto_data
+        
+    except Exception as e:
+        print(f"Erreur CMC API: {e}")
+        return None
+
 # Configuration de la page
 st.set_page_config(
     page_title="Bloomberg Terminal",
@@ -322,29 +361,68 @@ for idx, (name, ticker) in enumerate(markets.items()):
 
 st.markdown('<div style="border-bottom: 1px solid #333; margin: 8px 0;"></div>', unsafe_allow_html=True)
 
+# ===== CRYPTO LIVE (CoinMarketCap) =====
+st.markdown("### ₿ CRYPTO LIVE - COINMARKETCAP")
+
+crypto_symbols = ['BTC', 'ETH', 'SOL']
+crypto_data_cmc = get_crypto_data_cmc(crypto_symbols)
+
+cols_crypto = st.columns(3)
+
+if crypto_data_cmc:
+    crypto_pairs = [
+        ('BTC', 'BTCUSDT'),
+        ('ETH', 'ETHUSDT'),
+        ('SOL', 'SOLUSDT')
+    ]
+    
+    for idx, (symbol, pair) in enumerate(crypto_pairs):
+        with cols_crypto[idx]:
+            if symbol in crypto_data_cmc:
+                price = crypto_data_cmc[symbol]['price']
+                change = crypto_data_cmc[symbol]['change_24h']
+                
+                st.metric(
+                    label=pair,
+                    value=f"${price:,.2f}",
+                    delta=f"{change:+.2f}%"
+                )
+            else:
+                st.metric(label=pair, value="ERROR", delta="0%")
+else:
+    for idx, pair in enumerate(['BTCUSDT', 'ETHUSDT', 'SOLUSDT']):
+        with cols_crypto[idx]:
+            st.metric(label=pair, value="LOAD...", delta="0%")
+
+# Auto-refresh toutes les 3 secondes
+st.markdown("""
+<script>
+    setTimeout(function(){
+        window.parent.location.reload();
+    }, 3000);
+</script>
+""", unsafe_allow_html=True)
+
+st.markdown('<div style="border-bottom: 1px solid #333; margin: 8px 0;"></div>', unsafe_allow_html=True)
+
 # ===== COMMODITIES =====
-st.markdown("### 💰 COMMODITIES & CRYPTO")
+st.markdown("### 💰 COMMODITIES")
 
 commodities = {
     'GOLD': 'GC=F',
     'SILVER': 'SI=F',
     'OIL': 'CL=F',
-    'GAS': 'NG=F',
-    'BTC': 'BTC-USD',
-    'ETH': 'ETH-USD'
+    'GAS': 'NG=F'
 }
 
-cols_comm = st.columns(6)
+cols_comm = st.columns(4)
 
 for idx, (name, ticker) in enumerate(commodities.items()):
     with cols_comm[idx]:
         current, change, _ = get_market_data(ticker)
         
         if current is not None:
-            if 'BTC' in ticker or 'ETH' in ticker:
-                value_display = f"${current:,.0f}"
-            else:
-                value_display = f"${current:,.2f}"
+            value_display = f"${current:,.2f}"
             
             st.metric(
                 label=name,
