@@ -345,7 +345,7 @@ with col_r2:
         st.cache_data.clear()
         st.rerun()
 
-# ===== GRAPHIQUE MULTI-TICKERS COMPARATIF =====
+# ===== MARKET OVERVIEW =====
 st.markdown("### 📈 COMPARATIVE CHART - PERFORMANCE %")
 
 col_chart1, col_chart2, col_chart3 = st.columns([3, 1, 1])
