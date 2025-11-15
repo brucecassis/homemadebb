@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 from datetime import datetime
 import pandas as pd
+import time
 
 # Configuration de la page
 st.set_page_config(
@@ -11,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS Bloomberg style (même que la page principale)
+# CSS Bloomberg style
 st.markdown("""
 <style>
     * {
@@ -187,25 +188,28 @@ st.markdown(f'''
 def get_company_cik(ticker):
     """Récupère le CIK d'une entreprise à partir de son ticker"""
     try:
-        # API SEC pour mapper ticker -> CIK
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        url = f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={ticker}&type=&dateb=&owner=exclude&count=1&output=json"
+        headers = {
+            'User-Agent': 'lightinyourcar@gmail.com',  # ← METTEZ VOTRE EMAIL ICI
+            'Accept-Encoding': 'gzip, deflate',
+            'Host': 'www.sec.gov'
+        }
         
-        response = requests.get(url, headers=headers)
+        # Utiliser l'API officielle SEC pour les tickers
+        cik_url = "https://www.sec.gov/files/company_tickers.json"
+        response = requests.get(cik_url, headers=headers)
         
         if response.status_code == 200:
-            # Parser la page pour extraire le CIK
-            # Alternative: utiliser l'API officielle
-            cik_url = "https://www.sec.gov/files/company_tickers.json"
-            cik_response = requests.get(cik_url, headers=headers)
+            data = response.json()
             
-            if cik_response.status_code == 200:
-                data = cik_response.json()
-                for key, value in data.items():
-                    if value['ticker'].upper() == ticker.upper():
-                        return str(value['cik_str']).zfill(10), value['title']
+            # Chercher le ticker dans les données
+            for key, value in data.items():
+                if value['ticker'].upper() == ticker.upper():
+                    cik = str(value['cik_str']).zfill(10)
+                    company_name = value['title']
+                    return cik, company_name
         
         return None, None
+        
     except Exception as e:
         st.error(f"Erreur lors de la récupération du CIK: {e}")
         return None, None
@@ -215,11 +219,18 @@ def get_company_filings(cik, filing_type='', count=20):
     """Récupère les filings SEC d'une entreprise"""
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (contact@example.com)'
+            'User-Agent': 'VotreNom votre.email@exemple.com',  # ← METTEZ VOTRE EMAIL ICI
+            'Accept-Encoding': 'gzip, deflate',
+            'Host': 'data.sec.gov'
         }
+        
+        # Retirer les zéros au début pour l'URL
+        cik_no_zeros = str(int(cik))
         
         # URL de l'API SEC EDGAR
         url = f"https://data.sec.gov/submissions/CIK{cik}.json"
+        
+        time.sleep(0.1)  # Respecter les limites de rate de la SEC
         
         response = requests.get(url, headers=headers)
         
@@ -230,33 +241,60 @@ def get_company_filings(cik, filing_type='', count=20):
             filings = data.get('filings', {}).get('recent', {})
             
             if filings:
+                # Créer le DataFrame
+                forms = filings.get('form', [])
+                dates = filings.get('filingDate', [])
+                accessions = filings.get('accessionNumber', [])
+                primary_docs = filings.get('primaryDocument', [])
+                descriptions = filings.get('primaryDocDescription', [])
+                
+                # S'assurer que toutes les listes ont la même longueur
+                min_length = min(len(forms), len(dates), len(accessions), len(primary_docs))
+                
                 df = pd.DataFrame({
-                    'Form Type': filings.get('form', []),
-                    'Filing Date': filings.get('filingDate', []),
-                    'Accession Number': filings.get('accessionNumber', []),
-                    'Primary Document': filings.get('primaryDocument', []),
-                    'Description': filings.get('primaryDocDescription', [])
+                    'Form Type': forms[:min_length],
+                    'Filing Date': dates[:min_length],
+                    'Accession Number': accessions[:min_length],
+                    'Primary Document': primary_docs[:min_length],
+                    'Description': descriptions[:min_length] if descriptions else ['N/A'] * min_length
                 })
                 
                 # Filtrer par type si spécifié
-                if filing_type:
+                if filing_type and filing_type != 'ALL':
                     df = df[df['Form Type'] == filing_type]
                 
-                return df.head(count)
+                return df.head(count), cik_no_zeros
         
-        return None
+        return None, None
         
     except Exception as e:
         st.error(f"Erreur lors de la récupération des filings: {e}")
-        return None
+        return None, None
 
 def create_filing_url(cik, accession_number, primary_doc):
     """Crée l'URL de téléchargement d'un filing"""
-    # Nettoyer le numéro d'accession
+    # Nettoyer le numéro d'accession (enlever les tirets)
     accession_clean = accession_number.replace('-', '')
     
-    url = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{accession_clean}/{primary_doc}"
+    # Utiliser le CIK sans zéros
+    cik_clean = str(int(cik))
+    
+    url = f"https://www.sec.gov/Archives/edgar/data/{cik_clean}/{accession_clean}/{primary_doc}"
     return url
+
+def download_filing_content(url):
+    """Télécharge le contenu d'un filing"""
+    try:
+        headers = {
+            'User-Agent': 'VotreNom votre.email@exemple.com',  # ← METTEZ VOTRE EMAIL ICI
+        }
+        time.sleep(0.1)  # Respecter le rate limit
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            return response.content
+        return None
+    except:
+        return None
 
 # ===== INTERFACE PRINCIPALE =====
 st.markdown("### 📋 SEC EDGAR FILINGS SEARCH")
@@ -273,7 +311,7 @@ with col1:
     ).upper()
 
 with col2:
-    filing_types = ['ALL', '10-K', '10-Q', '8-K', '20-F', 'DEF 14A', 'S-1', '4', '13F-HR']
+    filing_types = ['ALL', '10-K', '10-Q', '8-K', '20-F', 'DEF 14A', 'S-1', '4', '13F-HR', 'S-3', 'S-4', '3', '424B2', '424B5']
     filing_type_select = st.selectbox(
         "FORM TYPE",
         options=filing_types,
@@ -295,45 +333,56 @@ if search_button and ticker_input:
             st.success(f"✅ **{company_name}** (CIK: {cik})")
             
             # Récupérer les filings
-            filing_type_filter = '' if filing_type_select == 'ALL' else filing_type_select
-            filings_df = get_company_filings(cik, filing_type_filter, count=50)
+            filing_type_filter = filing_type_select if filing_type_select != 'ALL' else ''
+            result = get_company_filings(cik, filing_type_filter, count=50)
             
-            if filings_df is not None and len(filings_df) > 0:
-                st.markdown(f"### 📊 FILINGS FOUND: {len(filings_df)}")
+            if result and result[0] is not None:
+                filings_df, cik_clean = result
                 
-                # Afficher chaque filing
-                for idx, row in filings_df.iterrows():
-                    filing_url = create_filing_url(cik, row['Accession Number'], row['Primary Document'])
+                if len(filings_df) > 0:
+                    st.markdown(f"### 📊 FILINGS FOUND: {len(filings_df)}")
                     
-                    col_filing1, col_filing2, col_filing3 = st.columns([3, 2, 1])
+                    # Afficher chaque filing
+                    for idx, row in filings_df.iterrows():
+                        filing_url = create_filing_url(cik_clean, row['Accession Number'], row['Primary Document'])
+                        
+                        col_filing1, col_filing2, col_filing3 = st.columns([3, 2, 1])
+                        
+                        with col_filing1:
+                            st.markdown(f"""
+                            <div class="filing-item">
+                                <div class="filing-type">{row['Form Type']}</div>
+                                <div class="filing-date">📅 {row['Filing Date']}</div>
+                                <div class="filing-description">{row['Description']}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        with col_filing2:
+                            st.markdown(f"**Acc. No:** `{row['Accession Number']}`")
+                        
+                        with col_filing3:
+                            st.link_button("📄 VIEW", filing_url, use_container_width=True, key=f"view_{idx}")
+                            
+                            # Télécharger le contenu
+                            filing_content = download_filing_content(filing_url)
+                            if filing_content:
+                                st.download_button(
+                                    label="💾 DL",
+                                    data=filing_content,
+                                    file_name=f"{ticker_input}_{row['Form Type']}_{row['Filing Date']}.html",
+                                    mime="text/html",
+                                    use_container_width=True,
+                                    key=f"download_{idx}"
+                                )
+                            else:
+                                st.button("💾 DL", disabled=True, use_container_width=True, key=f"download_disabled_{idx}")
+                        
+                        st.markdown('<div style="border-bottom: 1px solid #222; margin: 5px 0;"></div>', unsafe_allow_html=True)
                     
-                    with col_filing1:
-                        st.markdown(f"""
-                        <div class="filing-item">
-                            <div class="filing-type">{row['Form Type']}</div>
-                            <div class="filing-date">📅 {row['Filing Date']}</div>
-                            <div class="filing-description">{row['Description']}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    
-                    with col_filing2:
-                        st.markdown(f"**Acc. No:** `{row['Accession Number']}`")
-                    
-                    with col_filing3:
-                        st.link_button("📄 VIEW", filing_url, use_container_width=True)
-                        st.download_button(
-                            label="💾 DL",
-                            data=filing_url,
-                            file_name=f"{ticker_input}_{row['Form Type']}_{row['Filing Date']}.html",
-                            mime="text/html",
-                            use_container_width=True,
-                            key=f"download_{idx}"
-                        )
-                    
-                    st.markdown('<div style="border-bottom: 1px solid #222; margin: 5px 0;"></div>', unsafe_allow_html=True)
-                
+                else:
+                    st.warning("⚠️ Aucun filing trouvé pour ce ticker et ce type de formulaire.")
             else:
-                st.warning("⚠️ Aucun filing trouvé pour ce ticker et ce type de formulaire.")
+                st.warning("⚠️ Aucun filing trouvé pour ce ticker.")
         
         else:
             st.error(f"❌ Impossible de trouver le ticker '{ticker_input}'. Vérifiez l'orthographe.")
@@ -353,7 +402,9 @@ filing_info = {
     'DEF 14A': 'Proxy Statement - Documents pour assemblées générales',
     'S-1': 'Registration Statement - Enregistrement IPO',
     '4': 'Insider Trading - Transactions des dirigeants',
-    '13F-HR': 'Institutional Holdings - Positions des fonds'
+    '13F-HR': 'Institutional Holdings - Positions des fonds',
+    'S-3': 'Securities Registration - Enregistrement de titres',
+    '424B5': 'Prospectus - Prospectus de placement'
 }
 
 cols_info = st.columns(2)
