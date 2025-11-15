@@ -353,7 +353,7 @@ col_chart1, col_chart2, col_chart3 = st.columns([3, 1, 1])
 with col_chart1:
     # Liste de tickers populaires
     popular_tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'JPM', 'V', 'WMT', 
-                       'SPY', 'QQQ', 'BTC-USD', 'ETH-USD']
+                       'SPY', 'QQQ', 'BTC-USD', 'ETH-USD', 'TRI']
     
     selected_tickers = st.multiselect(
         "Sélectionnez des tickers à comparer",
