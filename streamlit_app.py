@@ -366,12 +366,12 @@ with col_chart2:
     timeframe = st.selectbox(
         "Timeframe",
         options=['1d', '5d', '1mo', '3mo', '6mo', '1y', '5y'],
-        index=2,
+        index=3,
         help="Période d'analyse"
     )
 
 with col_chart3:
-    if st.button("📊 UPDATE CHART", use_container_width=True):
+    if st.button("📊 UPDATE", use_container_width=True, key="update_chart"):
         st.cache_data.clear()
 
 # Génération du graphique
@@ -381,15 +381,22 @@ if selected_tickers:
     fig = go.Figure()
     
     # Couleurs Bloomberg style
-    colors = ['#00FFFF', '#FF00FF', '#00FF00', '#FFA500', '#FF0000', '#FFFF00']
+    colors = ['#00FFFF', '#FF00FF', '#00FF00', '#FFA500', '#FF0000', '#FFFF00', 
+              '#FF1493', '#00CED1', '#32CD32', '#FFD700']
+    
+    # Stocker les données pour la corrélation
+    correlation_data = pd.DataFrame()
     
     with st.spinner('📊 Chargement des données...'):
-        for idx, ticker in enumerate(selected_tickers[:5]):  # Limite à 5 tickers
+        for idx, ticker in enumerate(selected_tickers[:10]):  # Limite à 10 tickers
             hist = get_historical_data(ticker, timeframe)
             
             if hist is not None and len(hist) > 0:
                 # Normaliser à 100%
                 normalized = normalize_to_percentage(hist['Close'])
+                
+                # Stocker pour corrélation
+                correlation_data[ticker] = hist['Close']
                 
                 # Ajouter la courbe
                 fig.add_trace(go.Scatter(
@@ -443,9 +450,9 @@ if selected_tickers:
     # Statistiques des performances
     st.markdown("#### 📊 PERFORMANCE SUMMARY")
     
-    cols_perf = st.columns(len(selected_tickers[:5]))
+    cols_perf = st.columns(min(len(selected_tickers), 10))
     
-    for idx, ticker in enumerate(selected_tickers[:5]):
+    for idx, ticker in enumerate(selected_tickers[:10]):
         with cols_perf[idx]:
             hist = get_historical_data(ticker, timeframe)
             if hist is not None and len(hist) > 1:
@@ -458,8 +465,69 @@ if selected_tickers:
                     value=f"{end_price:.2f}",
                     delta=f"{perf:+.2f}%"
                 )
+    
+    # ===== MATRICE DE CORRÉLATION =====
+    if len(correlation_data.columns) > 1:
+        st.markdown('<div style="border-top: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+        st.markdown("#### 📊 CORRELATION MATRIX")
+        
+        # Calculer la matrice de corrélation
+        corr_matrix = correlation_data.corr()
+        
+        # Créer la heatmap
+        fig_corr = go.Figure(data=go.Heatmap(
+            z=corr_matrix.values,
+            x=corr_matrix.columns,
+            y=corr_matrix.columns,
+            colorscale=[
+                [0, '#FF0000'],      # Rouge pour corrélation négative
+                [0.5, '#000000'],    # Noir pour 0
+                [1, '#00FF00']       # Vert pour corrélation positive
+            ],
+            zmid=0,
+            text=corr_matrix.values,
+            texttemplate='%{text:.2f}',
+            textfont={"size": 10, "color": "#FFAA00"},
+            colorbar=dict(
+                title="Correlation",
+                titleside="right",
+                tickmode="linear",
+                tick0=-1,
+                dtick=0.5,
+                titlefont=dict(color='#FFAA00'),
+                tickfont=dict(color='#FFAA00')
+            )
+        ))
+        
+        fig_corr.update_layout(
+            title="Correlation Matrix (1.0 = parfaitement corrélé, -1.0 = inversement corrélé)",
+            paper_bgcolor='#000',
+            plot_bgcolor='#111',
+            font=dict(color='#FFAA00', size=10),
+            xaxis=dict(
+                tickfont=dict(color='#FFAA00', size=9),
+                showgrid=False
+            ),
+            yaxis=dict(
+                tickfont=dict(color='#FFAA00', size=9),
+                showgrid=False
+            ),
+            height=400
+        )
+        
+        st.plotly_chart(fig_corr, use_container_width=True)
+        
+        # Interprétation
+        st.caption("""
+        **📖 Comment lire la matrice :**
+        - 🟢 **Vert (proche de 1.0)** : Les actions évoluent ensemble (forte corrélation positive)
+        - ⚫ **Noir (proche de 0)** : Pas de relation claire
+        - 🔴 **Rouge (proche de -1.0)** : Les actions évoluent en sens inverse (corrélation négative)
+        """)
 
 st.markdown('<div style="border-bottom: 1px solid #333; margin: 10px 0;"></div>', unsafe_allow_html=True)
+
+# ===== MAIN CONTENT =====
 
 # ===== MARKET OVERVIEW =====
 st.markdown("### 📊 GLOBAL MARKETS - LIVE")
@@ -527,7 +595,39 @@ for idx, (name, ticker) in enumerate(commodities.items()):
 
 st.markdown('<div style="border-bottom: 1px solid #333; margin: 8px 0;"></div>', unsafe_allow_html=True)
 
-# ===== MAIN CONTENT =====
+# ===== GRAPHIQUE MULTI-TICKERS COMPARATIF =====
+st.markdown("### 📈 COMPARATIVE CHART - PERFORMANCE %")
+
+# Liste COMPLÈTE des tickers S&P 500 (503 actions)
+sp500_tickers = ['A', 'AAL', 'AAPL', 'ABBV', 'ABC', 'ABMD', 'ABT', 'ACN', 'ADBE', 'ADI', 'ADM', 'ADP', 'ADSK', 'AEE', 'AEP', 'AES', 'AFL', 'AIG', 'AIZ', 'AJG', 'AKAM', 'ALB', 'ALGN', 'ALK', 'ALL', 'ALLE', 'AMAT', 'AMCR', 'AMD', 'AME', 'AMGN', 'AMP', 'AMT', 'AMZN', 'ANET', 'ANSS', 'AON', 'AOS', 'APA', 'APD', 'APH', 'APTV', 'ARE', 'ATO', 'AVB', 'AVGO', 'AVY', 'AWK', 'AXP', 'AZO', 'BA', 'BAC', 'BALL', 'BAX', 'BBWI', 'BBY', 'BDX', 'BEN', 'BF-B', 'BIIB', 'BIO', 'BK', 'BKNG', 'BKR', 'BLK', 'BMY', 'BR', 'BRK-B', 'BRO', 'BSX', 'BWA', 'BXP', 'C', 'CAG', 'CAH', 'CARR', 'CAT', 'CB', 'CBOE', 'CBRE', 'CCI', 'CCL', 'CDAY', 'CDNS', 'CDW', 'CE', 'CEG', 'CF', 'CFG', 'CHD', 'CHRW', 'CHTR', 'CI', 'CINF', 'CL', 'CLX', 'CMA', 'CMCSA', 'CME', 'CMG', 'CMI', 'CMS', 'CNC', 'CNP', 'COF', 'COO', 'COP', 'COST', 'CPB', 'CPRT', 'CPT', 'CRL', 'CRM', 'CSCO', 'CSGP', 'CSX', 'CTAS', 'CTLT', 'CTRA', 'CTSH', 'CTVA', 'CVS', 'CVX', 'CZR', 'D', 'DAL', 'DD', 'DE', 'DFS', 'DG', 'DGX', 'DHI', 'DHR', 'DIS', 'DLR', 'DLTR', 'DOV', 'DOW', 'DPZ', 'DRI', 'DTE', 'DUK', 'DVA', 'DVN', 'DXC', 'DXCM', 'EA', 'EBAY', 'ECL', 'ED', 'EFX', 'EIX', 'EL', 'EMN', 'EMR', 'ENPH', 'EOG', 'EPAM', 'EQIX', 'EQR', 'EQT', 'ES', 'ESS', 'ETN', 'ETR', 'ETSY', 'EVRG', 'EW', 'EXC', 'EXPD', 'EXPE', 'EXR', 'F', 'FANG', 'FAST', 'FBHS', 'FCX', 'FDS', 'FDX', 'FE', 'FFIV', 'FI', 'FICO', 'FIS', 'FITB', 'FLT', 'FMC', 'FOX', 'FOXA', 'FRC', 'FRT', 'FTNT', 'FTV', 'GD', 'GE', 'GILD', 'GIS', 'GL', 'GLW', 'GM', 'GNRC', 'GOOG', 'GOOGL', 'GPC', 'GPN', 'GRMN', 'GS', 'GWW', 'HAL', 'HAS', 'HBAN', 'HCA', 'HD', 'HES', 'HIG', 'HII', 'HLT', 'HOLX', 'HON', 'HPE', 'HPQ', 'HRL', 'HSIC', 'HST', 'HSY', 'HUM', 'HWM', 'IBM', 'ICE', 'IDXX', 'IEX', 'IFF', 'ILMN', 'INCY', 'INTC', 'INTU', 'INVH', 'IP', 'IPG', 'IQV', 'IR', 'IRM', 'ISRG', 'IT', 'ITW', 'IVZ', 'J', 'JBHT', 'JCI', 'JKHY', 'JNJ', 'JNPR', 'JPM', 'K', 'KDP', 'KEY', 'KEYS', 'KHC', 'KIM', 'KLAC', 'KMB', 'KMI', 'KMX', 'KO', 'KR', 'KVUE', 'L', 'LDOS', 'LEN', 'LH', 'LHX', 'LIN', 'LKQ', 'LLY', 'LMT', 'LNC', 'LNT', 'LOW', 'LRCX', 'LULU', 'LUV', 'LVS', 'LW', 'LYB', 'LYV', 'MA', 'MAA', 'MAR', 'MAS', 'MCD', 'MCHP', 'MCK', 'MCO', 'MDLZ', 'MDT', 'MET', 'META', 'MGM', 'MHK', 'MKC', 'MKTX', 'MLM', 'MMC', 'MMM', 'MNST', 'MO', 'MOH', 'MOS', 'MPC', 'MPWR', 'MRK', 'MRNA', 'MRO', 'MS', 'MSCI', 'MSFT', 'MSI', 'MTB', 'MTCH', 'MTD', 'MU', 'NCLH', 'NDAQ', 'NDSN', 'NEE', 'NEM', 'NFLX', 'NI', 'NKE', 'NOC', 'NOW', 'NRG', 'NSC', 'NTAP', 'NTRS', 'NUE', 'NVDA', 'NVR', 'NWS', 'NWSA', 'NXPI', 'O', 'ODFL', 'OKE', 'OMC', 'ON', 'ORCL', 'ORLY', 'OTIS', 'OXY', 'PANW', 'PARA', 'PAYC', 'PAYX', 'PCAR', 'PCG', 'PEAK', 'PEG', 'PEP', 'PFE', 'PFG', 'PG', 'PGR', 'PH', 'PHM', 'PKG', 'PKI', 'PLD', 'PM', 'PNC', 'PNR', 'PNW', 'PODD', 'POOL', 'PPG', 'PPL', 'PRU', 'PSA', 'PSX', 'PTC', 'PWR', 'PXD', 'PYPL', 'QCOM', 'QRVO', 'RCL', 'RE', 'REG', 'REGN', 'RF', 'RHI', 'RJF', 'RL', 'RMD', 'ROK', 'ROL', 'ROP', 'ROST', 'RSG', 'RTX', 'SBAC', 'SBNY', 'SBUX', 'SCHW', 'SHW', 'SIVB', 'SJM', 'SLB', 'SNA', 'SNPS', 'SO', 'SPG', 'SPGI', 'SRE', 'STE', 'STLD', 'STT', 'STX', 'STZ', 'SWK', 'SWKS', 'SYF', 'SYK', 'SYY', 'T', 'TAP', 'TDG', 'TDY', 'TECH', 'TEL', 'TER', 'TFC', 'TFX', 'TGT', 'TJX', 'TMO', 'TMUS', 'TPR', 'TRGP', 'TRMB', 'TROW', 'TRV', 'TSCO', 'TSLA', 'TSN', 'TT', 'TTWO', 'TXN', 'TXT', 'TYL', 'UAL', 'UDR', 'UHS', 'ULTA', 'UNH', 'UNP', 'UPS', 'URI', 'USB', 'V', 'VFC', 'VICI', 'VLO', 'VMC', 'VRSK', 'VRSN', 'VRTX', 'VTR', 'VTRS', 'VZ', 'WAB', 'WAT', 'WBA', 'WBD', 'WDC', 'WEC', 'WELL', 'WFC', 'WHR', 'WM', 'WMB', 'WMT', 'WRB', 'WRK', 'WST', 'WTW', 'WY', 'WYNN', 'XEL', 'XOM', 'XRAY', 'XYL', 'YUM', 'ZBH', 'ZBRA', 'ZION', 'ZTS']
+
+# NASDAQ 100 (100 actions tech)
+nasdaq_tickers = ['AAPL', 'ABNB', 'ADBE', 'ADI', 'ADP', 'ADSK', 'AEP', 'AMAT', 'AMD', 'AMGN', 'AMZN', 'ANSS', 'ASML', 'ATVI', 'AVGO', 'AZN', 'BIDU', 'BIIB', 'BKNG', 'CDNS', 'CEG', 'CHTR', 'CMCSA', 'COST', 'CPRT', 'CRWD', 'CSCO', 'CSGP', 'CSX', 'CTAS', 'CTSH', 'DDOG', 'DLTR', 'DXCM', 'EA', 'EBAY', 'ENPH', 'EXC', 'FANG', 'FAST', 'FISV', 'FTNT', 'GILD', 'GOOG', 'GOOGL', 'HON', 'IDXX', 'ILMN', 'INTC', 'INTU', 'ISRG', 'JD', 'KDP', 'KHC', 'KLAC', 'LCID', 'LRCX', 'LULU', 'MAR', 'MCHP', 'MDLZ', 'MELI', 'META', 'MNST', 'MRNA', 'MRVL', 'MSFT', 'MU', 'NFLX', 'NTES', 'NVDA', 'NXPI', 'ODFL', 'ON', 'ORLY', 'PANW', 'PAYX', 'PCAR', 'PDD', 'PEP', 'PYPL', 'QCOM', 'REGN', 'RIVN', 'ROST', 'SBUX', 'SGEN', 'SIRI', 'SNPS', 'TEAM', 'TMUS', 'TSLA', 'TXN', 'VRSK', 'VRTX', 'WBA', 'WBD', 'WDAY', 'XEL', 'ZM', 'ZS']
+
+# CAC 40 complet (40 actions)
+cac40_tickers = ['MC.PA', 'OR.PA', 'SAN.PA', 'AIR.PA', 'AI.PA', 'BNP.PA', 'CS.PA', 'SU.PA', 'TTE.PA', 'BN.PA', 'CA.PA', 'ACA.PA', 'SGO.PA', 'GLE.PA', 'VIE.PA', 'DSY.PA', 'EN.PA', 'CAP.PA', 'DG.PA', 'RMS.PA', 'SAF.PA', 'ORA.PA', 'PUB.PA', 'KER.PA', 'URW.PA', 'RI.PA', 'ML.PA', 'STM.PA', 'TEP.PA', 'VIV.PA', 'SOP.PA', 'WLN.PA', 'BOL.PA', 'ERF.PA', 'EL.PA', 'BVI.PA', 'GET.PA', 'FP.PA', 'LR.PA', 'STLA.PA']
+
+# SIX Swiss SMI (20 actions principales)
+six_tickers = ['NESN.SW', 'ROG.SW', 'NOVN.SW', 'UBSG.SW', 'ABBN.SW', 'ZURN.SW', 'SREN.SW', 'GIVN.SW', 'CSGN.SW', 'SLHN.SW', 'LOGN.SW', 'SIKA.SW', 'GEBN.SW', 'SCMN.SW', 'ALC.SW', 'LONN.SW', 'CFR.SW', 'PGHN.SW', 'HOLN.SW', 'VATN.SW']
+
+# Combiner toutes les listes
+all_tickers = ['--- CRYPTO ---', 'BTC-USD', 'ETH-USD', 'SOL-USD', 'BNB-USD', 'XRP-USD', 'ADA-USD', 'DOGE-USD', 'MATIC-USD', 'DOT-USD', 'AVAX-USD',
+               '--- NASDAQ 100 ---'] + sorted(list(set(nasdaq_tickers))) + \
+              ['--- S&P 500 ---'] + sorted(list(set(sp500_tickers))) + \
+              ['--- CAC 40 ---'] + sorted(cac40_tickers) + \
+              ['--- SIX SWISS ---'] + sorted(six_tickers)
+
+col_chart1, col_chart2, col_chart3 = st.columns([3, 1, 1])
+
+with col_chart1:
+    selected_tickers = st.multiselect(
+        "Sélectionnez des tickers à comparer (max 10)",
+        options=all_tickers,
+        default=['AAPL', 'MSFT', 'GOOGL'],
+        help="S&P 500, CAC 40, SIX Swiss Exchange"
+    )
+    # Filtrer les séparateurs
+    selected_tickers = [t for t in selected_tickers if not t.startswith('---')]
 col_main, col_sidebar = st.columns([2.5, 1])
 
 with col_main:
