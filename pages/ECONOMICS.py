@@ -688,6 +688,7 @@ with tab2:
             st.warning("⚠️ Please select at least one series")
 
 # ===== TAB 3: RECHERCHE DE SÉRIES =====
+# ===== TAB 3: RECHERCHE DE SÉRIES =====
 with tab3:
     st.markdown("### 🔍 SEARCH FRED SERIES")
     
@@ -763,8 +764,54 @@ with tab3:
                     st.markdown(f"**Title:** {info.get('title', 'N/A')}")
                     st.markdown(f"**Units:** {info.get('units', 'N/A')}")
                     st.markdown(f"**Frequency:** {info.get('frequency', 'N/A')}")
-                    st.markdown
-
+                    st.markdown(f"**Seasonal Adjustment:** {info.get('seasonal_adjustment', 'N/A')}")
+                
+                # Graphique
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=df['date'],
+                    y=df['value'],
+                    mode='lines',
+                    line=dict(color='#FFAA00', width=2),
+                    fill='tozeroy',
+                    fillcolor='rgba(255, 170, 0, 0.1)'
+                ))
+                
+                fig.update_layout(
+                    title=f"{custom_series_id} - Historical Data",
+                    paper_bgcolor='#000',
+                    plot_bgcolor='#111',
+                    font=dict(color='#FFAA00', size=10),
+                    xaxis=dict(gridcolor='#333', title="Date"),
+                    yaxis=dict(gridcolor='#333', title="Value"),
+                    height=400
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Statistiques
+                col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
+                
+                with col_stat1:
+                    st.metric("Current Value", f"{df['value'].iloc[-1]:.2f}")
+                
+                with col_stat2:
+                    st.metric("Mean", f"{df['value'].mean():.2f}")
+                
+                with col_stat3:
+                    st.metric("Min", f"{df['value'].min():.2f}")
+                
+                with col_stat4:
+                    st.metric("Max", f"{df['value'].max():.2f}")
+                
+                # Dernières valeurs
+                st.markdown("**Latest 20 Observations:**")
+                st.dataframe(df.tail(20).sort_values('date', ascending=False), use_container_width=True, hide_index=True)
+            
+            else:
+                st.error(f"❌ Series '{custom_series_id}' not found. Check the series ID on FRED website.")
+        else:
+            st.warning("⚠️ Please enter a series ID")
 st.markdown(f"**Frequency:** {info.get('frequency', 'N/A')}")
                     st.markdown(f"**Seasonal Adjustment:** {info.get('seasonal_adjustment', 'N/A')}")
                 
