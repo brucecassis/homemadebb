@@ -7,6 +7,17 @@ import time
 
 import requests
 
+import time
+
+# Configuration auto-refresh
+if 'last_refresh' not in st.session_state:
+    st.session_state.last_refresh = time.time()
+
+# Auto-refresh toutes les 3 secondes
+if time.time() - st.session_state.last_refresh > 3:
+    st.session_state.last_refresh = time.time()
+    st.rerun()
+
 # Configuration API CoinMarketCap
 CMC_API_KEY = "09e527de-bfea-4816-8afe-ae6a37bf5799"  # Remplacez par votre clé API
 
