@@ -488,14 +488,11 @@ if selected_tickers:
             text=corr_matrix.values,
             texttemplate='%{text:.2f}',
             textfont={"size": 10, "color": "#FFAA00"},
+            showscale=True,
             colorbar=dict(
-                title="Correlation",
-                titleside="right",
-                tickmode="linear",
-                tick0=-1,
-                dtick=0.5,
-                titlefont=dict(color='#FFAA00'),
-                tickfont=dict(color='#FFAA00')
+                title="Corr",
+                tickvals=[-1, -0.5, 0, 0.5, 1],
+                ticktext=['-1.0', '-0.5', '0', '0.5', '1.0']
             )
         ))
         
@@ -620,14 +617,23 @@ all_tickers = ['--- CRYPTO ---', 'BTC-USD', 'ETH-USD', 'SOL-USD', 'BNB-USD', 'XR
 col_chart1, col_chart2, col_chart3 = st.columns([3, 1, 1])
 
 with col_chart1:
-    selected_tickers = st.multiselect(
-        "Sélectionnez des tickers à comparer (max 10)",
-        options=all_tickers,
-        default=['AAPL', 'MSFT', 'GOOGL'],
-        help="S&P 500, CAC 40, SIX Swiss Exchange"
+    # Input texte pour contourner la limite du multiselect
+    tickers_input = st.text_input(
+        "Entrez les tickers séparés par des virgules (ex: AAPL, MSFT, TSLA, MC.PA, NESN.SW)",
+        value="AAPL, MSFT, GOOGL",
+        help="Max 10 tickers | S&P500: AAPL, MSFT | NASDAQ: NVDA, AMD | CAC40: MC.PA, OR.PA | SIX: NESN.SW, ROG.SW | Crypto: BTC-USD, ETH-USD"
     )
-    # Filtrer les séparateurs
-    selected_tickers = [t for t in selected_tickers if not t.startswith('---')]
+    # Convertir en liste et nettoyer
+    selected_tickers = [t.strip().upper() for t in tickers_input.split(',') if t.strip()]
+    
+    # Expander avec liste complète pour référence
+    with st.expander("📋 Voir tous les tickers disponibles"):
+        st.markdown("**🔷 CRYPTO:** BTC-USD, ETH-USD, SOL-USD, BNB-USD, XRP-USD, ADA-USD")
+        st.markdown("**🔷 NASDAQ 100:** AAPL, MSFT, GOOGL, META, NVDA, TSLA, AMD, INTC, NFLX, AMZN...")
+        st.markdown("**🔷 S&P 500:** Toutes les actions US (503 actions)")
+        st.markdown("**🔷 CAC 40:** MC.PA (LVMH), OR.PA (L'Oréal), SAN.PA (Sanofi), AIR.PA (Airbus)...")
+        st.markdown("**🔷 SIX Swiss:** NESN.SW (Nestlé), ROG.SW (Roche), NOVN.SW (Novartis)...")
+        st.caption("Pour voir la liste complète des tickers, visitez : finance.yahoo.com")
 col_main, col_sidebar = st.columns([2.5, 1])
 
 with col_main:
