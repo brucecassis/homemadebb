@@ -169,6 +169,16 @@ st.markdown("""
         color: #FFAA00 !important;
         border: 1px solid #333 !important;
     }
+    
+    a {
+        color: #FFAA00 !important;
+        text-decoration: none;
+        font-weight: bold;
+    }
+    
+    a:hover {
+        color: #FFF !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -189,7 +199,7 @@ def get_company_cik(ticker):
     """Récupère le CIK d'une entreprise à partir de son ticker"""
     try:
         headers = {
-            'User-Agent': 'lightinyourcar@gmail.com',  # ← METTEZ VOTRE EMAIL ICI
+            'User-Agent': 'VotreNom votre.email@exemple.com',  # ← METTEZ VOTRE EMAIL ICI
             'Accept-Encoding': 'gzip, deflate',
             'Host': 'www.sec.gov'
         }
@@ -219,7 +229,7 @@ def get_company_filings(cik, filing_type='', count=20):
     """Récupère les filings SEC d'une entreprise"""
     try:
         headers = {
-            'User-Agent': 'VotreNom votre.email@exemple.com',  # ← METTEZ VOTRE EMAIL ICI
+            'User-Agent': 'lightinyourcar@gmail.com',  # ← METTEZ VOTRE EMAIL ICI
             'Accept-Encoding': 'gzip, deflate',
             'Host': 'data.sec.gov'
         }
@@ -346,38 +356,39 @@ if search_button and ticker_input:
                     for idx, row in filings_df.iterrows():
                         filing_url = create_filing_url(cik_clean, row['Accession Number'], row['Primary Document'])
                         
-                        col_filing1, col_filing2, col_filing3 = st.columns([3, 2, 1])
-                        
-                        with col_filing1:
-                            st.markdown(f"""
-                            <div class="filing-item">
-                                <div class="filing-type">{row['Form Type']}</div>
-                                <div class="filing-date">📅 {row['Filing Date']}</div>
-                                <div class="filing-description">{row['Description']}</div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                        
-                        with col_filing2:
-                            st.markdown(f"**Acc. No:** `{row['Accession Number']}`")
-                        
-                        with col_filing3:
-                            st.link_button("📄 VIEW", filing_url, use_container_width=True, key=f"view_{idx}")
+                        # Conteneur pour chaque filing
+                        with st.container():
+                            col1, col2 = st.columns([3, 1])
                             
-                            # Télécharger le contenu
-                            filing_content = download_filing_content(filing_url)
-                            if filing_content:
-                                st.download_button(
-                                    label="💾 DL",
-                                    data=filing_content,
-                                    file_name=f"{ticker_input}_{row['Form Type']}_{row['Filing Date']}.html",
-                                    mime="text/html",
-                                    use_container_width=True,
-                                    key=f"download_{idx}"
-                                )
-                            else:
-                                st.button("💾 DL", disabled=True, use_container_width=True, key=f"download_disabled_{idx}")
-                        
-                        st.markdown('<div style="border-bottom: 1px solid #222; margin: 5px 0;"></div>', unsafe_allow_html=True)
+                            with col1:
+                                st.markdown(f"""
+                                <div class="filing-item">
+                                    <div class="filing-type">{row['Form Type']}</div>
+                                    <div class="filing-date">📅 {row['Filing Date']}</div>
+                                    <div class="filing-description">{row['Description']}</div>
+                                    <div style="color: #666; font-size: 9px; margin-top: 5px;">Acc. No: {row['Accession Number']}</div>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            
+                            with col2:
+                                # Lien VIEW
+                                st.markdown(f"[📄 VIEW FILING]({filing_url})", unsafe_allow_html=True)
+                                
+                                # Télécharger le contenu
+                                filing_content = download_filing_content(filing_url)
+                                if filing_content:
+                                    st.download_button(
+                                        label="💾 DOWNLOAD",
+                                        data=filing_content,
+                                        file_name=f"{ticker_input}_{row['Form Type']}_{row['Filing Date']}.html",
+                                        mime="text/html",
+                                        use_container_width=True,
+                                        key=f"download_{idx}"
+                                    )
+                                else:
+                                    st.button("💾 ERROR", disabled=True, use_container_width=True, key=f"download_disabled_{idx}")
+                            
+                            st.markdown('<div style="border-bottom: 1px solid #222; margin: 8px 0;"></div>', unsafe_allow_html=True)
                     
                 else:
                     st.warning("⚠️ Aucun filing trouvé pour ce ticker et ce type de formulaire.")
