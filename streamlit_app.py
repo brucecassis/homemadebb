@@ -146,6 +146,22 @@ st.markdown("""
         box-shadow: 0 0 3px #FFAA00;
     }
     
+    .stMultiSelect {
+        background-color: #000;
+    }
+    
+    .stMultiSelect > div {
+        background-color: #000;
+        border: 1px solid #FFAA00;
+    }
+    
+    .stSelectbox select {
+        background-color: #000;
+        color: #FFAA00;
+        border: 1px solid #FFAA00;
+        font-family: 'Courier New', monospace;
+    }
+    
     hr {
         border-color: #333333;
         margin: 5px 0;
@@ -181,14 +197,23 @@ st.markdown("""
         margin-right: 8px;
     }
     
-    p, div, span {
+    p, div, span, label {
         font-family: 'Courier New', monospace !important;
         font-size: 11px;
+        color: #FFAA00;
+    }
+    
+    /* Chart container */
+    .chart-section {
+        background: #111;
+        border: 1px solid #333;
+        padding: 15px;
+        margin: 10px 0;
     }
 </style>
 
 <script>
-    // Horloge en temps réel qui tourne sans recharger la page
+    // Horloge en temps réel
     function updateClock() {
         const now = new Date();
         const hours = String(now.getHours()).padStart(2, '0');
@@ -202,7 +227,6 @@ st.markdown("""
         });
     }
     
-    // Mise à jour toutes les secondes
     setInterval(updateClock, 1000);
     updateClock();
 </script>
@@ -227,6 +251,24 @@ def get_market_data(ticker):
         
     except:
         return None, None, None
+
+# Fonction pour récupérer les données historiques
+@st.cache_data(ttl=300)
+def get_historical_data(ticker, period):
+    """Récupère les données historiques pour un ticker"""
+    try:
+        stock = yf.Ticker(ticker)
+        hist = stock.history(period=period)
+        return hist
+    except:
+        return None
+
+# Fonction pour normaliser en %
+def normalize_to_percentage(df):
+    """Normalise les prix à 100% au début"""
+    if df is None or len(df) == 0:
+        return None
+    return (df / df.iloc[0]) * 100
 
 # Fonction pour récupérer les news réelles
 @st.cache_data(ttl=300)
@@ -275,7 +317,7 @@ with st.form(key="nav_form", clear_on_submit=True):
         cmd = search_command.upper().strip()
         
         if cmd == "PRICE" or cmd == "PRICING":
-            st.switch_page("pages/pricing.py")
+            st.info("📊 Page PRICING : Cliquez sur le bouton dans la sidebar →")
         elif cmd == "NEWS" or cmd == "N":
             st.info("📰 Page NEWS en construction...")
         elif cmd == "SCREENER" or cmd == "SCREEN":
@@ -302,6 +344,126 @@ with col_r2:
     if st.button("🔄 REFRESH", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
+
+# ===== GRAPHIQUE MULTI-TICKERS COMPARATIF =====
+st.markdown("### 📈 COMPARATIVE CHART - PERFORMANCE %")
+
+col_chart1, col_chart2, col_chart3 = st.columns([3, 1, 1])
+
+with col_chart1:
+    # Liste de tickers populaires
+    popular_tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'JPM', 'V', 'WMT', 
+                       'SPY', 'QQQ', 'BTC-USD', 'ETH-USD']
+    
+    selected_tickers = st.multiselect(
+        "Sélectionnez des tickers à comparer",
+        options=popular_tickers,
+        default=['AAPL', 'MSFT', 'TSLA'],
+        help="Sélectionnez jusqu'à 5 tickers"
+    )
+
+with col_chart2:
+    timeframe = st.selectbox(
+        "Timeframe",
+        options=['1d', '5d', '1mo', '3mo', '6mo', '1y', '5y'],
+        index=2,
+        help="Période d'analyse"
+    )
+
+with col_chart3:
+    if st.button("📊 UPDATE CHART", use_container_width=True):
+        st.cache_data.clear()
+
+# Génération du graphique
+if selected_tickers:
+    st.markdown('<div class="chart-section">', unsafe_allow_html=True)
+    
+    fig = go.Figure()
+    
+    # Couleurs Bloomberg style
+    colors = ['#00FFFF', '#FF00FF', '#00FF00', '#FFA500', '#FF0000', '#FFFF00']
+    
+    with st.spinner('📊 Chargement des données...'):
+        for idx, ticker in enumerate(selected_tickers[:5]):  # Limite à 5 tickers
+            hist = get_historical_data(ticker, timeframe)
+            
+            if hist is not None and len(hist) > 0:
+                # Normaliser à 100%
+                normalized = normalize_to_percentage(hist['Close'])
+                
+                # Ajouter la courbe
+                fig.add_trace(go.Scatter(
+                    x=hist.index,
+                    y=normalized,
+                    mode='lines',
+                    name=ticker,
+                    line=dict(color=colors[idx % len(colors)], width=2),
+                    hovertemplate=f'<b>{ticker}</b><br>%{{y:.2f}}%<br>%{{x}}<extra></extra>'
+                ))
+    
+    # Mise en forme du graphique
+    fig.update_layout(
+        title=dict(
+            text=f"Performance Comparison - {timeframe.upper()}",
+            font=dict(color='#FFAA00', size=14, family='Courier New')
+        ),
+        paper_bgcolor='#000',
+        plot_bgcolor='#111',
+        font=dict(color='#FFAA00', family='Courier New', size=10),
+        xaxis=dict(
+            gridcolor='#333',
+            showgrid=True,
+            title="Date",
+            titlefont=dict(color='#FFAA00')
+        ),
+        yaxis=dict(
+            gridcolor='#333',
+            showgrid=True,
+            title="Performance (%)",
+            titlefont=dict(color='#FFAA00'),
+            ticksuffix='%'
+        ),
+        hovermode='x unified',
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+            bgcolor='rgba(0,0,0,0.5)',
+            bordercolor='#FFAA00',
+            borderwidth=1
+        ),
+        height=500
+    )
+    
+    # Ligne horizontale à 100%
+    fig.add_hline(y=100, line_dash="dash", line_color="#666", line_width=1)
+    
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': True})
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Statistiques des performances
+    st.markdown("#### 📊 PERFORMANCE SUMMARY")
+    
+    cols_perf = st.columns(len(selected_tickers[:5]))
+    
+    for idx, ticker in enumerate(selected_tickers[:5]):
+        with cols_perf[idx]:
+            hist = get_historical_data(ticker, timeframe)
+            if hist is not None and len(hist) > 1:
+                start_price = hist['Close'].iloc[0]
+                end_price = hist['Close'].iloc[-1]
+                perf = ((end_price - start_price) / start_price) * 100
+                
+                st.metric(
+                    label=ticker,
+                    value=f"{end_price:.2f}",
+                    delta=f"{perf:+.2f}%"
+                )
+
+st.markdown('<div style="border-bottom: 1px solid #333; margin: 10px 0;"></div>', unsafe_allow_html=True)
 
 # ===== MARKET OVERVIEW =====
 st.markdown("### 📊 GLOBAL MARKETS - LIVE")
@@ -456,15 +618,9 @@ with col_sidebar:
     
     st.markdown('<div style="border-top: 1px solid #333; margin: 10px 0; padding-top: 10px;"></div>', unsafe_allow_html=True)
     st.markdown("### 🛠️ QUICK ACCESS")
-    
-    if st.button("📊 OPTIONS PRICING", use_container_width=True):
-        st.switch_page("pages/pricing.py")
-    
-    if st.button("📈 SCREENER", use_container_width=True):
-        st.info("Coming soon...")
-    
-    if st.button("💼 PORTFOLIO", use_container_width=True):
-        st.info("Coming soon...")
+    st.caption("📊 OPTIONS PRICING")
+    st.caption("📈 SCREENER (soon)")
+    st.caption("💼 PORTFOLIO (soon)")
 
 # ===== FOOTER =====
 st.markdown('<div style="border-top: 1px solid #333; margin: 10px 0;"></div>', unsafe_allow_html=True)
