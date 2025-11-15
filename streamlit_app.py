@@ -10,13 +10,12 @@ st.set_page_config(
     page_title="Bloomberg Terminal",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# CSS personnalisé STYLE BLOOMBERG AUTHENTIQUE
+# CSS + JavaScript pour horloge en temps réel
 st.markdown("""
 <style>
-    /* Fond noir total */
     * {
         margin: 0;
         padding: 0;
@@ -39,7 +38,6 @@ st.markdown("""
         background-color: #000000;
     }
     
-    /* Barre orange Bloomberg */
     .bloomberg-header {
         background: #FFAA00;
         padding: 5px 20px;
@@ -55,7 +53,6 @@ st.markdown("""
         margin-bottom: 5px;
     }
     
-    /* Titres orange */
     h1, h2, h3, h4 {
         color: #FFAA00 !important;
         font-family: 'Courier New', monospace !important;
@@ -68,7 +65,6 @@ st.markdown("""
         padding-bottom: 4px !important;
     }
     
-    /* Metrics Bloomberg style */
     [data-testid="stMetricValue"] {
         font-size: 20px !important;
         color: #FFAA00 !important;
@@ -90,7 +86,6 @@ st.markdown("""
         font-family: 'Courier New', monospace !important;
     }
     
-    /* News style Bloomberg */
     .news-item {
         background-color: #0a0a0a;
         border-left: 3px solid #FFAA00;
@@ -119,7 +114,6 @@ st.markdown("""
         font-weight: bold;
     }
     
-    /* Boutons Bloomberg */
     .stButton > button {
         background-color: #333;
         color: #FFAA00;
@@ -138,7 +132,6 @@ st.markdown("""
         color: #000;
     }
     
-    /* Input boxes */
     .stTextInput input {
         background-color: #000;
         color: #FFAA00;
@@ -153,13 +146,11 @@ st.markdown("""
         box-shadow: 0 0 3px #FFAA00;
     }
     
-    /* Lignes de séparation */
     hr {
         border-color: #333333;
         margin: 5px 0;
     }
     
-    /* Supprimer le padding par défaut */
     .block-container {
         padding-top: 0rem;
         padding-bottom: 0rem;
@@ -167,7 +158,6 @@ st.markdown("""
         padding-right: 1rem;
     }
     
-    /* Horloge en temps réel */
     .live-clock {
         font-family: 'Courier New', monospace;
         font-size: 12px;
@@ -175,7 +165,6 @@ st.markdown("""
         color: #000;
     }
     
-    /* Command line style */
     .command-line {
         background: #000;
         padding: 5px 10px;
@@ -192,18 +181,6 @@ st.markdown("""
         margin-right: 8px;
     }
     
-    /* Sidebar navigation */
-    [data-testid="stSidebar"] {
-        background-color: #000;
-        border-right: 2px solid #FFAA00;
-    }
-    
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
-        color: #FFAA00;
-        font-family: 'Courier New', monospace;
-    }
-    
-    /* Terminal text style */
     p, div, span {
         font-family: 'Courier New', monospace !important;
         font-size: 11px;
@@ -211,7 +188,7 @@ st.markdown("""
 </style>
 
 <script>
-    // Horloge en temps réel JavaScript
+    // Horloge en temps réel qui tourne sans recharger la page
     function updateClock() {
         const now = new Date();
         const hours = String(now.getHours()).padStart(2, '0');
@@ -225,17 +202,14 @@ st.markdown("""
         });
     }
     
+    // Mise à jour toutes les secondes
     setInterval(updateClock, 1000);
     updateClock();
-    
-    // Auto-refresh toutes les 3 secondes
-    setTimeout(function() {
-        window.location.reload();
-    }, 3000);
 </script>
 """, unsafe_allow_html=True)
 
 # Fonction pour récupérer les données réelles
+@st.cache_data(ttl=60)
 def get_market_data(ticker):
     """Récupère les données réelles de Yahoo Finance"""
     try:
@@ -255,6 +229,7 @@ def get_market_data(ticker):
         return None, None, None
 
 # Fonction pour récupérer les news réelles
+@st.cache_data(ttl=300)
 def get_real_news(ticker):
     """Récupère les vraies news de Yahoo Finance"""
     try:
@@ -273,29 +248,60 @@ st.markdown(f'''
 </div>
 ''', unsafe_allow_html=True)
 
-# ===== BARRE DE COMMANDE =====
+# ===== BARRE DE RECHERCHE / NAVIGATION =====
 st.markdown("""
 <div class="command-line">
-    <span class="prompt">NAV></span>
-    <span style="color: #666;">OPTIONS PRICING disponible dans le menu à gauche ←</span>
+    <span class="prompt">FUNCTION></span>
+    <span style="color: #666;">Tapez: PRICE, NEWS, SCREENER, PORTFOLIO, HELP...</span>
 </div>
 """, unsafe_allow_html=True)
 
-col_nav1, col_nav2 = st.columns([4, 1])
-
-with col_nav1:
-    search_command = st.text_input("", placeholder="Commande: HELP pour aide", label_visibility="collapsed", key="nav_search")
-
-with col_nav2:
-    if st.button("EXEC", use_container_width=True):
+# Formulaire pour gérer l'entrée
+with st.form(key="nav_form", clear_on_submit=True):
+    col1, col2 = st.columns([5, 1])
+    
+    with col1:
+        search_command = st.text_input(
+            "",
+            placeholder="Entrez une fonction (PRICE, NEWS, HELP...)",
+            label_visibility="collapsed",
+            key="command_input"
+        )
+    
+    with col2:
+        submit = st.form_submit_button("EXEC", use_container_width=True)
+    
+    if submit and search_command:
         cmd = search_command.upper().strip()
         
-        if cmd == "HELP":
-            st.info("📋 **COMMANDES:**\nUtilisez le menu à gauche pour OPTIONS PRICING\nTapez un ticker dans la recherche rapide")
-        elif cmd:
-            st.warning(f"⚠️ '{cmd}' - Utilisez le menu latéral")
+        if cmd == "PRICE" or cmd == "PRICING":
+            st.switch_page("pages/pricing.py")
+        elif cmd == "NEWS" or cmd == "N":
+            st.info("📰 Page NEWS en construction...")
+        elif cmd == "SCREENER" or cmd == "SCREEN":
+            st.info("📊 Page SCREENER en construction...")
+        elif cmd == "PORTFOLIO" or cmd == "PORT":
+            st.info("💼 Page PORTFOLIO en construction...")
+        elif cmd == "HELP" or cmd == "H":
+            st.info("""
+            **📋 FONCTIONS DISPONIBLES:**
+            - PRICE / PRICING : Options pricing calculator
+            - NEWS / N : Market news
+            - SCREENER / SCREEN : Stock screener
+            - PORTFOLIO / PORT : Portfolio tracker
+            - HELP / H : Afficher cette aide
+            """)
+        else:
+            st.warning(f"⚠️ Fonction '{cmd}' non reconnue. Tapez HELP pour voir les commandes.")
 
 st.markdown('<div style="border-bottom: 1px solid #333; margin: 5px 0;"></div>', unsafe_allow_html=True)
+
+# Bouton refresh manuel
+col_r1, col_r2 = st.columns([5, 1])
+with col_r2:
+    if st.button("🔄 REFRESH", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
 
 # ===== MARKET OVERVIEW =====
 st.markdown("### 📊 GLOBAL MARKETS - LIVE")
@@ -450,14 +456,21 @@ with col_sidebar:
     
     st.markdown('<div style="border-top: 1px solid #333; margin: 10px 0; padding-top: 10px;"></div>', unsafe_allow_html=True)
     st.markdown("### 🛠️ QUICK ACCESS")
-    st.markdown("**→ OPTIONS PRICING**")
-    st.caption("Voir menu latéral ←")
+    
+    if st.button("📊 OPTIONS PRICING", use_container_width=True):
+        st.switch_page("pages/pricing.py")
+    
+    if st.button("📈 SCREENER", use_container_width=True):
+        st.info("Coming soon...")
+    
+    if st.button("💼 PORTFOLIO", use_container_width=True):
+        st.info("Coming soon...")
 
 # ===== FOOTER =====
 st.markdown('<div style="border-top: 1px solid #333; margin: 10px 0;"></div>', unsafe_allow_html=True)
 last_update = datetime.now().strftime('%H:%M:%S')
 st.markdown(f"""
 <div style='text-align: center; color: #666; font-size: 9px; font-family: "Courier New", monospace; padding: 5px;'>
-    © 2025 BLOOMBERG ENS® | YAHOO FINANCE | UPDATE: {last_update} | REFRESH: 3S
+    © 2025 BLOOMBERG ENS® | YAHOO FINANCE | LAST UPDATE: {last_update}
 </div>
 """, unsafe_allow_html=True)
