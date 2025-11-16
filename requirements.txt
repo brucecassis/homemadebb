@@ -6,3 +6,7 @@ numpy
 scipy
 requests
 openpyxl
+statsmodels
+scikit-learn
+xgboost
+numpy
