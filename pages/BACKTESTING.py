@@ -206,7 +206,7 @@ def calculate_z_score(series):
     return (series - mean) / std
 
 # ONGLETS PRINCIPAUX
-tab1, tab2, tab3 = st.tabs(["🎯 GDP NOWCASTING", "📊 MACRO BACKTESTING", "📈 TRADING SIGNALS"])
+tab1, tab2, tab3, tab4 = st.tabs(["🎯 GDP NOWCASTING", "📊 MACRO BACKTESTING", "📈 TRADING SIGNALS", "🔗 DATA INTEGRATION"])
 
 # ===== TAB 1: GDP NOWCASTING =====
 with tab1:
@@ -1068,7 +1068,927 @@ with tab3:
             
             else:
                 st.error("❌ Could not retrieve all required data")
+# ===== TAB 4: DATA INTEGRATION =====
+with tab4:
+    st.markdown("### 🔗 DATA INTEGRATION & ENRICHMENT")
+    
+    st.markdown("""
+    <div style="background-color: #0a0a0a; border-left: 3px solid #FF00FF; padding: 10px; margin: 10px 0;">
+        <p style="margin: 0; font-size: 10px; color: #FF00FF; font-weight: bold;">
+        🔗 MULTI-SOURCE DATA FUSION
+        </p>
+        <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
+        Fusionne données macro FRED avec prix de marché, données alternatives, et fondamentaux.
+        Alignement automatique des dates avec business days.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Sous-onglets
+    integration_tab1, integration_tab2, integration_tab3, integration_tab4 = st.tabs([
+        "📊 MACRO + MARKET DATA",
+        "🌍 ALTERNATIVE DATA",
+        "🏭 SECTOR MAPPING",
+        "🏢 COMPANY FUNDAMENTALS"
+    ])
+    
+    # ===== INTEGRATION TAB 1: MACRO + MARKET DATA =====
+    with integration_tab1:
+        st.markdown("#### 📊 MACRO-MARKET DATA FUSION")
+        st.caption("Cross-join FRED macro series with market prices (Yahoo Finance)")
+        
+        col_mm1, col_mm2 = st.columns(2)
+        
+        with col_mm1:
+            macro_series_select = st.selectbox(
+                "SELECT MACRO SERIES",
+                options=[
+                    'FEDFUNDS - Fed Funds Rate',
+                    'CPIAUCSL - CPI',
+                    'UNRATE - Unemployment',
+                    'GDP - GDP',
+                    'M2SL - M2 Money Supply',
+                    'DGS10 - 10Y Treasury'
+                ],
+                key="macro_series_mm"
+            )
+            
+            market_ticker = st.text_input(
+                "MARKET TICKER (Yahoo Finance)",
+                value="SPY",
+                help="Ex: SPY, QQQ, GLD, TLT, AAPL...",
+                key="market_ticker"
+            ).upper()
+        
+        with col_mm2:
+            fusion_period = st.selectbox(
+                "TIME PERIOD",
+                options=['1Y', '2Y', '5Y', '10Y'],
+                index=2,
+                key="fusion_period"
+            )
+            
+            alignment_method = st.selectbox(
+                "DATE ALIGNMENT",
+                options=['Forward Fill', 'Backward Fill', 'Interpolate'],
+                help="Forward Fill = use last available macro value",
+                key="alignment_method"
+            )
+        
+        if st.button("🔗 MERGE DATA", use_container_width=True, key="merge_macro_market"):
+            with st.spinner("Merging macro and market data..."):
+                # Calculer date de début
+                years = int(fusion_period[:-1])
+                start_date = (datetime.now() - timedelta(days=years*365)).strftime('%Y-%m-%d')
+                
+                # Récupérer série macro
+                macro_id = macro_series_select.split(' - ')[0]
+                df_macro = get_fred_series(macro_id, observation_start=start_date)
+                
+                # Récupérer données marché
+                try:
+                    import yfinance as yf
+                    
+                    ticker_data = yf.Ticker(market_ticker)
+                    df_market = ticker_data.history(start=start_date, interval='1d')
+                    
+                    if not df_market.empty and df_macro is not None:
+                        # Préparer données marché
+                        df_market = df_market.reset_index()
+                        df_market = df_market.rename(columns={'Date': 'date'})
+                        df_market['date'] = pd.to_datetime(df_market['date']).dt.tz_localize(None)
+                        
+                        # Préparer données macro
+                        df_macro = df_macro.rename(columns={'value': 'macro_value'})
+                        
+                        st.success(f"✅ Data retrieved: {len(df_macro)} macro obs, {len(df_market)} market days")
+                        
+                        # Merger les données
+                        if alignment_method == "Forward Fill":
+                            df_merged = pd.merge_asof(
+                                df_market.sort_values('date'),
+                                df_macro[['date', 'macro_value']].sort_values('date'),
+                                on='date',
+                                direction='backward'
+                            )
+                        elif alignment_method == "Backward Fill":
+                            df_merged = pd.merge_asof(
+                                df_market.sort_values('date'),
+                                df_macro[['date', 'macro_value']].sort_values('date'),
+                                on='date',
+                                direction='forward'
+                            )
+                        else:  # Interpolate
+                            df_merged = pd.merge(
+                                df_market,
+                                df_macro[['date', 'macro_value']],
+                                on='date',
+                                how='outer'
+                            ).sort_values('date')
+                            df_merged['macro_value'] = df_merged['macro_value'].interpolate(method='linear')
+                            df_merged = df_merged.dropna(subset=['Close'])
+                        
+                        st.markdown("### 📊 MERGED DATASET")
+                        st.caption(f"Total observations: {len(df_merged)}")
+                        
+                        # Aperçu des données
+                        st.dataframe(
+                            df_merged[['date', 'Close', 'macro_value']].tail(10),
+                            use_container_width=True,
+                            hide_index=True
+                        )
+                        
+                        # Graphique dual-axis
+                        st.markdown("#### 📈 DUAL-AXIS VISUALIZATION")
+                        
+                        fig_dual = make_subplots(specs=[[{"secondary_y": True}]])
+                        
+                        fig_dual.add_trace(
+                            go.Scatter(
+                                x=df_merged['date'],
+                                y=df_merged['Close'],
+                                name=f"{market_ticker} Price",
+                                line=dict(color='#FFAA00', width=2)
+                            ),
+                            secondary_y=False
+                        )
+                        
+                        fig_dual.add_trace(
+                            go.Scatter(
+                                x=df_merged['date'],
+                                y=df_merged['macro_value'],
+                                name=macro_series_select.split(' - ')[1],
+                                line=dict(color='#00FF00', width=2)
+                            ),
+                            secondary_y=True
+                        )
+                        
+                        fig_dual.update_layout(
+                            title=f"{market_ticker} vs {macro_series_select.split(' - ')[1]}",
+                            paper_bgcolor='#000',
+                            plot_bgcolor='#111',
+                            font=dict(color='#FFAA00', size=10),
+                            xaxis=dict(gridcolor='#333'),
+                            height=400,
+                            hovermode='x unified'
+                        )
+                        
+                        fig_dual.update_yaxes(title_text=f"{market_ticker} Price", secondary_y=False, gridcolor='#333')
+                        fig_dual.update_yaxes(title_text="Macro Value", secondary_y=True, gridcolor='#333')
+                        
+                        st.plotly_chart(fig_dual, use_container_width=True)
+                        
+                        # Analyse de corrélation
+                        st.markdown("#### 📊 CORRELATION ANALYSIS")
+                        
+                        df_merged['market_return'] = df_merged['Close'].pct_change()
+                        df_merged['macro_change'] = df_merged['macro_value'].pct_change()
+                        
+                        corr = df_merged[['market_return', 'macro_change']].corr().iloc[0, 1]
+                        
+                        # Rolling correlation
+                        df_merged['rolling_corr'] = df_merged['market_return'].rolling(60).corr(df_merged['macro_change'])
+                        
+                        col_corr1, col_corr2 = st.columns(2)
+                        
+                        with col_corr1:
+                            st.metric("OVERALL CORRELATION", f"{corr:.3f}")
+                            
+                            if abs(corr) > 0.5:
+                                st.success("Strong correlation detected")
+                            elif abs(corr) > 0.3:
+                                st.info("Moderate correlation")
+                            else:
+                                st.warning("Weak correlation")
+                        
+                        with col_corr2:
+                            st.metric("CURRENT ROLLING CORR (60D)", 
+                                     f"{df_merged['rolling_corr'].iloc[-1]:.3f}")
+                        
+                        # Graphique rolling correlation
+                        fig_corr = go.Figure()
+                        
+                        fig_corr.add_trace(go.Scatter(
+                            x=df_merged['date'],
+                            y=df_merged['rolling_corr'],
+                            mode='lines',
+                            line=dict(color='#00FFFF', width=2),
+                            fill='tozeroy',
+                            fillcolor='rgba(0, 255, 255, 0.1)'
+                        ))
+                        
+                        fig_corr.add_hline(y=0, line_dash="dash", line_color="#FFAA00")
+                        
+                        fig_corr.update_layout(
+                            title="60-Day Rolling Correlation",
+                            paper_bgcolor='#000',
+                            plot_bgcolor='#111',
+                            font=dict(color='#FFAA00', size=10),
+                            xaxis=dict(gridcolor='#333', title="Date"),
+                            yaxis=dict(gridcolor='#333', title="Correlation"),
+                            height=300
+                        )
+                        
+                        st.plotly_chart(fig_corr, use_container_width=True)
+                        
+                        # Download merged data
+                        st.markdown("#### 💾 EXPORT MERGED DATA")
+                        
+                        csv_data = df_merged[['date', 'Close', 'macro_value', 'market_return', 'macro_change']].to_csv(index=False)
+                        
+                        st.download_button(
+                            label="📥 DOWNLOAD CSV",
+                            data=csv_data,
+                            file_name=f"{market_ticker}_{macro_id}_merged_{datetime.now().strftime('%Y%m%d')}.csv",
+                            mime="text/csv",
+                            use_container_width=True
+                        )
+                    
+                    else:
+                        st.error(f"❌ Could not retrieve data for {market_ticker}")
+                
+                except ImportError:
+                    st.error("❌ yfinance not installed. Run: pip install yfinance")
+                except Exception as e:
+                    st.error(f"❌ Error: {e}")
+    
+    # ===== INTEGRATION TAB 2: ALTERNATIVE DATA =====
+    with integration_tab2:
+        st.markdown("#### 🌍 ALTERNATIVE DATA INTEGRATION")
+        st.caption("Enhance nowcasts with high-frequency alternative data")
+        
+        st.markdown("""
+        <div style="background-color: #111; border: 1px solid #333; padding: 15px; margin: 10px 0;">
+            <p style="margin: 0; font-size: 11px; color: #FFAA00; font-weight: bold;">
+            📊 AVAILABLE ALTERNATIVE DATA SOURCES
+            </p>
+            <ul style="margin: 10px 0; font-size: 10px; color: #999;">
+                <li><strong>Mobility Data:</strong> Google Mobility Reports, Apple Mobility Trends</li>
+                <li><strong>Google Trends:</strong> Search volume for economic keywords</li>
+                <li><strong>Shipping Indices:</strong> Baltic Dry Index (BDI), Harpex</li>
+                <li><strong>Energy Data:</strong> EIA Petroleum Status, Natural Gas Storage</li>
+                <li><strong>Credit Card Data:</strong> Affinity Solutions spending data</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        alt_data_type = st.selectbox(
+            "SELECT ALTERNATIVE DATA TYPE",
+            options=[
+                "Shipping Index (Baltic Dry)",
+                "Energy Data (EIA)",
+                "Custom CSV Upload"
+            ],
+            key="alt_data_type"
+        )
+        
+        if alt_data_type == "Shipping Index (Baltic Dry)":
+            st.markdown("#### 🚢 BALTIC DRY INDEX")
+            st.caption("Leading indicator for global trade and GDP")
+            
+            if st.button("📊 LOAD BDI DATA", use_container_width=True, key="load_bdi"):
+                with st.spinner("Loading Baltic Dry Index..."):
+                    # Note: BDI n'est pas directement dans FRED, mais on peut utiliser un proxy
+                    # Ou simuler avec données alternatives
+                    
+                    st.info("""
+                    **🔧 IMPLEMENTATION NOTE:**
+                    
+                    Baltic Dry Index n'est pas disponible via FRED API.
+                    
+                    **Options d'intégration :**
+                    1. **Quandl API** : `QUANDL/CHRIS/ICE_B1` (nécessite compte)
+                    2. **Web Scraping** : https://www.investing.com/indices/baltic-dry
+                    3. **CSV Upload** : Télécharger données depuis Bloomberg/Reuters
+                    
+                    **Code exemple (Quandl) :**
+```python
+                    import quandl
+                    quandl.ApiConfig.api_key = "YOUR_KEY"
+                    bdi = quandl.get("QUANDL/CHRIS/ICE_B1")
+```
+                    """)
+        
+        elif alt_data_type == "Energy Data (EIA)":
+            st.markdown("#### ⚡ ENERGY INFORMATION ADMINISTRATION")
+            
+            eia_series = st.selectbox(
+                "SELECT EIA SERIES",
+                options=[
+                    "Crude Oil Stocks",
+                    "Natural Gas Storage",
+                    "Gasoline Prices",
+                    "Electricity Generation"
+                ],
+                key="eia_series"
+            )
+            
+            if st.button("📊 LOAD EIA DATA", use_container_width=True, key="load_eia"):
+                st.info("""
+                **🔧 EIA API INTEGRATION:**
+                
+                L'EIA (Energy Information Administration) fournit une API gratuite.
+                
+                **Setup requis :**
+                1. Créer compte sur : https://www.eia.gov/opendata/
+                2. Obtenir API key gratuite
+                3. Installer : `pip install eia-python`
+                
+                **Code exemple :**
+```python
+                from eia import API
+                api = API('YOUR_EIA_KEY')
+                
+                # Crude oil stocks
+                crude_stocks = api.data_by_series('PET.WCRSTUS1.W')
+```
+                
+                **Séries utiles pour nowcasting :**
+                - `PET.WCRSTUS1.W` : Crude stocks (hebdo)
+                - `NG.NW2_EPG0_SWO_R48_BCF.W` : Natural gas storage
+                - `PET.EMM_EPM0_PTE_NUS_DPG.W` : Gasoline prices
+                """)
+        
+        else:  # Custom CSV Upload
+            st.markdown("#### 📁 CUSTOM DATA UPLOAD")
+            
+            uploaded_file = st.file_uploader(
+                "UPLOAD CSV FILE",
+                type=['csv'],
+                help="CSV must have 'date' and 'value' columns",
+                key="custom_csv_upload"
+            )
+            
+            if uploaded_file is not None:
+                try:
+                    df_custom = pd.read_csv(uploaded_file)
+                    
+                    st.success(f"✅ File loaded: {len(df_custom)} rows")
+                    st.dataframe(df_custom.head(10), use_container_width=True)
+                    
+                    # Vérifier colonnes
+                    if 'date' in df_custom.columns and 'value' in df_custom.columns:
+                        df_custom['date'] = pd.to_datetime(df_custom['date'])
+                        
+                        # Graphique
+                        fig_custom = go.Figure()
+                        
+                        fig_custom.add_trace(go.Scatter(
+                            x=df_custom['date'],
+                            y=df_custom['value'],
+                            mode='lines',
+                            line=dict(color='#FF00FF', width=2)
+                        ))
+                        
+                        fig_custom.update_layout(
+                            title="Custom Alternative Data",
+                            paper_bgcolor='#000',
+                            plot_bgcolor='#111',
+                            font=dict(color='#FFAA00', size=10),
+                            xaxis=dict(gridcolor='#333'),
+                            yaxis=dict(gridcolor='#333'),
+                            height=350
+                        )
+                        
+                        st.plotly_chart(fig_custom, use_container_width=True)
+                        
+                        # Option de merge avec macro
+                        st.markdown("#### 🔗 MERGE WITH MACRO DATA")
+                        
+                        macro_to_merge = st.selectbox(
+                            "SELECT MACRO SERIES",
+                            options=['GDP', 'CPIAUCSL', 'UNRATE', 'INDPRO'],
+                            key="macro_merge_custom"
+                        )
+                        
+                        if st.button("🔗 MERGE", key="merge_custom"):
+                            df_macro_merge = get_fred_series(macro_to_merge)
+                            
+                            if df_macro_merge is not None:
+                                df_merged_custom = pd.merge_asof(
+                                    df_custom.sort_values('date'),
+                                    df_macro_merge[['date', 'value']].rename(columns={'value': 'macro_value'}).sort_values('date'),
+                                    on='date',
+                                    direction='backward'
+                                )
+                                
+                                st.success(f"✅ Merged: {len(df_merged_custom)} observations")
+                                st.dataframe(df_merged_custom.tail(10), use_container_width=True)
+                    
+                    else:
+                        st.error("❌ CSV must contain 'date' and 'value' columns")
+                
+                except Exception as e:
+                    st.error(f"❌ Error reading CSV: {e}")
+    
+    # ===== INTEGRATION TAB 3: SECTOR MAPPING =====
+    with integration_tab3:
+        st.markdown("#### 🏭 MACRO-TO-SECTOR MAPPING")
+        st.caption("Map GDP/CPI moves to sector exposures for portfolio tilting")
+        
+        st.markdown("""
+        <div style="background-color: #111; border: 1px solid #333; padding: 15px; margin: 10px 0;">
+            <p style="margin: 0; font-size: 11px; color: #FFAA00; font-weight: bold;">
+            📊 SECTOR SENSITIVITY FRAMEWORK
+            </p>
+            <p style="margin: 10px 0 0 0; font-size: 10px; color: #999;">
+            Différents secteurs réagissent différemment aux cycles macro :
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Matrice de sensibilité prédéfinie
+        sector_sensitivity = {
+            'Technology': {'GDP': 1.5, 'Inflation': -0.8, 'Rates': -1.2, 'Type': 'Cyclical'},
+            'Consumer Discretionary': {'GDP': 1.3, 'Inflation': -1.0, 'Rates': -0.9, 'Type': 'Cyclical'},
+            'Financials': {'GDP': 1.1, 'Inflation': -0.5, 'Rates': 0.8, 'Type': 'Cyclical'},
+            'Industrials': {'GDP': 1.4, 'Inflation': -0.7, 'Rates': -0.6, 'Type': 'Cyclical'},
+            'Materials': {'GDP': 1.6, 'Inflation': 0.3, 'Rates': -0.5, 'Type': 'Cyclical'},
+            'Energy': {'GDP': 0.9, 'Inflation': 0.9, 'Rates': -0.3, 'Type': 'Cyclical'},
+            'Consumer Staples': {'GDP': 0.3, 'Inflation': -0.4, 'Rates': -0.2, 'Type': 'Defensive'},
+            'Healthcare': {'GDP': 0.4, 'Inflation': -0.3, 'Rates': -0.4, 'Type': 'Defensive'},
+            'Utilities': {'GDP': 0.2, 'Inflation': -0.2, 'Rates': -0.7, 'Type': 'Defensive'},
+            'Real Estate': {'GDP': 0.8, 'Inflation': -0.5, 'Rates': -1.5, 'Type': 'Sensitive'},
+            'Communication Services': {'GDP': 0.7, 'Inflation': -0.6, 'Rates': -0.8, 'Type': 'Mixed'}
+        }
+        
+        # Afficher la matrice
+        st.markdown("#### 📊 SECTOR SENSITIVITY MATRIX")
+        
+        sens_df = pd.DataFrame(sector_sensitivity).T
+        sens_df = sens_df.reset_index().rename(columns={'index': 'Sector'})
+        
+        st.dataframe(sens_df, use_container_width=True, hide_index=True)
+        
+        st.caption("""
+        **Interprétation des sensibilités :**
+        - **GDP**: Sensibilité à la croissance économique (>1 = très sensible)
+        - **Inflation**: Sensibilité à l'inflation (positif = bénéficie, négatif = pénalisé)
+        - **Rates**: Sensibilité aux taux d'intérêt (négatif = souffre de hausse taux)
+        """)
+        
+        # Calculer recommandations actuelles
+        st.markdown("#### 🎯 CURRENT SECTOR RECOMMENDATIONS")
+        
+        if st.button("📊 GENERATE RECOMMENDATIONS", use_container_width=True, key="sector_reco"):
+            with st.spinner("Analyzing macro conditions..."):
+                # Récupérer conditions actuelles
+                df_gdp = get_fred_series('GDP')
+                df_cpi = get_fred_series('CPIAUCSL')
+                df_rates = get_fred_series('DGS10')
+                
+                if all(df is not None for df in [df_gdp, df_cpi, df_rates]):
+                    # Croissance GDP (QoQ annualisé)
+                    gdp_growth = (df_gdp['value'].iloc[-1] / df_gdp['value'].iloc[-2] - 1) * 400
+                    
+                    # Inflation YoY
+                    inflation = (df_cpi['value'].iloc[-1] / df_cpi['value'].iloc[-13] - 1) * 100
+                    
+                    # Changement taux (vs 6 mois)
+                    rate_change = df_rates['value'].iloc[-1] - df_rates['value'].iloc[-120]
+                    
+                    # Normaliser les signaux (-1 à +1)
+                    gdp_signal = np.clip((gdp_growth - 2) / 2, -1, 1)  # 2% = neutre
+                    inflation_signal = np.clip((inflation - 2) / 2, -1, 1)  # 2% = neutre
+                    rate_signal = np.clip(rate_change / 2, -1, 1)  # 2% move = extrême
+                    
+                    st.markdown("**📊 Current Macro Conditions:**")
+                    
+                    col_macro1, col_macro2, col_macro3 = st.columns(3)
+                    
+                    with col_macro1:
+                        st.metric("GDP GROWTH", f"{gdp_growth:.2f}%")
+                    
+                    with col_macro2:
+                        st.metric("INFLATION", f"{inflation:.2f}%")
+                    
+                    with col_macro3:
+                        st.metric("RATE CHANGE (6M)", f"{rate_change:+.2f}%")
+                    
+                    # Calculer scores par secteur
+                    sector_scores = {}
+                    
+                    for sector, sensitivities in sector_sensitivity.items():
+                        score = (
+                            sensitivities['GDP'] * gdp_signal +
+                            sensitivities['Inflation'] * inflation_signal +
+                            sensitivities['Rates'] * rate_signal
+                        )
+                        sector_scores[sector] = {
+                            'score': score,
+                            'type': sensitivities['Type']
+                        }
+                    
+                    # Trier par score
+                    sorted_sectors = sorted(sector_scores.items(), key=lambda x: x[1]['score'], reverse=True)
+                    
+                    st.markdown("#### 🎯 SECTOR RANKINGS")
+                    
+                    for i, (sector, data) in enumerate(sorted_sectors):
+                        col_rank1, col_rank2, col_rank3 = st.columns([3, 1, 1])
+                        
+                        with col_rank1:
+                            if i < 3:
+                                emoji = "🟢"
+                                label = "OVERWEIGHT"
+                            elif i < 8:
+                                emoji = "🟡"
+                                label = "NEUTRAL"
+                            else:
+                                emoji = "🔴"
+                                label = "UNDERWEIGHT"
+                            
+                            st.markdown(f"{emoji} **{sector}** ({data['type']})")
+                        
+                        with col_rank2:
+                            st.markdown(f"Score: {data['score']:.2f}")
+                        
+                        with col_rank3:
+                            st.markdown(f"**{label}**")
+                    
+                    # Graphique radar
+                    st.markdown("#### 📊 TOP 5 SECTORS - SENSITIVITY PROFILE")
+                    
+                    top5_sectors = [s[0] for s in sorted_sectors[:5]]
+                    
+                    fig_radar = go.Figure()
+                    
+                    for sector in top5_sectors:
+                        sens = sector_sensitivity[sector]
+                        
+                        fig_radar.add_trace(go.Scatterpolar(
+                            r=[sens['GDP'], sens['Inflation'], sens['Rates']],
+                            theta=['GDP Sensitivity', 'Inflation Sensitivity', 'Rate Sensitivity'],
+                            name=sector,
+                            fill='toself'
+                        ))
+                    
+                    fig_radar.update_layout(
+                        polar=dict(
+                            radialaxis=dict(visible=True, range=[-2, 2], gridcolor='#333'),
+                            angularaxis=dict(gridcolor='#333')
+                        ),
+                        paper_bgcolor='#000',
+                        plot_bgcolor='#111',
+                        font=dict(color='#FFAA00', size=10),
+                        height=500
+                    )
+                    
+                    st.plotly_chart(fig_radar, use_container_width=True)
+    
+    # ===== INTEGRATION TAB 4: COMPANY FUNDAMENTALS =====
+    with integration_tab4:
+        st.markdown("#### 🏢 MACRO-TO-COMPANY FUNDAMENTALS")
+        st.caption("Adjust revenue forecasts using GDP/PCE macro drivers")
+        
+        st.markdown("""
+        <div style="background-color: #111; border: 1px solid #333; padding: 15px; margin: 10px 0;">
+            <p style="margin: 0; font-size: 11px; color: #FFAA00; font-weight: bold;">
+            📈 REVENUE FORECASTING FRAMEWORK
+            </p>
+            <p style="margin: 10px 0 0 0; font-size: 10px; color: #999;">
+            Ajuste les prévisions de revenus des entreprises en fonction des conditions macro.
+            Utilise des élasticités sectorielles calibrées.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col_comp1, col_comp2 = st.columns(2)
+        
+        with col_comp1:
+            company_ticker = st.text_input(
+                "COMPANY TICKER",
+                value="AAPL",
+                help="Yahoo Finance ticker",
+                key="company_ticker"
+            ).upper()
+            
+            company_sector = st.selectbox(
+                "COMPANY SECTOR",
+                options=list(sector_sensitivity.keys()),
+                index=0,
+                key="company_sector"
+            )
+        
+        with col_comp2:
+            base_revenue = st.number_input(
+                "BASE REVENUE (Last Year, $B)",
+                min_value=0.0,
+                value=100.0,
+                step=1.0,
+                key="base_revenue"
+            )
+            
+            forecast_horizon = st.slider(
+                "FORECAST HORIZON (Quarters)",
+                min_value=1,
+                max_value=8,
+                value=4,
+                key="forecast_horizon"
+            )
+        
+        if st.button("📊 GENERATE REVENUE FORECAST", use_container_width=True, key="revenue_forecast"):
+            with st.spinner("Generating macro-adjusted forecast..."):
+                # Récupérer données macro
+                df_gdp = get_fred_series('GDP')
+                df_pce = get_fred_series('PCE')
+                
+                if df_gdp is not None and df_pce is not None:
+                    # Croissance GDP historique
+                    gdp_growth_hist = df_gdp['value'].pct_change(1).tail(8) * 100
+                    
+                    # Sensibilité du secteur
+                    sector_sens = sector_sensitivity[company_sector]
+                    
+                    st.markdown("### 📊 REVENUE FORECAST")
+                    
+                    # Scénarios
+                    scenarios = {
+                        'Base Case': gdp_growth_hist.mean(),
+                        'Bull Case': gdp_growth_hist.mean() + gdp_growth_hist.std(),
+                        'Bear Case': gdp_growth_hist.mean() - gdp_growth_hist.std()
+                    }
+                    
+                    # Calculer prévisions pour chaque scénario
+                    forecast_data = []
+                    
+                    for scenario_name, gdp_growth in scenarios.items():
+                        # Calculer croissance revenue ajustée par sensibilité secteur
+                        revenue_growth = sector_sens['GDP'] * (gdp_growth / 100)
+                        
+                        # Projeter sur horizon
+                        projected_revenue = [base_revenue]
+                        for q in range(forecast_horizon):
+                            next_revenue = projected_revenue[-1] * (1 + revenue_growth)
+                            projected_revenue.append(next_revenue)
+                        
+                        forecast_data.append({
+                            'scenario': scenario_name,
+                            'gdp_growth': gdp_growth,
+                            'revenue_growth': revenue_growth * 100,
+                            'revenues': projected_revenue[1:],
+                            'final_revenue': projected_revenue[-1]
+                        })
+                    
+                    # Afficher résumé
+                    st.markdown("#### 📊 FORECAST SUMMARY")
+                    
+                    summary_df = pd.DataFrame([
+                        {
+                            'Scenario': f['scenario'],
+                            'GDP Growth (%)': f"{f['gdp_growth']:.2f}",
+                            'Revenue Growth (%)': f"{f['revenue_growth']:.2f}",
+                            'Year-End Revenue ($B)': f"{f['final_revenue']:.2f}",
+                            'vs Base': f"{((f['final_revenue']/base_revenue - 1) * 100):+.2f}%"
+                        }
+                        for f in forecast_data
+                    ])
+                    
+                    st.dataframe(summary_df, use_container_width=True, hide_index=True)
+                    
+                    # Graphique des scénarios
+                    st.markdown("#### 📈 REVENUE PROJECTIONS BY SCENARIO")
+                    
+                    fig_forecast = go.Figure()
+                    
+                    quarters = [f"Q{i+1}" for i in range(forecast_horizon)]
+                    
+                    colors = {'Base Case': '#FFAA00', 'Bull Case': '#00FF00', 'Bear Case': '#FF0000'}
+                    
+                    for f in forecast_data:
+                        fig_forecast.add_trace(go.Scatter(
+                            x=['Q0'] + quarters,
+                            y=[base_revenue] + f['revenues'],
+                            mode='lines+markers',
+                            name=f['scenario'],
+                            line=dict(color=colors.get(f['scenario'], '#999'), width=2),
+                            marker=dict(size=8)
+                        ))
+                    
+                    fig_forecast.update_layout(
+                        title=f"{company_ticker} Revenue Forecast - Macro-Adjusted",
+                        paper_bgcolor='#000',
+                        plot_bgcolor='#111',
+                        font=dict(color='#FFAA00', size=10),
+                        xaxis=dict(gridcolor='#333', title="Quarter"),
+                        yaxis=dict(gridcolor='#333', title="Revenue ($B)"),
+                        height=400,
+                        hovermode='x unified'
+                    )
+                    
+                    st.plotly_chart(fig_forecast, use_container_width=True)
+                    
+                    # Sensitivity Analysis
+                    st.markdown("#### 📊 SENSITIVITY ANALYSIS")
+                    
+                    st.markdown(f"""
+                    **Sector Sensitivities ({company_sector}):**
+                    - GDP Sensitivity: {sector_sens['GDP']:.2f}x
+                    - Inflation Sensitivity: {sector_sens['Inflation']:.2f}x
+                    - Rate Sensitivity: {sector_sens['Rates']:.2f}x
+                    
+                    **Interpretation:**
+                    - GDP sensitivity of {sector_sens['GDP']:.2f}x means a 1% GDP growth → 
+                      {sector_sens['GDP']:.2f}% revenue growth for this sector
+                    """)
+                    
+                    # Matrice de sensibilité
+                    st.markdown("#### 🎯 SCENARIO MATRIX")
+                    
+                    gdp_scenarios = [-2, -1, 0, 1, 2, 3, 4]
+                    
+                    matrix_data = []
+                    for gdp in gdp_scenarios:
+                        revenue_impact = sector_sens['GDP'] * gdp
+                        final_rev = base_revenue * (1 + revenue_impact/100) ** forecast_horizon
+                        
+                        matrix_data.append({
+                            'GDP Growth (%)': f"{gdp:+.0f}",
+                            'Revenue Impact/Q (%)': f"{revenue_impact:+.2f}",
+                            'Final Revenue ($B)': f"{final_rev:.2f}",
+                            'Total Change (%)': f"{((final_rev/base_revenue - 1) * 100):+.2f}"
+                        })
+                    
+                    matrix_df = pd.DataFrame(matrix_data)
+                    st.dataframe(matrix_df, use_container_width=True, hide_index=True)
+                    
+                    # Download forecast
+                    st.markdown("#### 💾 EXPORT FORECAST")
+                    
+                    forecast_export = []
+                    for q in range(forecast_horizon):
+                        row = {'Quarter': f"Q{q+1}"}
+                        for f in forecast_data:
+                            row[f['scenario']] = f['revenues'][q]
+                        forecast_export.append(row)
+                    
+                    forecast_df = pd.DataFrame(forecast_export)
+                    csv_forecast = forecast_df.to_csv(index=False)
+                    
+                    st.download_button(
+                        label="📥 DOWNLOAD FORECAST CSV",
+                        data=csv_forecast,
+                        file_name=f"{company_ticker}_revenue_forecast_{datetime.now().strftime('%Y%m%d')}.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
+                    
+                    # Comparaison avec market expectations
+                    st.markdown("#### 📊 MARKET EXPECTATIONS COMPARISON")
+                    
+                    st.markdown("""
+                    <div style="background-color: #0a0a0a; border-left: 3px solid #FFAA00; padding: 10px; margin: 10px 0;">
+                        <p style="margin: 0; font-size: 10px; color: #FFAA00;">
+                        💡 NEXT STEPS:
+                        </p>
+                        <ul style="margin: 5px 0; font-size: 9px; color: #999;">
+                            <li>Compare forecast with analyst consensus (from Bloomberg/FactSet)</li>
+                            <li>Calculate implied earnings using historical margins</li>
+                            <li>Adjust EPS estimates for macro headwinds/tailwinds</li>
+                            <li>Update DCF valuation with revised revenue assumptions</li>
+                        </ul>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Advanced: DCF impact
+                    st.markdown("#### 💰 IMPLIED VALUATION IMPACT")
+                    
+                    col_val1, col_val2 = st.columns(2)
+                    
+                    with col_val1:
+                        ebitda_margin = st.number_input(
+                            "EBITDA MARGIN (%)",
+                            min_value=0.0,
+                            max_value=100.0,
+                            value=25.0,
+                            step=1.0,
+                            key="ebitda_margin"
+                        )
+                    
+                    with col_val2:
+                        ev_ebitda_multiple = st.number_input(
+                            "EV/EBITDA MULTIPLE",
+                            min_value=0.0,
+                            max_value=50.0,
+                            value=15.0,
+                            step=0.5,
+                            key="ev_ebitda"
+                        )
+                    
+                    if st.button("💰 CALCULATE IMPLIED VALUATION", key="calc_valuation"):
+                        val_results = []
+                        
+                        for f in forecast_data:
+                            final_rev = f['final_revenue']
+                            ebitda = final_rev * (ebitda_margin / 100)
+                            enterprise_value = ebitda * ev_ebitda_multiple
+                            
+                            val_results.append({
+                                'Scenario': f['scenario'],
+                                'Revenue ($B)': f"{final_rev:.2f}",
+                                'EBITDA ($B)': f"{ebitda:.2f}",
+                                'Enterprise Value ($B)': f"{enterprise_value:.2f}"
+                            })
+                        
+                        val_df = pd.DataFrame(val_results)
+                        st.dataframe(val_df, use_container_width=True, hide_index=True)
+                        
+                        # Graphique valuation
+                        fig_val = go.Figure()
+                        
+                        fig_val.add_trace(go.Bar(
+                            x=[v['Scenario'] for v in val_results],
+                            y=[float(v['Enterprise Value ($B)']) for v in val_results],
+                            marker=dict(color=['#FF0000', '#FFAA00', '#00FF00']),
+                            text=[v['Enterprise Value ($B)'] for v in val_results],
+                            textposition='auto'
+                        ))
+                        
+                        fig_val.update_layout(
+                            title=f"{company_ticker} Implied Enterprise Value by Scenario",
+                            paper_bgcolor='#000',
+                            plot_bgcolor='#111',
+                            font=dict(color='#FFAA00', size=10),
+                            xaxis=dict(gridcolor='#333', title="Scenario"),
+                            yaxis=dict(gridcolor='#333', title="Enterprise Value ($B)"),
+                            height=400
+                        )
+                        
+                        st.plotly_chart(fig_val, use_container_width=True)
+                        
+                        # Upside/Downside
+                        base_val = float(val_results[0]['Enterprise Value ($B)'])
+                        bull_val = float(val_results[1]['Enterprise Value ($B)'])
+                        bear_val = float(val_results[2]['Enterprise Value ($B)'])
+                        
+                        upside = ((bull_val / base_val) - 1) * 100
+                        downside = ((bear_val / base_val) - 1) * 100
+                        
+                        col_updown1, col_updown2, col_updown3 = st.columns(3)
+                        
+                        with col_updown1:
+                            st.metric("BASE CASE EV", f"${base_val:.1f}B")
+                        
+                        with col_updown2:
+                            st.metric("UPSIDE", f"{upside:+.1f}%", 
+                                     delta=f"${bull_val - base_val:.1f}B")
+                        
+                        with col_updown3:
+                            st.metric("DOWNSIDE", f"{downside:+.1f}%",
+                                     delta=f"${bear_val - base_val:.1f}B")
+                
+                else:
+                    st.error("❌ Could not retrieve macro data")
+        
+        # Section: Macro-to-Earnings Pipeline
+        st.markdown('<div style="border-top: 1px solid #333; margin: 20px 0;"></div>', unsafe_allow_html=True)
+        st.markdown("#### 🔄 COMPLETE MACRO-TO-EARNINGS PIPELINE")
+        
+        st.markdown("""
+        <div style="background-color: #111; border: 1px solid #333; padding: 15px; margin: 10px 0;">
+            <p style="margin: 0; font-size: 11px; color: #00FF00; font-weight: bold;">
+            📈 FULL INTEGRATION WORKFLOW
+            </p>
+            <ol style="margin: 10px 0; font-size: 10px; color: #999;">
+                <li><strong>Macro Inputs:</strong> GDP, CPI, Rates, Unemployment (FRED)</li>
+                <li><strong>Sector Mapping:</strong> Apply sector sensitivities</li>
+                <li><strong>Revenue Forecast:</strong> Project company revenues</li>
+                <li><strong>Margin Assumptions:</strong> Adjust for inflation/cost pressures</li>
+                <li><strong>Earnings Translation:</strong> Calculate EPS impacts</li>
+                <li><strong>Valuation Impact:</strong> Update fair value estimates</li>
+                <li><strong>Portfolio Action:</strong> Adjust position sizing</li>
+            </ol>
+            
+            <p style="margin: 10px 0 0 0; font-size: 10px; color: #FFAA00; font-weight: bold;">
+            💡 USE CASES:
+            </p>
+            <ul style="margin: 5px 0; font-size: 9px; color: #999;">
+                <li><strong>Equity Research:</strong> Adjust DCF models with macro scenarios</li>
+                <li><strong>Portfolio Management:</strong> Tilt exposures based on macro outlook</li>
+                <li><strong>Risk Management:</strong> Stress-test portfolios under macro shocks</li>
+                <li><strong>Trading:</strong> Generate macro-driven stock signals</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Quick reference table
+        st.markdown("#### 📊 QUICK REFERENCE: MACRO LINKAGES")
+        
+        linkages_data = [
+            {'Macro Variable': 'GDP Growth', 'Primary Impact': 'Revenue', 'Secondary Impact': 'Volume/Pricing', 'Best For': 'Cyclicals'},
+            {'Macro Variable': 'Inflation (CPI)', 'Primary Impact': 'COGS', 'Secondary Impact': 'Pricing Power', 'Best For': 'Consumer'},
+            {'Macro Variable': 'Unemployment', 'Primary Impact': 'Demand', 'Secondary Impact': 'Labor Costs', 'Best For': 'Retail'},
+            {'Macro Variable': 'Interest Rates', 'Primary Impact': 'Discount Rate', 'Secondary Impact': 'Finance Costs', 'Best For': 'Growth/Tech'},
+            {'Macro Variable': 'PCE', 'Primary Impact': 'Consumer Spending', 'Secondary Impact': 'Margins', 'Best For': 'Discretionary'},
+            {'Macro Variable': 'Industrial Production', 'Primary Impact': 'Capacity Use', 'Secondary Impact': 'Capex', 'Best For': 'Industrials'},
+            {'Macro Variable': 'Housing Starts', 'Primary Impact': 'Demand', 'Secondary Impact': 'Credit', 'Best For': 'Homebuilders'},
+            {'Macro Variable': 'Oil Prices', 'Primary Impact': 'Input Costs', 'Secondary Impact': 'Transport', 'Best For': 'Energy/Airlines'}
+        ]
+        
+        linkages_df = pd.DataFrame(linkages_data)
+        st.dataframe(linkages_df, use_container_width=True, hide_index=True)
 
+                        
 # Footer
 st.markdown('<div style="border-top: 1px solid #333; margin: 10px 0;"></div>', unsafe_allow_html=True)
 last_update = datetime.now().strftime('%H:%M:%S')
