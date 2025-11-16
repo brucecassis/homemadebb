@@ -2978,7 +2978,7 @@ with tab7:
             - **Structural breaks :** Changement de régime
             """)
 
-with st.expander("📚 GLOSSARY - QUICK REFERENCE", expanded=False):
+        with st.expander("📚 GLOSSARY - QUICK REFERENCE", expanded=False):
             st.markdown("""
             | Terme | Définition |
             |-------|-----------|
