@@ -274,8 +274,7 @@ ECONOMIC_SERIES = {
 }
 
 # ONGLETS PRINCIPAUX
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📊 DASHBOARD", "📈 CUSTOM ANALYSIS", "📐 CONSTRUCTED INDICATORS", "🔬 ECONOMETRIC TESTS", "🔍 SERIES SEARCH", "📥 DOWNLOAD DATA"])
-# TAB 1: DASHBOARD
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["📊 DASHBOARD", "📈 CUSTOM ANALYSIS", "📐 CONSTRUCTED INDICATORS", "🔬 ECONOMETRIC TESTS", "🔍 SERIES SEARCH", "📥 DOWNLOAD DATA", "📝 NOTES"])# TAB 1: DASHBOARD
 with tab1:
     st.markdown("### 📊 ECONOMIC INDICATORS DASHBOARD")
     
@@ -2147,3 +2146,943 @@ with tab6:
             else:
                 st.warning("⚠️ Please select at least one feature variable")
                         
+# TAB 7: NOTES & EXPLICATIONS
+with tab7:
+    st.markdown("### 📝 TECHNICAL NOTES & METHODOLOGY")
+    
+    st.markdown("""
+    <div style="background-color: #0a0a0a; border-left: 3px solid #FFAA00; padding: 10px; margin: 10px 0;">
+        <p style="margin: 0; font-size: 10px; color: #FFAA00;">
+        📚 Référence rapide des concepts économétriques et statistiques utilisés dans ce terminal.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Sous-onglets pour organiser
+    notes_tab1, notes_tab2, notes_tab3, notes_tab4 = st.tabs([
+        "📊 INDICATORS", 
+        "🔬 TESTS", 
+        "📈 MODELS",
+        "📊 METRICS"
+    ])
+    
+    # ===== NOTES TAB 1: INDICATEURS =====
+    with notes_tab1:
+        st.markdown("#### 📊 CONSTRUCTED INDICATORS")
+        
+        with st.expander("💰 INFLATION YoY", expanded=False):
+            st.markdown("""
+            **Formule:** `100 * (CPI_t / CPI_{t-12} - 1)`
+            
+            **À quoi ça sert :**
+            - Mesure la variation des prix sur 12 mois
+            - Indicateur clé pour la politique monétaire
+            - Fed cible 2% d'inflation annuelle
+            
+            **Interprétation :**
+            - \> 2% : Inflation au-dessus de la cible (politique restrictive probable)
+            - ≈ 2% : Cible atteinte (politique neutre)
+            - < 2% : Inflation faible (risque de déflation, politique accommodante)
+            """)
+        
+        with st.expander("📊 REAL YIELD (10Y)", expanded=False):
+            st.markdown("""
+            **Formule:** `Nominal 10Y Treasury - CPI YoY`
+            
+            **À quoi ça sert :**
+            - Mesure le rendement réel ajusté de l'inflation
+            - Indicateur d'attractivité des obligations
+            - Signal pour les investisseurs
+            
+            **Interprétation :**
+            - Positif : Rendement réel attractif → incite à l'épargne
+            - Négatif : Perte de pouvoir d'achat → favorise la consommation/investissement
+            - Historiquement : moyenne ~2%
+            """)
+        
+        with st.expander("📉 YIELD CURVE (10Y-2Y)", expanded=False):
+            st.markdown("""
+            **Formule:** `DGS10 - DGS2`
+            
+            **À quoi ça sert :**
+            - **Indicateur #1 de récession** (fiabilité historique 80%+)
+            - Reflète les anticipations économiques du marché
+            
+            **Interprétation :**
+            - \> 0 : Courbe normale (croissance attendue)
+            - ≈ 0 : Courbe plate (incertitude)
+            - < 0 : **INVERSION** → Récession probable dans 12-18 mois
+            
+            **Pourquoi ça marche :**  
+            Inversion = marché anticipe baisse des taux futurs (Fed combat récession)
+            """)
+        
+        with st.expander("📉 YIELD CURVE (10Y-3M)", expanded=False):
+            st.markdown("""
+            **Formule:** `DGS10 - DGS3MO`
+            
+            **À quoi ça sert :**
+            - Meilleur indicateur avancé que 10Y-2Y
+            - Plus sensible aux changements de politique monétaire
+            
+            **Délai typique inversion → récession :** 6-12 mois
+            
+            **Avantage vs 10Y-2Y :**  
+            3M reflète directement le taux directeur Fed
+            """)
+        
+        with st.expander("💵 MONEY SUPPLY GROWTH (M2)", expanded=False):
+            st.markdown("""
+            **Formule:** `100 * (M2_t / M2_{t-12} - 1)`
+            
+            **À quoi ça sert :**
+            - Mesure l'expansion/contraction monétaire
+            - Lié à l'inflation (théorie quantitative de la monnaie)
+            - Indicateur de liquidité dans l'économie
+            
+            **Interprétation :**
+            - Croissance forte (>10%) : Risque inflationniste
+            - Croissance modérée (2-6%) : Normal
+            - **Contraction (<0%)** : Signal déflationniste très rare et dangereux
+            
+            **Note :** Contraction M2 a précédé la Grande Dépression (1929-1933)
+            """)
+        
+        with st.expander("📈 REAL GDP QoQ ANNUALIZED", expanded=False):
+            st.markdown("""
+            **Formule:** `400 * (GDP_t / GDP_{t-1} - 1)`
+            
+            **À quoi ça sert :**
+            - Mesure la croissance économique trimestrielle
+            - Multipliée par 4 pour annualiser
+            
+            **Interprétation :**
+            - \> 3% : Croissance forte
+            - 2-3% : Croissance tendancielle US
+            - 0-2% : Croissance faible
+            - < 0 : Contraction
+            - **2 trimestres négatifs consécutifs = Récession technique**
+            
+            **Limite :** Définition NBER de récession est plus large
+            """)
+        
+        with st.expander("🎯 TAYLOR RULE", expanded=False):
+            st.markdown("""
+            **Formule complète:**  
+            `i = r* + π + 0.5*(π - π*) + 0.5*y`
+            
+            Où :
+            - `i` = taux directeur optimal
+            - `r*` = taux neutre (~2%)
+            - `π` = inflation actuelle
+            - `π*` = cible inflation (2%)
+            - `y` = output gap
+            
+            **Simplifiée (si y=0):**  
+            `Taylor Rate = 2 + inflation + 0.5*(inflation - 2)`
+            
+            **À quoi ça sert :**
+            - Règle normative pour la politique monétaire
+            - Compare taux Fed vs taux "optimal"
+            
+            **Policy Gap = Fed Funds - Taylor Rate**
+            - Gap > 0 : Politique **restrictive**
+            - Gap < 0 : Politique **accommodante**
+            """)
+    
+    # ===== NOTES TAB 2: TESTS =====
+    with notes_tab2:
+        st.markdown("#### 🔬 ECONOMETRIC TESTS")
+        
+        with st.expander("📊 ADF TEST (Augmented Dickey-Fuller)", expanded=False):
+            st.markdown("""
+            **Objectif :** Tester la stationnarité d'une série temporelle
+            
+            **Hypothèses :**
+            - H₀ : La série a une racine unitaire (= NON stationnaire)
+            - H₁ : La série est stationnaire
+            
+            **Interprétation :**
+            - p-value < 0.05 → **Rejet H₀** → Série STATIONNAIRE ✅
+            - p-value ≥ 0.05 → Série NON STATIONNAIRE ⚠️
+            
+            **Pourquoi c'est important :**
+            - Régression sur séries non-stationnaires → régression fallacieuse
+            - Besoin de différencier ou utiliser cointégration
+            
+            **Règle pratique :**
+            - Série I(0) : stationnaire en niveau
+            - Série I(1) : stationnaire en première différence
+            """)
+        
+        with st.expander("📊 KPSS TEST", expanded=False):
+            st.markdown("""
+            **Objectif :** Test de stationnarité (complémentaire à ADF)
+            
+            **Hypothèses :**
+            - H₀ : La série EST stationnaire (inverse de ADF !)
+            - H₁ : La série a une racine unitaire
+            
+            **Interprétation :**
+            - p-value > 0.05 → Série STATIONNAIRE ✅
+            - p-value ≤ 0.05 → Série NON STATIONNAIRE ⚠️
+            
+            **Pourquoi utiliser ADF ET KPSS :**
+            
+            | ADF | KPSS | Conclusion |
+            |-----|------|-----------|
+            | Stationnaire | Stationnaire | ✅ Clairement stationnaire |
+            | Non-stat | Non-stat | ⚠️ Incertain (tester différences) |
+            | Stationnaire | Non-stat | 🔄 Trend-stationary |
+            | Non-stat | Stationnaire | ⚠️ Résultats contradictoires |
+            """)
+        
+        with st.expander("🔗 COINTEGRATION (Engle-Granger)", expanded=False):
+            st.markdown("""
+            **Objectif :** Tester si 2+ séries non-stationnaires partagent une relation long-terme
+            
+            **Méthode :**
+            1. Régression : `Y = α + βX + ε`
+            2. Test ADF sur les résidus `ε`
+            
+            **Hypothèses :**
+            - H₀ : Pas de cointégration
+            - H₁ : Cointégration existe
+            
+            **Interprétation :**
+            - p < 0.05 → **Cointégrées** → Utiliser VECM ✅
+            - p ≥ 0.05 → Pas cointégrées → Utiliser VAR en différences
+            
+            **Exemple classique :**
+            - Rendement nominal 10Y et anticipations inflation
+            - Prix spot et futures (arbitrage)
+            
+            **Implication :** Même si séries individuelles non-stationnaires,  
+            leur combinaison linéaire est stationnaire
+            """)
+        
+        with st.expander("🔗 COINTEGRATION (Johansen)", expanded=False):
+            st.markdown("""
+            **Objectif :** Test de cointégration pour systèmes multivariés
+            
+            **Avantages vs Engle-Granger :**
+            - Plusieurs relations de cointégration possibles
+            - Pas besoin de choisir variable dépendante
+            - Plus puissant pour 3+ variables
+            
+            **Statistiques :**
+            - **Trace statistic** : teste nombre de relations
+            - **Max eigenvalue** : teste chaque relation individuellement
+            
+            **Interprétation Trace :**
+            - r = 0 : Aucune relation
+            - r ≤ 1 : Au moins 1 relation
+            - r ≤ 2 : Au moins 2 relations
+            
+            Si Trace Stat > Critical Value → rejeter H₀
+            
+            **Utilisation :** Systèmes de taux (courbe des taux), devises, matières premières
+            """)
+        
+        with st.expander("🎯 GRANGER CAUSALITY", expanded=False):
+            st.markdown("""
+            **Objectif :** X "cause" Y au sens de Granger si X passé améliore prédiction de Y
+            
+            **Ce n'est PAS une causalité vraie !**  
+            C'est une "précédence temporelle prédictive"
+            
+            **Hypothèses :**
+            - H₀ : X ne Granger-cause pas Y
+            - H₁ : X Granger-cause Y
+            
+            **Interprétation :**
+            - p < 0.05 → X améliore significativement prédiction de Y
+            
+            **Exemples classiques :**
+            - Fed Funds → CPI ? (politique monétaire → inflation)
+            - Consommation → PIB ?
+            - VIX → S&P 500 ?
+            
+            **Piège :** "A Granger-cause B" ≠ "A cause B"  
+            Peut juste refléter anticipations communes d'un 3e facteur
+            """)
+        
+        with st.expander("📈 VAR (Vector AutoRegression)", expanded=False):
+            st.markdown("""
+            **Objectif :** Modéliser interactions dynamiques entre plusieurs variables
+            
+            **Structure :**  
+            Chaque variable = f(ses propres lags + lags des autres variables)
+            
+            **Exemple VAR(2) à 2 variables :**
+```
+            Y₁ₜ = c₁ + α₁₁Y₁ₜ₋₁ + α₁₂Y₁ₜ₋₂ + β₁₁Y₂ₜ₋₁ + β₁₂Y₂ₜ₋₂ + ε₁ₜ
+            Y₂ₜ = c₂ + α₂₁Y₁ₜ₋₁ + α₂₂Y₁ₜ₋₂ + β₂₁Y₂ₜ₋₁ + β₂₂Y₂ₜ₋₂ + ε₂ₜ
+```
+            
+            **Applications :**
+            - Impulse Response Functions (IRF) : choc sur X → effet sur Y
+            - Forecast Error Variance Decomposition (FEVD)
+            - Granger causality (test F joint)
+            
+            **Condition :** Variables doivent être stationnaires (ou cointégrées → VECM)
+            
+            **Choix du lag :** AIC, BIC, ou tests séquentiels
+            """)
+        
+        with st.expander("📈 VECM (Vector Error Correction Model)", expanded=False):
+            st.markdown("""
+            **Objectif :** VAR pour variables I(1) cointégrées
+            
+            **Différence avec VAR :**  
+            VECM = VAR en différences + **terme de correction d'erreur**
+            
+            **Structure :**
+```
+            ΔYₜ = α(βYₜ₋₁) + Γ₁ΔYₜ₋₁ + ... + εₜ
+```
+            
+            Où :
+            - `β` = vecteur de cointégration (relation long-terme)
+            - `α` = vitesse d'ajustement
+            - `Γᵢ` = dynamiques court-terme
+            
+            **Interprétation α :**
+            - α = -0.2 → 20% de l'écart LT corrigé chaque période
+            - |α| proche de 1 → ajustement rapide
+            - α proche de 0 → ajustement lent
+            
+            **Usage :** Taux d'intérêt, spreads, relations arbitrage
+            """)
+    
+    # ===== NOTES TAB 3: MODÈLES =====
+    with notes_tab3:
+        st.markdown("#### 📈 FORECASTING MODELS")
+        
+        with st.expander("📊 ARIMA (AutoRegressive Integrated Moving Average)", expanded=False):
+            st.markdown("""
+            **Structure :** ARIMA(p, d, q)
+            
+            **Composantes :**
+            - **AR(p)** : Autoregressive = régression sur p valeurs passées
+            - **I(d)** : Integrated = différenciation d ordre d
+            - **MA(q)** : Moving Average = moyenne mobile des erreurs passées
+            
+            **Formule ARIMA(1,1,1) :**
+```
+            ΔYₜ = c + φ₁ΔYₜ₋₁ + θ₁εₜ₋₁ + εₜ
+```
+            
+            **Identification :**
+            - ACF (autocorrelation) → ordre MA
+            - PACF (partial autocorrelation) → ordre AR
+            - Ou utiliser Auto ARIMA (optimise AIC/BIC)
+            
+            **Quand l'utiliser :**
+            - Série univariée
+            - Dépendance temporelle claire
+            - Pas de saisonnalité forte (sinon SARIMA)
+            """)
+        
+        with st.expander("📊 SARIMAX (Seasonal ARIMA with eXogenous)", expanded=False):
+            st.markdown("""
+            **Structure :** SARIMAX(p,d,q)(P,D,Q,s)
+            
+            **Nouveauté vs ARIMA :**
+            - **(P,D,Q,s)** : composante saisonnière de période s
+            - **X** : variables exogènes (régresseurs)
+            
+            **Exemple SARIMAX(1,1,1)(1,1,1,12) :**
+            - (1,1,1) : ARIMA standard
+            - (1,1,1,12) : composante saisonnière mensuelle
+            
+            **Applications :**
+            - CPI, ventes retail (saisonnalité)
+            - Unemployment (cycles)
+            - Variables exogènes : vacances, politique monétaire
+            
+            **Avantage :** Capture patterns saisonniers + effets exogènes
+            """)
+        
+        with st.expander("📊 EXPONENTIAL SMOOTHING (Holt-Winters)", expanded=False):
+            st.markdown("""
+            **Principe :** Pondération exponentielle décroissante du passé
+            
+            **3 types :**
+            1. **Simple** : niveau seulement
+            2. **Holt** : niveau + tendance
+            3. **Holt-Winters** : niveau + tendance + saisonnalité
+            
+            **Formules (Holt-Winters additif) :**
+```
+            Niveau    : Lₜ = α(Yₜ - Sₜ₋ₛ) + (1-α)(Lₜ₋₁ + Tₜ₋₁)
+            Tendance  : Tₜ = β(Lₜ - Lₜ₋₁) + (1-β)Tₜ₋₁
+            Saison    : Sₜ = γ(Yₜ - Lₜ) + (1-γ)Sₜ₋ₛ
+            Prévision : Ŷₜ₊ₕ = Lₜ + hTₜ + Sₜ₊ₕ₋ₛ
+```
+            
+            **Quand l'utiliser :**
+            - Simple à implémenter
+            - Patterns saisonniers réguliers
+            - Moins flexible qu'ARIMA mais plus rapide
+            
+            **Variante multiplicative :** pour saisonnalité proportionnelle au niveau
+            """)
+        
+        with st.expander("🤖 RANDOM FOREST REGRESSION", expanded=False):
+            st.markdown("""
+            **Principe :** Ensemble de nombreux arbres de décision
+            
+            **Fonctionnement :**
+            1. Créer N arbres avec bootstrap samples
+            2. À chaque split, considérer sous-ensemble aléatoire de features
+            3. Prédiction = moyenne des prédictions de tous les arbres
+            
+            **Avantages :**
+            - ✅ Capture non-linéarités
+            - ✅ Interactions automatiques
+            - ✅ Robuste au surapprentissage
+            - ✅ Feature importance
+            
+            **Inconvénients :**
+            - ❌ Moins bon pour extrapolation
+            - ❌ Boîte noire (interprétabilité limitée)
+            
+            **Hyperparamètres clés :**
+            - `n_estimators` : nombre d'arbres
+            - `max_depth` : profondeur max (contrôle overfitting)
+            - `min_samples_split` : observations min pour split
+            """)
+        
+        with st.expander("🤖 XGBOOST (Extreme Gradient Boosting)", expanded=False):
+            st.markdown("""
+            **Principe :** Boosting = arbres séquentiels corrigeant erreurs précédentes
+            
+            **Différence vs Random Forest :**
+            - RF : arbres parallèles indépendants
+            - XGBoost : arbres séquentiels, chacun corrige le précédent
+            
+            **Avantages :**
+            - ✅ Souvent meilleure performance que RF
+            - ✅ Gestion native des valeurs manquantes
+            - ✅ Régularisation intégrée (L1, L2)
+            - ✅ Très rapide (implémentation optimisée)
+            
+            **Hyperparamètres clés :**
+            - `learning_rate` : taux d'apprentissage (0.01-0.3)
+            - `n_estimators` : nombre d'arbres
+            - `max_depth` : profondeur (3-10)
+            - `subsample` : fraction des données par arbre
+            
+            **Risque :** Overfitting si mal réglé → validation croisée essentielle
+            """)
+        
+        with st.expander("🤖 FEATURE ENGINEERING", expanded=False):
+            st.markdown("""
+            **Variables créées automatiquement dans l'onglet ML :**
+            
+            **1. Lags (retards) :**
+            - `X_lag1`, `X_lag2`, ..., `X_lag12`
+            - Capture dépendance temporelle
+            
+            **2. Moving Averages :**
+            - `X_ma3` : moyenne mobile 3 périodes
+            - `X_ma6` : moyenne mobile 6 périodes
+            - Lisse bruit, capture tendance
+            
+            **3. Momentum :**
+            - `X_mom` = variation sur 3 périodes
+            - `X_mom = (Xₜ - Xₜ₋₃) / Xₜ₋₃`
+            
+            **Pourquoi ça marche :**
+            - Transforme série temporelle en problème supervisé
+            - ML capte patterns non-linéaires que ARIMA rate
+            
+            **Piège :** Attention au data leakage !  
+            Ne jamais utiliser info du futur pour prédire le passé
+            """)
+    
+    # ===== NOTES TAB 4: MÉTRIQUES =====
+    with notes_tab4:
+        st.markdown("#### 📊 PERFORMANCE METRICS")
+        
+        with st.expander("📊 RMSE (Root Mean Squared Error)", expanded=False):
+            st.markdown("""
+            **Formule :**  
+            `RMSE = √(Σ(yᵢ - ŷᵢ)² / n)`
+            
+            **Unité :** Même que la variable Y
+            
+            **Interprétation :**
+            - RMSE = 0 : Prédiction parfaite
+            - Plus RMSE petit → meilleur modèle
+            - Pénalise fortement les grandes erreurs (²)
+            
+            **Exemple :**
+            - Prédire CPI (indice ~300)
+            - RMSE = 2.5 → erreur moyenne de 2.5 points d'indice
+            
+            **Avantage :** Sensible aux outliers (utile si coûteux)
+            
+            **Comparaison :** RMSE toujours ≥ MAE (égalité ssi toutes erreurs identiques)
+            """)
+        
+        with st.expander("📊 MAE (Mean Absolute Error)", expanded=False):
+            st.markdown("""
+            **Formule :**  
+            `MAE = Σ|yᵢ - ŷᵢ| / n`
+            
+            **Unité :** Même que la variable Y
+            
+            **Interprétation :**
+            - MAE = erreur moyenne en valeur absolue
+            - Plus robuste aux outliers que RMSE
+            - Interprétation plus intuitive
+            
+            **Exemple :**
+            - Prédire taux chômage (%)
+            - MAE = 0.3 → erreur moyenne de 0.3 points de %
+            
+            **Quand préférer MAE vs RMSE :**
+            - MAE : si outliers pas plus graves que petites erreurs
+            - RMSE : si grandes erreurs très coûteuses
+            """)
+        
+        with st.expander("📊 R² (Coefficient of Determination)", expanded=False):
+            st.markdown("""
+            **Formule :**  
+            `R² = 1 - (SS_res / SS_tot)`
+            
+            Où :
+            - `SS_res = Σ(yᵢ - ŷᵢ)²` : somme carrés résidus
+            - `SS_tot = Σ(yᵢ - ȳ)²` : variance totale
+            
+            **Interprétation :**
+            - R² = 1 : Modèle parfait (100% variance expliquée)
+            - R² = 0 : Modèle = prédire la moyenne
+            - R² < 0 : Modèle pire que la moyenne (très mauvais !)
+            
+            **Exemple :**
+            - R² = 0.85 → 85% de la variance de Y expliquée par le modèle
+            
+            **ATTENTION :**
+            - ❌ R² seul ne suffit pas (vérifier résidus)
+            - ❌ R² augmente toujours si on ajoute variables → utiliser R² ajusté
+            - ❌ R² élevé ≠ causalité
+            
+            **Règles empiriques :**
+            - R² > 0.9 : Excellent (attention overfitting)
+            - R² 0.7-0.9 : Bon
+            - R² 0.5-0.7 : Moyen
+            - R² < 0.5 : Faible pouvoir prédictif
+            """)
+        
+        with st.expander("📊 AIC / BIC (Information Criteria)", expanded=False):
+            st.markdown("""
+            **Formules :**
+```
+            AIC = 2k - 2ln(L)
+            BIC = k·ln(n) - 2ln(L)
+```
+            
+            Où :
+            - `k` = nombre de paramètres
+            - `n` = nombre d'observations
+            - `L` = vraisemblance du modèle
+            
+            **Objectif :** Équilibre fit vs complexité (pénalise surparamétrage)
+            
+            **Utilisation :**
+            - Comparer modèles (plus petit = meilleur)
+            - Sélection ordre AR/MA dans ARIMA
+            - Choix nombre de lags dans VAR
+            
+            **AIC vs BIC :**
+            - **BIC** pénalise plus la complexité (terme `ln(n)`)
+            - BIC → modèles plus parcimonieux
+            - AIC → meilleur pour prédiction
+            - BIC → meilleur pour théorie
+            
+            **Règle :** Différence de 10 points = très significative
+            """)
+        
+        with st.expander("📊 P-VALUE", expanded=False):
+            st.markdown("""
+            **Définition :** Probabilité d'observer résultat aussi extrême si H₀ vraie
+            
+            **Interprétation :**
+            - p < 0.01 : Très significatif (***) → forte évidence contre H₀
+            - p < 0.05 : Significatif (**) → rejet H₀ (seuil standard)
+            - p < 0.10 : Faiblement significatif (*) → évidence marginale
+            - p ≥ 0.10 : Non significatif → pas d'évidence contre H₀
+            
+            **CE QUE P-VALUE N'EST PAS :**
+            - ❌ Probabilité que H₀ soit vraie
+            - ❌ Probabilité de faire une erreur
+            - ❌ Importance de l'effet
+            
+            **Piège du p-hacking :**
+            Tester 20 hypothèses → 1 sera significatif à 5% par hasard !
+            
+            **Bonnes pratiques :**
+            - Préspécifier hypothèses
+            - Correction Bonferroni si tests multiples
+            - Regarder aussi magnitude de l'effet (pas que significativité)
+            """)
+        
+        with st.expander("📊 CRITICAL VALUES", expanded=False):
+            st.markdown("""
+            **Définition :** Seuils de rejet pour tests statistiques
+            
+            **Niveaux standards :**
+            - **1%** : Très conservateur (forte évidence requise)
+            - **5%** : Standard en économie/finance
+            - **10%** : Plus permissif (sciences sociales)
+            
+            **Exemple ADF Test :**
+            Statistique ADF = -3.5
+        Critical value 5% = -2.86
+        → -3.5 < -2.86 → Rejet H₀ → Série stationnaire
+            
+            **Lien avec p-value :**
+            - Stat test < Critical value ⟺ p-value < seuil
+            - Critical values sont pré-tabulés
+            - p-value est probabilité exacte
+            
+            **One-tail vs Two-tail :**
+            - One-tail : test directionnel (> ou <)
+            - Two-tail : test non-directionnel (≠)
+            - Critical values différents !
+            """)
+        
+        with st.expander("📊 CONFIDENCE INTERVALS", expanded=False):
+            st.markdown("""
+            **Définition :** Intervalle contenant vraie valeur avec probabilité donnée
+            
+            **IC 95% :**  
+            `[Estimate - 1.96·SE, Estimate + 1.96·SE]`
+            
+            **Interprétation :**
+            - "Si on répète expérience 100 fois, 95 IC contiendront vraie valeur"
+            - Plus IC étroit → estimation précise
+            - Plus IC large → incertitude élevée
+            
+            **Exemple forecast :**
+```
+            Prévision CPI : 315.5
+            IC 95% : [312.3, 318.7]
+```
+            → 95% de confiance que vraie valeur entre 312.3 et 318.7
+            
+            **Facteurs affectant largeur IC :**
+            - ✅ Plus de données → IC plus étroit
+            - ✅ Moins de variance → IC plus étroit
+            - ❌ Horizon long → IC plus large
+            
+            **IC 90% vs 95% vs 99% :**
+            - 90% : Plus étroit mais moins confiant
+            - 95% : Standard (compromis)
+            - 99% : Plus large mais plus confiant
+            """)
+        
+        with st.expander("📊 RESIDUALS ANALYSIS", expanded=False):
+            st.markdown("""
+            **Définition :** Résidus = Erreurs de prédiction = `Y - Ŷ`
+            
+            **Propriétés d'un BON modèle :**
+            
+            1. **Moyenne nulle :** `E(ε) = 0`
+               - Sinon : biais systématique
+            
+            2. **Homoscédasticité :** Variance constante
+               - Test visuel : plot résidus vs fitted
+               - Si entonnoir → hétéroscédasticité
+            
+            3. **Pas d'autocorrélation :** `Corr(εₜ, εₜ₋₁) = 0`
+               - Test Durbin-Watson ou Ljung-Box
+               - Si autocorrélés → info non capturée
+            
+            4. **Normalité :** `ε ~ N(0, σ²)`
+               - Test visuel : histogramme, Q-Q plot
+               - Pas crucial pour grandes données (CLT)
+            
+            **Diagnostics graphiques :**
+```
+            1. Résidus vs Temps → détecter patterns
+            2. Résidus vs Fitted → détecter hétéroscédasticité
+            3. Histogram résidus → vérifier normalité
+            4. Q-Q plot → normalité
+            5. ACF résidus → autocorrélation
+```
+            
+            **Si résidus mauvais :**
+            - Ajouter variables omises
+            - Transformer Y (log, Box-Cox)
+            - Changer spécification modèle
+            """)
+        
+        with st.expander("📊 OVERFITTING vs UNDERFITTING", expanded=False):
+            st.markdown("""
+            **OVERFITTING (surapprentissage) :**
+            - Modèle trop complexe
+            - Excellentes performances sur train
+            - Mauvaises performances sur test
+            - Capture le bruit au lieu du signal
+            
+            **Signes :**
+            - R² train = 0.99, R² test = 0.50
+            - Modèle avec 100 paramètres pour 120 observations
+            
+            **Solutions :**
+            - ✅ Régularisation (Ridge, Lasso)
+            - ✅ Cross-validation
+            - ✅ Early stopping
+            - ✅ Simplifier modèle
+            - ✅ Plus de données
+            
+            **UNDERFITTING (sous-apprentissage) :**
+            - Modèle trop simple
+            - Mauvaises performances train ET test
+            - Ne capture pas patterns importants
+            
+            **Signes :**
+            - R² train = 0.40, R² test = 0.38
+            - Modèle linéaire pour relation non-linéaire
+            
+            **Solutions :**
+            - ✅ Ajouter features
+            - ✅ Polynômes / interactions
+            - ✅ Modèle plus complexe
+            
+            **Sweet spot :** Train > Test, mais pas trop
+            
+            **Bias-Variance Tradeoff :**
+```
+            Error = Bias² + Variance + Irreducible Error
+            
+            Simple model → High Bias, Low Variance
+            Complex model → Low Bias, High Variance
+```
+            """)
+        
+        with st.expander("📊 CROSS-VALIDATION", expanded=False):
+            st.markdown("""
+            **Objectif :** Évaluer performance sans gaspiller données
+            
+            **K-Fold CV (standard) :**
+            1. Diviser données en K folds
+            2. Entraîner sur K-1 folds
+            3. Tester sur fold restant
+            4. Répéter K fois
+            5. Performance = moyenne des K tests
+            
+            **Time Series CV (IMPORTANT !) :**
+            ⚠️ **NE PAS utiliser K-Fold standard !**
+            
+            Problème : mélange passé/futur → data leakage
+            
+            **Solution : Walk-Forward / Rolling Window**
+```
+            Train: [1...100] → Test: [101...110]
+            Train: [1...110] → Test: [111...120]
+            Train: [1...120] → Test: [121...130]
+            ...
+```
+            
+            **Expanding Window :**
+            - Train grandit à chaque étape
+            - Utilise toute l'histoire
+            
+            **Rolling Window :**
+            - Taille train fixe
+            - Plus adaptatif aux changements
+            
+            **Règle d'or :** Ne JAMAIS entraîner sur données futures !
+            """)
+        
+        with st.expander("📊 FEATURE IMPORTANCE", expanded=False):
+            st.markdown("""
+            **Objectif :** Identifier variables les plus prédictives
+            
+            **Méthodes selon modèle :**
+            
+            **1. Tree-based (RF, XGBoost) :**
+            - Importance = réduction moyenne d'impureté (Gini/entropy)
+            - Ou permutation importance
+            
+            **2. Linear models :**
+            - Coefficients (si variables standardisées)
+            - Ou coefficients régularisés (Lasso)
+            
+            **3. Permutation Importance (général) :**
+            - Mélanger valeurs d'une feature
+            - Mesurer baisse de performance
+            - Grande baisse → feature importante
+            
+            **Interprétation :**
+```
+            Feature          | Importance
+            -----------------|-----------
+            FEDFUNDS_lag1   |   0.25     ← 25% de l'importance
+            CPI_lag3        |   0.18
+            M2_ma6          |   0.12
+            ...
+```
+            
+            **Attention :**
+            - Variables corrélées → importance partagée
+            - Importance ≠ causalité
+            - Dépend du modèle
+            
+            **Usage :**
+            - Feature selection
+            - Interpréter "boîte noire"
+            - Identifier drivers économiques
+            """)
+        
+        with st.expander("📊 STATIONARITY (Pourquoi c'est crucial)", expanded=False):
+            st.markdown("""
+            **Série stationnaire :** Propriétés statistiques constantes dans le temps
+            
+            **Conditions :**
+            1. Moyenne constante : `E(Yₜ) = μ` ∀t
+            2. Variance constante : `Var(Yₜ) = σ²` ∀t
+            3. Covariance dépend que du lag : `Cov(Yₜ, Yₜ₋ₖ) = γₖ`
+            
+            **Pourquoi c'est important :**
+            
+            ❌ **Sans stationnarité :**
+            - Régression fallacieuse (spurious regression)
+            - R² élevé mais relation inexistante
+            - Tests statistiques invalides
+            
+            **Exemple célèbre (Yule 1926) :**
+            Régression "Mortalité UK" sur "Mariages Église d'Angleterre"  
+            → R² = 0.95 mais aucun lien causal !  
+            (Les deux sont trending)
+            
+            ✅ **Avec stationnarité :**
+            - Inférence statistique valide
+            - Prévisions fiables
+            - Relations vraies (pas artefacts)
+            
+            **Solutions si non-stationnaire :**
+            1. **Différenciation :** `ΔYₜ = Yₜ - Yₜ₋₁`
+            2. **Détrending :** Retirer tendance
+            3. **Transformation :** Log, Box-Cox
+            4. **Cointégration :** Si relation long-terme vraie
+            
+            **Types de non-stationnarité :**
+            - **Trend-stationary :** Détrending suffit
+            - **Difference-stationary (I(1))** : Différenciation nécessaire
+            - **Structural breaks :** Changement de régime
+            """)
+
+with st.expander("📚 GLOSSARY - QUICK REFERENCE", expanded=False):
+            st.markdown("""
+            | Terme | Définition |
+            |-------|-----------|
+            | **AR** | AutoRegressive - régression sur valeurs passées |
+            | **MA** | Moving Average - moyenne des erreurs passées |
+            | **I(d)** | Integrated of order d - différenciation d fois pour stationnarité |
+            | **Lag** | Retard temporel (lag 1 = période précédente) |
+            | **White noise** | Erreurs non corrélées, variance constante |
+            | **Unit root** | Racine = 1 → série non-stationnaire |
+            | **Spurious regression** | Régression fallacieuse sur séries non-stationnaires |
+            | **Cointegration** | Relation long-terme entre séries I(1) |
+            | **ECM** | Error Correction Model - ajustement vers équilibre |
+            | **IRF** | Impulse Response Function - effet d'un choc |
+            | **FEVD** | Forecast Error Variance Decomposition |
+            | **Exogenous** | Variable externe non expliquée par le modèle |
+            | **Endogenous** | Variable expliquée par le modèle |
+            | **Heteroskedasticity** | Variance non constante |
+            | **Autocorrelation** | Corrélation avec valeurs passées |
+            | **OLS** | Ordinary Least Squares - MCO |
+            | **MLE** | Maximum Likelihood Estimation |
+            | **QQ-plot** | Quantile-Quantile plot - test normalité graphique |
+            | **ACF** | AutoCorrelation Function |
+            | **PACF** | Partial AutoCorrelation Function |
+            | **Nowcasting** | Prévision temps présent (avec données incomplètes) |
+            """)
+        
+        with st.expander("🔗 USEFUL RESOURCES", expanded=False):
+            st.markdown("""
+            **📚 Livres de référence :**
+            
+            **Économétrie séries temporelles :**
+            - Hamilton (1994) - Time Series Analysis
+            - Enders (2015) - Applied Econometric Time Series
+            - Tsay (2010) - Analysis of Financial Time Series
+            
+            **Machine Learning :**
+            - Hastie & Tibshirani - Elements of Statistical Learning
+            - James et al. - Introduction to Statistical Learning
+            
+            **Macroéconomie appliquée :**
+            - Stock & Watson - Introduction to Econometrics
+            - Wooldridge - Econometric Analysis of Cross Section and Panel Data
+            
+            **📊 Bases de données :**
+            - FRED (Federal Reserve) : https://fred.stlouisfed.org
+            - BEA (Bureau of Economic Analysis)
+            - BLS (Bureau of Labor Statistics)
+            - World Bank Open Data
+            - IMF Data
+            
+            **🛠️ Outils Python :**
+            - `statsmodels` : Tests économétriques, ARIMA, VAR
+            - `scikit-learn` : Machine learning
+            - `prophet` : Forecasting (Facebook)
+            - `pmdarima` : Auto ARIMA
+            - `arch` : GARCH models
+            
+            **📖 Documentation :**
+            - Statsmodels : https://www.statsmodels.org
+            - Scikit-learn : https://scikit-learn.org
+            - FRED API : https://fred.stlouisfed.org/docs/api/
+            """)
+        
+        with st.expander("⚠️ COMMON PITFALLS", expanded=False):
+            st.markdown("""
+            **🚨 Erreurs fréquentes à éviter :**
+            
+            **1. Data Leakage**
+            ❌ Utiliser données futures pour prédire passé
+            ✅ Strict train/test split chronologique
+            
+            **2. Ignorer la stationnarité**
+            ❌ Régression sur séries non-stationnaires
+            ✅ Tester ADF/KPSS, différencier si besoin
+            
+            **3. P-hacking**
+            ❌ Tester 50 variables, garder les 3 significatives
+            ✅ Préspécifier hypothèses, correction tests multiples
+            
+            **4. Overfitting**
+            ❌ Modèle parfait sur train, mauvais sur test
+            ✅ Cross-validation, régularisation
+            
+            **5. Confondre corrélation et causalité**
+            ❌ "R² = 0.9 donc X cause Y"
+            ✅ Corrélation ≠ causalité (3e variable?)
+            
+            **6. Ignorer les résidus**
+            ❌ Regarder que R², ignorer diagnostics
+            ✅ Analyser résidus (autocorrélation, normalité)
+            
+            **7. Extrapolation naïve**
+            ❌ Prédire 10 ans avec modèle ARIMA(1,1,1)
+            ✅ Modèles structurels pour long-terme
+            
+            **8. Oublier l'incertitude**
+            ❌ "Mon modèle prédit CPI = 315.5"
+            ✅ "Prévision 315.5 ± 3.2 (IC 95%)"
+            
+            **9. Feature selection post-hoc**
+            ❌ Regarder importance après coup → biais
+            ✅ Domain knowledge + tests a priori
+            
+            **10. Ignorer structural breaks**
+            ❌ Modèle sur 50 ans incluant 2008
+            ✅ Tester breaks (Chow, Bai-Perron)
+            """)
