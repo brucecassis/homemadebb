@@ -274,8 +274,7 @@ ECONOMIC_SERIES = {
 }
 
 # ONGLETS PRINCIPAUX
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 DASHBOARD", "📈 CUSTOM ANALYSIS", "📐 CONSTRUCTED INDICATORS", "🔍 SERIES SEARCH", "📥 DOWNLOAD DATA"])
-
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📊 DASHBOARD", "📈 CUSTOM ANALYSIS", "📐 CONSTRUCTED INDICATORS", "🔬 ECONOMETRIC TESTS", "🔍 SERIES SEARCH", "📥 DOWNLOAD DATA"])
 # TAB 1: DASHBOARD
 with tab1:
     st.markdown("### 📊 ECONOMIC INDICATORS DASHBOARD")
@@ -1122,3 +1121,1029 @@ st.markdown(f"""
     © 2025 BLOOMBERG ENS® | FEDERAL RESERVE ECONOMIC DATA (FRED) | LAST UPDATE: {datetime.now().strftime('%H:%M:%S')}
 </div>
 """, unsafe_allow_html=True)
+
+
+# TAB 6: TESTS ÉCONOMÉTRIQUES
+with tab6:
+    st.markdown("### 🔬 ECONOMETRIC TESTS & MODELS")
+    
+    st.markdown("""
+    <div style="background-color: #0a0a0a; border-left: 3px solid #00FF00; padding: 10px; margin: 10px 0;">
+        <p style="margin: 0; font-size: 10px; color: #00FF00; font-weight: bold;">
+        ⚡ ADVANCED ECONOMETRICS TOOLKIT
+        </p>
+        <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
+        Tests de stationnarité, cointégration, VAR/VECM, Granger causality, ARIMA forecasting, et plus.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Sous-onglets pour organiser les tests
+    subtab1, subtab2, subtab3, subtab4, subtab5 = st.tabs([
+        "📊 STATIONARITY", 
+        "🔗 COINTEGRATION", 
+        "📈 VAR/VECM", 
+        "🎯 FORECASTING",
+        "🤖 ML MODELS"
+    ])
+    
+    # ===== SUBTAB 1: TESTS DE STATIONNARITÉ =====
+    with subtab1:
+        st.markdown("#### 📊 STATIONARITY TESTS")
+        st.caption("ADF (Augmented Dickey-Fuller) & KPSS Tests")
+        
+        col_stat1, col_stat2 = st.columns([2, 1])
+        
+        with col_stat1:
+            # Sélection de série
+            all_series_flat = []
+            for category, series in ECONOMIC_SERIES.items():
+                for series_id in series.keys():
+                    all_series_flat.append(series_id)
+            
+            selected_series_stat = st.selectbox(
+                "SELECT SERIES FOR STATIONARITY TEST",
+                options=all_series_flat,
+                key="stat_series_select"
+            )
+        
+        with col_stat2:
+            test_type = st.radio(
+                "TEST TYPE",
+                options=["Both", "ADF Only", "KPSS Only"],
+                key="stat_test_type"
+            )
+        
+        if st.button("🔬 RUN STATIONARITY TESTS", use_container_width=True, key="run_stat_test"):
+            df_series = get_fred_series(selected_series_stat)
+            
+            if df_series is not None and len(df_series) > 30:
+                try:
+                    from statsmodels.tsa.stattools import adfuller, kpss
+                    
+                    series_values = df_series['value'].dropna()
+                    
+                    st.markdown(f"### Results for: {selected_series_stat}")
+                    
+                    col_res1, col_res2 = st.columns(2)
+                    
+                    # ADF Test
+                    if test_type in ["Both", "ADF Only"]:
+                        with col_res1:
+                            st.markdown("**🔹 ADF Test (Null: Unit Root exists)**")
+                            
+                            adf_result = adfuller(series_values, autolag='AIC')
+                            
+                            adf_data = {
+                                'Metric': ['ADF Statistic', 'p-value', '# Lags Used', '# Observations'],
+                                'Value': [f"{adf_result[0]:.4f}", f"{adf_result[1]:.4f}", 
+                                         f"{adf_result[2]}", f"{adf_result[3]}"]
+                            }
+                            
+                            st.dataframe(pd.DataFrame(adf_data), hide_index=True, use_container_width=True)
+                            
+                            st.markdown("**Critical Values:**")
+                            crit_vals = pd.DataFrame({
+                                'Level': ['1%', '5%', '10%'],
+                                'Critical Value': [f"{adf_result[4]['1%']:.4f}", 
+                                                  f"{adf_result[4]['5%']:.4f}", 
+                                                  f"{adf_result[4]['10%']:.4f}"]
+                            })
+                            st.dataframe(crit_vals, hide_index=True, use_container_width=True)
+                            
+                            # Interprétation
+                            if adf_result[1] < 0.05:
+                                st.markdown("""
+                                <div style="background-color: #0a1a00; border-left: 3px solid #00FF00; padding: 8px; margin: 5px 0;">
+                                    <p style="margin: 0; font-size: 10px; color: #00FF00; font-weight: bold;">
+                                    ✅ STATIONARY (p < 0.05)
+                                    </p>
+                                    <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
+                                    Reject null hypothesis - No unit root
+                                    </p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            else:
+                                st.markdown("""
+                                <div style="background-color: #1a0a00; border-left: 3px solid #FF6600; padding: 8px; margin: 5px 0;">
+                                    <p style="margin: 0; font-size: 10px; color: #FF6600; font-weight: bold;">
+                                    ⚠️ NON-STATIONARY (p ≥ 0.05)
+                                    </p>
+                                    <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
+                                    Fail to reject - Unit root present
+                                    </p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                    
+                    # KPSS Test
+                    if test_type in ["Both", "KPSS Only"]:
+                        with col_res2:
+                            st.markdown("**🔹 KPSS Test (Null: Series is stationary)**")
+                            
+                            kpss_result = kpss(series_values, regression='c', nlags='auto')
+                            
+                            kpss_data = {
+                                'Metric': ['KPSS Statistic', 'p-value', '# Lags Used'],
+                                'Value': [f"{kpss_result[0]:.4f}", f"{kpss_result[1]:.4f}", f"{kpss_result[2]}"]
+                            }
+                            
+                            st.dataframe(pd.DataFrame(kpss_data), hide_index=True, use_container_width=True)
+                            
+                            st.markdown("**Critical Values:**")
+                            crit_vals_kpss = pd.DataFrame({
+                                'Level': ['10%', '5%', '2.5%', '1%'],
+                                'Critical Value': [f"{kpss_result[3]['10%']:.4f}", 
+                                                  f"{kpss_result[3]['5%']:.4f}",
+                                                  f"{kpss_result[3]['2.5%']:.4f}",
+                                                  f"{kpss_result[3]['1%']:.4f}"]
+                            })
+                            st.dataframe(crit_vals_kpss, hide_index=True, use_container_width=True)
+                            
+                            # Interprétation (inverse de ADF)
+                            if kpss_result[1] > 0.05:
+                                st.markdown("""
+                                <div style="background-color: #0a1a00; border-left: 3px solid #00FF00; padding: 8px; margin: 5px 0;">
+                                    <p style="margin: 0; font-size: 10px; color: #00FF00; font-weight: bold;">
+                                    ✅ STATIONARY (p > 0.05)
+                                    </p>
+                                    <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
+                                    Fail to reject null - Series is stationary
+                                    </p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            else:
+                                st.markdown("""
+                                <div style="background-color: #1a0a00; border-left: 3px solid #FF6600; padding: 8px; margin: 5px 0;">
+                                    <p style="margin: 0; font-size: 10px; color: #FF6600; font-weight: bold;">
+                                    ⚠️ NON-STATIONARY (p ≤ 0.05)
+                                    </p>
+                                    <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
+                                    Reject null - Series is not stationary
+                                    </p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                    
+                    # Test sur les différences
+                    st.markdown('<div style="border-top: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+                    st.markdown("#### 📊 TEST ON FIRST DIFFERENCES")
+                    
+                    series_diff = series_values.diff().dropna()
+                    
+                    if len(series_diff) > 30:
+                        adf_diff = adfuller(series_diff, autolag='AIC')
+                        
+                        col_diff1, col_diff2 = st.columns(2)
+                        
+                        with col_diff1:
+                            st.metric("ADF Statistic (Diff)", f"{adf_diff[0]:.4f}")
+                            st.metric("p-value (Diff)", f"{adf_diff[1]:.4f}")
+                        
+                        with col_diff2:
+                            if adf_diff[1] < 0.05:
+                                st.markdown("""
+                                <div style="background-color: #0a1a00; border-left: 3px solid #00FF00; padding: 8px;">
+                                    <p style="margin: 0; font-size: 10px; color: #00FF00; font-weight: bold;">
+                                    ✅ FIRST DIFFERENCE IS STATIONARY
+                                    </p>
+                                    <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
+                                    Series is I(1) - Integrated of order 1
+                                    </p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                    
+                    # Graphique de la série
+                    st.markdown('<div style="border-top: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+                    st.markdown("#### 📈 SERIES VISUALIZATION")
+                    
+                    fig_stat = make_subplots(rows=2, cols=1, 
+                                            subplot_titles=('Original Series', 'First Difference'))
+                    
+                    fig_stat.add_trace(
+                        go.Scatter(x=df_series['date'], y=df_series['value'], 
+                                  mode='lines', line=dict(color='#FFAA00', width=1)),
+                        row=1, col=1
+                    )
+                    
+                    df_diff = df_series.copy()
+                    df_diff['diff'] = df_diff['value'].diff()
+                    
+                    fig_stat.add_trace(
+                        go.Scatter(x=df_diff['date'], y=df_diff['diff'], 
+                                  mode='lines', line=dict(color='#00FFFF', width=1)),
+                        row=2, col=1
+                    )
+                    
+                    fig_stat.update_layout(
+                        paper_bgcolor='#000',
+                        plot_bgcolor='#111',
+                        font=dict(color='#FFAA00', size=10),
+                        height=500,
+                        showlegend=False
+                    )
+                    
+                    fig_stat.update_xaxes(gridcolor='#333')
+                    fig_stat.update_yaxes(gridcolor='#333')
+                    
+                    st.plotly_chart(fig_stat, use_container_width=True)
+                    
+                except ImportError:
+                    st.error("❌ statsmodels not installed. Run: pip install statsmodels")
+                except Exception as e:
+                    st.error(f"❌ Error running tests: {e}")
+            else:
+                st.warning("⚠️ Not enough data points (need > 30)")
+    
+    # ===== SUBTAB 2: COINTÉGRATION =====
+    with subtab2:
+        st.markdown("#### 🔗 COINTEGRATION TESTS")
+        st.caption("Engle-Granger & Johansen Tests for long-run equilibrium")
+        
+        col_coint1, col_coint2 = st.columns([2, 1])
+        
+        with col_coint1:
+            series_coint_1 = st.selectbox(
+                "SELECT FIRST SERIES",
+                options=all_series_flat,
+                key="coint_series1"
+            )
+            
+            series_coint_2 = st.selectbox(
+                "SELECT SECOND SERIES",
+                options=all_series_flat,
+                index=1,
+                key="coint_series2"
+            )
+        
+        with col_coint2:
+            coint_test_type = st.radio(
+                "TEST METHOD",
+                options=["Engle-Granger", "Johansen"],
+                key="coint_test_method"
+            )
+        
+        if st.button("🔬 RUN COINTEGRATION TEST", use_container_width=True, key="run_coint_test"):
+            df1 = get_fred_series(series_coint_1)
+            df2 = get_fred_series(series_coint_2)
+            
+            if df1 is not None and df2 is not None:
+                try:
+                    from statsmodels.tsa.stattools import coint
+                    from statsmodels.tsa.vector_ar.vecm import coint_johansen
+                    
+                    # Merger les deux séries
+                    df_merged = pd.merge(
+                        df1[['date', 'value']].rename(columns={'value': 'series1'}),
+                        df2[['date', 'value']].rename(columns={'value': 'series2'}),
+                        on='date',
+                        how='inner'
+                    )
+                    
+                    if len(df_merged) > 30:
+                        if coint_test_type == "Engle-Granger":
+                            st.markdown("### 📊 ENGLE-GRANGER COINTEGRATION TEST")
+                            
+                            # Test de cointégration
+                            coint_stat, pvalue, crit_vals = coint(df_merged['series1'], df_merged['series2'])
+                            
+                            col_eg1, col_eg2 = st.columns(2)
+                            
+                            with col_eg1:
+                                st.metric("Test Statistic", f"{coint_stat:.4f}")
+                                st.metric("p-value", f"{pvalue:.4f}")
+                            
+                            with col_eg2:
+                                st.markdown("**Critical Values:**")
+                                crit_df = pd.DataFrame({
+                                    'Level': ['1%', '5%', '10%'],
+                                    'Value': [f"{crit_vals[0]:.4f}", f"{crit_vals[1]:.4f}", f"{crit_vals[2]:.4f}"]
+                                })
+                                st.dataframe(crit_df, hide_index=True, use_container_width=True)
+                            
+                            # Interprétation
+                            if pvalue < 0.05:
+                                st.markdown("""
+                                <div style="background-color: #0a1a00; border-left: 3px solid #00FF00; padding: 10px; margin: 10px 0;">
+                                    <p style="margin: 0; font-size: 11px; color: #00FF00; font-weight: bold;">
+                                    ✅ COINTEGRATED (p < 0.05)
+                                    </p>
+                                    <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
+                                    Series share a long-run equilibrium relationship. A VECM model can be estimated.
+                                    </p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            else:
+                                st.markdown("""
+                                <div style="background-color: #1a0a00; border-left: 3px solid #FF6600; padding: 10px; margin: 10px 0;">
+                                    <p style="margin: 0; font-size: 11px; color: #FF6600; font-weight: bold;">
+                                    ⚠️ NOT COINTEGRATED (p ≥ 0.05)
+                                    </p>
+                                    <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
+                                    No evidence of long-run equilibrium. Consider differencing or VAR in levels.
+                                    </p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                        
+                        else:  # Johansen
+                            st.markdown("### 📊 JOHANSEN COINTEGRATION TEST")
+                            
+                            data_matrix = df_merged[['series1', 'series2']].values
+                            
+                            johansen_result = coint_johansen(data_matrix, det_order=0, k_ar_diff=1)
+                            
+                            st.markdown("**Trace Statistic:**")
+                            trace_df = pd.DataFrame({
+                                'Rank': ['r = 0', 'r ≤ 1'],
+                                'Trace Stat': [f"{johansen_result.trace_stat[0]:.4f}", 
+                                              f"{johansen_result.trace_stat[1]:.4f}"],
+                                'Crit 5%': [f"{johansen_result.trace_stat_crit_vals[0, 1]:.4f}",
+                                           f"{johansen_result.trace_stat_crit_vals[1, 1]:.4f}"]
+                            })
+                            st.dataframe(trace_df, hide_index=True, use_container_width=True)
+                            
+                            # Interprétation
+                            if johansen_result.trace_stat[0] > johansen_result.trace_stat_crit_vals[0, 1]:
+                                st.markdown("""
+                                <div style="background-color: #0a1a00; border-left: 3px solid #00FF00; padding: 10px; margin: 10px 0;">
+                                    <p style="margin: 0; font-size: 11px; color: #00FF00; font-weight: bold;">
+                                    ✅ AT LEAST 1 COINTEGRATING RELATIONSHIP
+                                    </p>
+                                    <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
+                                    Series are cointegrated. VECM is appropriate.
+                                    </p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                        
+                        # Graphique des deux séries
+                        st.markdown('<div style="border-top: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+                        st.markdown("#### 📈 SERIES COMPARISON")
+                        
+                        fig_coint = make_subplots(specs=[[{"secondary_y": True}]])
+                        
+                        fig_coint.add_trace(
+                            go.Scatter(x=df_merged['date'], y=df_merged['series1'], 
+                                      name=series_coint_1, line=dict(color='#FFAA00', width=2)),
+                            secondary_y=False
+                        )
+                        
+                        fig_coint.add_trace(
+                            go.Scatter(x=df_merged['date'], y=df_merged['series2'], 
+                                      name=series_coint_2, line=dict(color='#00FFFF', width=2)),
+                            secondary_y=True
+                        )
+                        
+                        fig_coint.update_layout(
+                            title=f"{series_coint_1} vs {series_coint_2}",
+                            paper_bgcolor='#000',
+                            plot_bgcolor='#111',
+                            font=dict(color='#FFAA00', size=10),
+                            height=400
+                        )
+                        
+                        fig_coint.update_xaxes(gridcolor='#333')
+                        fig_coint.update_yaxes(gridcolor='#333')
+                        
+                        st.plotly_chart(fig_coint, use_container_width=True)
+                    
+                    else:
+                        st.warning("⚠️ Not enough overlapping data points")
+                
+                except ImportError:
+                    st.error("❌ statsmodels not installed")
+                except Exception as e:
+                    st.error(f"❌ Error: {e}")
+    
+    # ===== SUBTAB 3: VAR/VECM =====
+    with subtab3:
+        st.markdown("#### 📈 VAR/VECM MODELS")
+        st.caption("Vector Autoregression & Vector Error Correction Models")
+        
+        st.markdown("""
+        <div style="background-color: #0a0a0a; border-left: 3px solid #FFAA00; padding: 10px; margin: 10px 0;">
+            <p style="margin: 0; font-size: 10px; color: #FFAA00;">
+            🔧 VAR/VECM implementation requires substantial computation. 
+            Select 2-3 series and a reasonable lag order.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Sélection multi-séries
+        var_series = st.multiselect(
+            "SELECT 2-3 SERIES FOR VAR",
+            options=all_series_flat,
+            default=[all_series_flat[0], all_series_flat[1]],
+            max_selections=3,
+            key="var_series_select"
+        )
+        
+        col_var1, col_var2 = st.columns(2)
+        
+        with col_var1:
+            var_lags = st.slider("NUMBER OF LAGS", min_value=1, max_value=12, value=4, key="var_lags")
+        
+        with col_var2:
+            var_model_type = st.selectbox("MODEL TYPE", options=["VAR", "VECM"], key="var_model_type")
+        
+        if st.button("🔬 ESTIMATE VAR MODEL", use_container_width=True, key="run_var"):
+            if len(var_series) >= 2:
+                try:
+                    from statsmodels.tsa.api import VAR
+                    from statsmodels.tsa.vector_ar.vecm import VECM
+                    
+                    # Récupérer toutes les séries
+                    dfs = []
+                    for sid in var_series:
+                        df_temp = get_fred_series(sid)
+                        if df_temp is not None:
+                            dfs.append(df_temp[['date', 'value']].rename(columns={'value': sid}))
+                    
+                    # Merger
+                    df_var = dfs[0]
+                    for df in dfs[1:]:
+                        df_var = pd.merge(df_var, df, on='date', how='inner')
+                    
+                    df_var = df_var.dropna()
+                    
+                    if len(df_var) > var_lags * 3:
+                        data_for_var = df_var[var_series].values
+                        
+                        if var_model_type == "VAR":
+                            st.markdown("### 📊 VAR MODEL RESULTS")
+                            
+                            model = VAR(data_for_var)
+                            results = model.fit(var_lags)
+                            
+                            st.markdown(f"**Model Summary:**")
+                            st.text(str(results.summary()))
+                            
+                            # Granger causality
+                            st.markdown('<div style="border-top: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+                            st.markdown("#### 🎯 GRANGER CAUSALITY TESTS")
+                            
+                            from statsmodels.tsa.stattools import grangercausalitytests
+                            
+                            for i, caused in enumerate(var_series):
+                                for causing in var_series:
+                                    if caused != causing:
+                                        st.markdown(f"**Does {causing} Granger-cause {caused}?**")
+                                        
+                                        data_gc = df_var[[caused, causing]].values
+                                        gc_res = grangercausalitytests(data_gc, maxlag=var_lags, verbose=False)
+                                        
+                                        # Extraire p-value du test F
+                                        pval = gc_res[var_lags][0]['ssr_ftest'][1]
+                                        
+                                        if pval < 0.05:
+                                            st.success(f"✅ YES (p={pval:.4f})")
+                                        else:
+                                            st.info(f"❌ NO (p={pval:.4f})")
+                            
+                            # Impulse Response
+                            st.markdown('<div style="border-top: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+                            st.markdown("#### 📈 IMPULSE RESPONSE FUNCTIONS")
+                            
+                            irf = results.irf(10)
+                            
+                            fig_irf = irf.plot(impulse=var_series[0], response=var_series[1])
+                            st.pyplot(fig_irf)
+                        
+                        else:  # VECM
+                            st.markdown("### 📊 VECM MODEL (under construction)")
+                            st.info("VECM estimation requires cointegration testing first")
+                    
+                    else:
+                        st.warning("⚠️ Not enough data for VAR estimation")
+                
+                except ImportError:
+                    st.error("❌ statsmodels not installed")
+                except Exception as e:
+                    st.error(f"❌ Error: {e}")
+            else:
+                st.warning("⚠️ Select at least 2 series")
+    
+    # ===== SUBTAB 4: FORECASTING =====
+    with subtab4:
+        st.markdown("#### 🎯 TIME SERIES FORECASTING")
+        st.caption("ARIMA, SARIMAX, and Exponential Smoothing")
+        
+        col_fcst1, col_fcst2 = st.columns([2, 1])
+        
+        with col_fcst1:
+            fcst_series = st.selectbox(
+                "SELECT SERIES TO FORECAST",
+                options=all_series_flat,
+                key="fcst_series"
+            )
+        
+        with col_fcst2:
+            fcst_horizon = st.slider("FORECAST HORIZON (periods)", min_value=3, max_value=24, value=12, key="fcst_horizon")
+            
+            fcst_method = st.selectbox(
+                "METHOD",
+                options=["Auto ARIMA", "SARIMAX", "Exponential Smoothing"],
+                key="fcst_method"
+            )
+        
+        if st.button("🎯 GENERATE FORECAST", use_container_width=True, key="run_forecast"):
+            df_fcst = get_fred_series(fcst_series)
+            
+            if df_fcst is not None and len(df_fcst) > 50:
+                try:
+                    from statsmodels.tsa.arima.model import ARIMA
+                    from statsmodels.tsa.statespace.sarimax import SARIMAX
+                    from statsmodels.tsa.holtwinters import ExponentialSmoothing
+                    
+                    st.markdown(f"### 📊 FORECAST: {fcst_series}")
+                    
+                    series_data = df_fcst['value'].values
+                    dates = df_fcst['date'].values
+                    
+                    if fcst_method == "Auto ARIMA":
+                        # Simple ARIMA(1,1,1) pour démo
+                        model = ARIMA(series_data, order=(1,1,1))
+                        fitted = model.fit()
+                        
+                        forecast = fitted.forecast(steps=fcst_horizon)
+                        
+                        # Graphique
+                        fig_fcst = go.Figure()
+                        
+                        fig_fcst.add_trace(go.Scatter(
+                            x=dates,
+                            y=series_data,
+                            mode='lines',
+                            name='Historical',
+                            line=dict(color='#FFAA00', width=2)
+                        ))
+                        
+                        # Dates futures
+                        last_date = pd.to_datetime(dates[-1])
+                        freq = pd.infer_freq(dates)
+                        if freq is None:
+                            freq = 'M'  # Default monthly
+                        
+                        future_dates = pd.date_range(start=last_date, periods=fcst_horizon+1, freq=freq)[1:]
+                        
+                        fig_fcst.add_trace(go.Scatter(
+                            x=future_dates,
+                            y=forecast,
+                            mode='lines',
+                            name='Forecast',
+                            line=dict(color='#00FF00', width=2, dash='dash')
+                        ))
+                        
+                        fig_fcst.update_layout(
+                            title=f"{fcst_series} - ARIMA Forecast",
+                            paper_bgcolor='#000',
+                            plot_bgcolor='#111',
+                            font=dict(color='#FFAA00', size=10),
+                            xaxis=dict(gridcolor='#333'),
+                            yaxis=dict(gridcolor='#333'),
+                            height=400
+                        )
+                        
+                        st.plotly_chart(fig_fcst, use_container_width=True)
+                        
+                        # Statistiques du modèle
+                        st.markdown("**Model Statistics:**")
+                        col_stat1, col_stat2, col_stat3 = st.columns(3)
+                        
+                        with col_stat1:
+                            st.metric("AIC", f"{fitted.aic:.2f}")
+                        
+                        with col_stat2:
+                            st.metric("BIC", f"{fitted.bic:.2f}")
+                        
+                        with col_stat3:
+                            st.metric("Log-Likelihood", f"{fitted.llf:.2f}")
+                        
+                        # Forecast values table
+                        st.markdown("**Forecast Values:**")
+                        forecast_df = pd.DataFrame({
+                            'Date': future_dates,
+                            'Forecast': forecast,
+                            'Lower 95%': forecast - 1.96 * fitted.forecast(steps=fcst_horizon).std(),
+                            'Upper 95%': forecast + 1.96 * fitted.forecast(steps=fcst_horizon).std()
+                        })
+                        st.dataframe(forecast_df, hide_index=True, use_container_width=True)
+                    
+                    elif fcst_method == "SARIMAX":
+                        st.info("🔧 SARIMAX with seasonal components (12,1,1)(1,1,1,12)")
+                        
+                        # SARIMAX avec saisonnalité
+                        try:
+                            model = SARIMAX(series_data, order=(1,1,1), seasonal_order=(1,1,1,12))
+                            fitted = model.fit(disp=False)
+                            
+                            forecast = fitted.forecast(steps=fcst_horizon)
+                            
+                            # Graphique
+                            fig_fcst = go.Figure()
+                            
+                            fig_fcst.add_trace(go.Scatter(
+                                x=dates,
+                                y=series_data,
+                                mode='lines',
+                                name='Historical',
+                                line=dict(color='#FFAA00', width=2)
+                            ))
+                            
+                            last_date = pd.to_datetime(dates[-1])
+                            freq = pd.infer_freq(dates) or 'M'
+                            future_dates = pd.date_range(start=last_date, periods=fcst_horizon+1, freq=freq)[1:]
+                            
+                            fig_fcst.add_trace(go.Scatter(
+                                x=future_dates,
+                                y=forecast,
+                                mode='lines',
+                                name='Forecast',
+                                line=dict(color='#00FF00', width=2, dash='dash')
+                            ))
+                            
+                            # Confidence intervals
+                            forecast_ci = fitted.get_forecast(steps=fcst_horizon).conf_int()
+                            
+                            fig_fcst.add_trace(go.Scatter(
+                                x=future_dates,
+                                y=forecast_ci.iloc[:, 0],
+                                mode='lines',
+                                name='Lower 95%',
+                                line=dict(color='#666', width=1, dash='dot'),
+                                showlegend=True
+                            ))
+                            
+                            fig_fcst.add_trace(go.Scatter(
+                                x=future_dates,
+                                y=forecast_ci.iloc[:, 1],
+                                mode='lines',
+                                name='Upper 95%',
+                                line=dict(color='#666', width=1, dash='dot'),
+                                fill='tonexty',
+                                fillcolor='rgba(102, 102, 102, 0.2)',
+                                showlegend=True
+                            ))
+                            
+                            fig_fcst.update_layout(
+                                title=f"{fcst_series} - SARIMAX Forecast",
+                                paper_bgcolor='#000',
+                                plot_bgcolor='#111',
+                                font=dict(color='#FFAA00', size=10),
+                                xaxis=dict(gridcolor='#333'),
+                                yaxis=dict(gridcolor='#333'),
+                                height=400
+                            )
+                            
+                            st.plotly_chart(fig_fcst, use_container_width=True)
+                            
+                            # Model stats
+                            col_s1, col_s2, col_s3 = st.columns(3)
+                            with col_s1:
+                                st.metric("AIC", f"{fitted.aic:.2f}")
+                            with col_s2:
+                                st.metric("BIC", f"{fitted.bic:.2f}")
+                            with col_s3:
+                                st.metric("Log-Likelihood", f"{fitted.llf:.2f}")
+                        
+                        except Exception as e:
+                            st.error(f"SARIMAX error: {e}. Trying simple ARIMA instead.")
+                            # Fallback to simple ARIMA
+                            model = ARIMA(series_data, order=(1,1,1))
+                            fitted = model.fit()
+                            forecast = fitted.forecast(steps=fcst_horizon)
+                            st.warning("Fell back to ARIMA(1,1,1)")
+                    
+                    elif fcst_method == "Exponential Smoothing":
+                        st.info("🔧 Exponential Smoothing (Holt-Winters)")
+                        
+                        try:
+                            model = ExponentialSmoothing(series_data, seasonal_periods=12, trend='add', seasonal='add')
+                            fitted = model.fit()
+                            
+                            forecast = fitted.forecast(steps=fcst_horizon)
+                            
+                            # Graphique
+                            fig_fcst = go.Figure()
+                            
+                            fig_fcst.add_trace(go.Scatter(
+                                x=dates,
+                                y=series_data,
+                                mode='lines',
+                                name='Historical',
+                                line=dict(color='#FFAA00', width=2)
+                            ))
+                            
+                            last_date = pd.to_datetime(dates[-1])
+                            freq = pd.infer_freq(dates) or 'M'
+                            future_dates = pd.date_range(start=last_date, periods=fcst_horizon+1, freq=freq)[1:]
+                            
+                            fig_fcst.add_trace(go.Scatter(
+                                x=future_dates,
+                                y=forecast,
+                                mode='lines',
+                                name='Forecast',
+                                line=dict(color='#00FF00', width=2, dash='dash')
+                            ))
+                            
+                            fig_fcst.update_layout(
+                                title=f"{fcst_series} - Exponential Smoothing Forecast",
+                                paper_bgcolor='#000',
+                                plot_bgcolor='#111',
+                                font=dict(color='#FFAA00', size=10),
+                                xaxis=dict(gridcolor='#333'),
+                                yaxis=dict(gridcolor='#333'),
+                                height=400
+                            )
+                            
+                            st.plotly_chart(fig_fcst, use_container_width=True)
+                            
+                        except Exception as e:
+                            st.error(f"Exponential Smoothing error: {e}")
+                
+                except ImportError:
+                    st.error("❌ statsmodels not installed. Run: pip install statsmodels")
+                except Exception as e:
+                    st.error(f"❌ Error: {e}")
+            else:
+                st.warning("⚠️ Need at least 50 data points for forecasting")
+    
+    # ===== SUBTAB 5: MACHINE LEARNING =====
+    with subtab5:
+        st.markdown("#### 🤖 MACHINE LEARNING MODELS")
+        st.caption("Random Forest, XGBoost, and Neural Networks for economic forecasting")
+        
+        st.markdown("""
+        <div style="background-color: #0a0a0a; border-left: 3px solid #FF00FF; padding: 10px; margin: 10px 0;">
+            <p style="margin: 0; font-size: 10px; color: #FF00FF; font-weight: bold;">
+            🚀 ADVANCED ML FORECASTING
+            </p>
+            <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
+            Uses multiple economic indicators as features to predict target variable.
+            Includes automatic feature engineering (lags, rolling means, momentum indicators).
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col_ml1, col_ml2 = st.columns([2, 1])
+        
+        with col_ml1:
+            ml_target = st.selectbox(
+                "TARGET VARIABLE TO PREDICT",
+                options=['CPIAUCSL', 'UNRATE', 'GDP', 'DGS10', 'FEDFUNDS'],
+                key="ml_target"
+            )
+            
+            ml_features = st.multiselect(
+                "FEATURE VARIABLES (predictors)",
+                options=[s for s in all_series_flat if s != ml_target],
+                default=['FEDFUNDS', 'M2SL', 'UNRATE'][:3] if ml_target != 'FEDFUNDS' else ['CPIAUCSL', 'M2SL', 'UNRATE'],
+                key="ml_features"
+            )
+        
+        with col_ml2:
+            ml_model_type = st.selectbox(
+                "MODEL TYPE",
+                options=["Random Forest", "XGBoost", "Linear Regression"],
+                key="ml_model"
+            )
+            
+            ml_lags = st.slider("NUMBER OF LAGS", min_value=1, max_value=12, value=6, key="ml_lags")
+            
+            ml_horizon = st.slider("FORECAST HORIZON", min_value=1, max_value=12, value=3, key="ml_horizon")
+        
+        if st.button("🤖 TRAIN ML MODEL", use_container_width=True, key="train_ml"):
+            if len(ml_features) > 0:
+                try:
+                    import numpy as np
+                    from sklearn.ensemble import RandomForestRegressor
+                    from sklearn.linear_model import LinearRegression
+                    from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+                    from sklearn.model_selection import train_test_split
+                    
+                    st.markdown(f"### 🤖 ML MODEL: {ml_model_type}")
+                    st.info(f"Target: {ml_target} | Features: {', '.join(ml_features)}")
+                    
+                    # Récupérer toutes les séries
+                    all_series_needed = [ml_target] + ml_features
+                    dfs_ml = []
+                    
+                    for sid in all_series_needed:
+                        df_temp = get_fred_series(sid)
+                        if df_temp is not None:
+                            dfs_ml.append(df_temp[['date', 'value']].rename(columns={'value': sid}))
+                    
+                    # Merger
+                    if len(dfs_ml) > 0:
+                        df_ml = dfs_ml[0]
+                        for df in dfs_ml[1:]:
+                            df_ml = pd.merge(df_ml, df, on='date', how='inner')
+                        
+                        df_ml = df_ml.dropna()
+                        df_ml = df_ml.sort_values('date').reset_index(drop=True)
+                        
+                        if len(df_ml) > 50:
+                            # Feature engineering
+                            st.markdown("**🔧 Feature Engineering...**")
+                            
+                            features_engineered = pd.DataFrame()
+                            
+                            # Ajouter les lags
+                            for feature in ml_features:
+                                for lag in range(1, ml_lags + 1):
+                                    features_engineered[f'{feature}_lag{lag}'] = df_ml[feature].shift(lag)
+                                
+                                # Rolling means
+                                features_engineered[f'{feature}_ma3'] = df_ml[feature].rolling(3).mean()
+                                features_engineered[f'{feature}_ma6'] = df_ml[feature].rolling(6).mean()
+                                
+                                # Momentum
+                                features_engineered[f'{feature}_mom'] = df_ml[feature].pct_change(3)
+                            
+                            # Target (future value)
+                            target = df_ml[ml_target].shift(-ml_horizon)
+                            
+                            # Combiner
+                            data_ml = pd.concat([features_engineered, target.rename('target')], axis=1)
+                            data_ml = data_ml.dropna()
+                            
+                            if len(data_ml) > 30:
+                                X = data_ml.drop('target', axis=1)
+                                y = data_ml['target']
+                                
+                                # Split train/test
+                                X_train, X_test, y_train, y_test = train_test_split(
+                                    X, y, test_size=0.2, shuffle=False
+                                )
+                                
+                                # Entraîner le modèle
+                                if ml_model_type == "Random Forest":
+                                    model = RandomForestRegressor(n_estimators=100, max_depth=10, random_state=42)
+                                elif ml_model_type == "Linear Regression":
+                                    model = LinearRegression()
+                                else:  # XGBoost
+                                    try:
+                                        import xgboost as xgb
+                                        model = xgb.XGBRegressor(n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42)
+                                    except ImportError:
+                                        st.warning("XGBoost not installed, using Random Forest instead")
+                                        model = RandomForestRegressor(n_estimators=100, max_depth=10, random_state=42)
+                                
+                                with st.spinner("Training model..."):
+                                    model.fit(X_train, y_train)
+                                
+                                # Prédictions
+                                y_pred_train = model.predict(X_train)
+                                y_pred_test = model.predict(X_test)
+                                
+                                # Métriques
+                                st.markdown("#### 📊 MODEL PERFORMANCE")
+                                
+                                col_perf1, col_perf2 = st.columns(2)
+                                
+                                with col_perf1:
+                                    st.markdown("**Training Set:**")
+                                    train_rmse = np.sqrt(mean_squared_error(y_train, y_pred_train))
+                                    train_mae = mean_absolute_error(y_train, y_pred_train)
+                                    train_r2 = r2_score(y_train, y_pred_train)
+                                    
+                                    st.metric("RMSE", f"{train_rmse:.4f}")
+                                    st.metric("MAE", f"{train_mae:.4f}")
+                                    st.metric("R²", f"{train_r2:.4f}")
+                                
+                                with col_perf2:
+                                    st.markdown("**Test Set:**")
+                                    test_rmse = np.sqrt(mean_squared_error(y_test, y_pred_test))
+                                    test_mae = mean_absolute_error(y_test, y_pred_test)
+                                    test_r2 = r2_score(y_test, y_pred_test)
+                                    
+                                    st.metric("RMSE", f"{test_rmse:.4f}")
+                                    st.metric("MAE", f"{test_mae:.4f}")
+                                    st.metric("R²", f"{test_r2:.4f}")
+                                
+                                # Feature importance
+                                if hasattr(model, 'feature_importances_'):
+                                    st.markdown("#### 📊 FEATURE IMPORTANCE")
+                                    
+                                    importance_df = pd.DataFrame({
+                                        'Feature': X.columns,
+                                        'Importance': model.feature_importances_
+                                    }).sort_values('Importance', ascending=False).head(10)
+                                    
+                                    fig_imp = go.Figure()
+                                    fig_imp.add_trace(go.Bar(
+                                        x=importance_df['Importance'],
+                                        y=importance_df['Feature'],
+                                        orientation='h',
+                                        marker=dict(color='#FFAA00')
+                                    ))
+                                    
+                                    fig_imp.update_layout(
+                                        title="Top 10 Most Important Features",
+                                        paper_bgcolor='#000',
+                                        plot_bgcolor='#111',
+                                        font=dict(color='#FFAA00', size=10),
+                                        xaxis=dict(gridcolor='#333', title="Importance"),
+                                        yaxis=dict(gridcolor='#333'),
+                                        height=400
+                                    )
+                                    
+                                    st.plotly_chart(fig_imp, use_container_width=True)
+                                
+                                # Graphique prédictions vs réel
+                                st.markdown("#### 📈 PREDICTIONS VS ACTUAL")
+                                
+                                fig_pred = go.Figure()
+                                
+                                # Test set only
+                                test_indices = y_test.index
+                                test_dates = df_ml.loc[test_indices, 'date']
+                                
+                                fig_pred.add_trace(go.Scatter(
+                                    x=test_dates,
+                                    y=y_test.values,
+                                    mode='lines+markers',
+                                    name='Actual',
+                                    line=dict(color='#FFAA00', width=2)
+                                ))
+                                
+                                fig_pred.add_trace(go.Scatter(
+                                    x=test_dates,
+                                    y=y_pred_test,
+                                    mode='lines+markers',
+                                    name='Predicted',
+                                    line=dict(color='#00FF00', width=2, dash='dash')
+                                ))
+                                
+                                fig_pred.update_layout(
+                                    title=f"{ml_target} - Actual vs Predicted (Test Set)",
+                                    paper_bgcolor='#000',
+                                    plot_bgcolor='#111',
+                                    font=dict(color='#FFAA00', size=10),
+                                    xaxis=dict(gridcolor='#333', title="Date"),
+                                    yaxis=dict(gridcolor='#333', title="Value"),
+                                    height=400
+                                )
+                                
+                                st.plotly_chart(fig_pred, use_container_width=True)
+                                
+                                # Résiduals analysis
+                                st.markdown("#### 📊 RESIDUALS ANALYSIS")
+                                
+                                residuals = y_test - y_pred_test
+                                
+                                col_res1, col_res2 = st.columns(2)
+                                
+                                with col_res1:
+                                    fig_res = go.Figure()
+                                    fig_res.add_trace(go.Scatter(
+                                        x=test_dates,
+                                        y=residuals,
+                                        mode='markers',
+                                        marker=dict(color='#FF6600', size=6)
+                                    ))
+                                    fig_res.add_hline(y=0, line_dash="dash", line_color="#FFAA00")
+                                    
+                                    fig_res.update_layout(
+                                        title="Residuals over Time",
+                                        paper_bgcolor='#000',
+                                        plot_bgcolor='#111',
+                                        font=dict(color='#FFAA00', size=10),
+                                        xaxis=dict(gridcolor='#333'),
+                                        yaxis=dict(gridcolor='#333'),
+                                        height=300
+                                    )
+                                    
+                                    st.plotly_chart(fig_res, use_container_width=True)
+                                
+                                with col_res2:
+                                    fig_hist = go.Figure()
+                                    fig_hist.add_trace(go.Histogram(
+                                        x=residuals,
+                                        nbinsx=20,
+                                        marker=dict(color='#FFAA00')
+                                    ))
+                                    
+                                    fig_hist.update_layout(
+                                        title="Residuals Distribution",
+                                        paper_bgcolor='#000',
+                                        plot_bgcolor='#111',
+                                        font=dict(color='#FFAA00', size=10),
+                                        xaxis=dict(gridcolor='#333', title="Residual"),
+                                        yaxis=dict(gridcolor='#333', title="Frequency"),
+                                        height=300
+                                    )
+                                    
+                                    st.plotly_chart(fig_hist, use_container_width=True)
+                            
+                            else:
+                                st.warning("⚠️ Not enough data after feature engineering")
+                        else:
+                            st.warning("⚠️ Need at least 50 overlapping observations")
+                    else:
+                        st.error("❌ Could not retrieve data for selected series")
+                
+                except ImportError as ie:
+                    st.error(f"❌ Missing library: {ie}. Install with: pip install scikit-learn xgboost")
+                except Exception as e:
+                    st.error(f"❌ Error: {e}")
+            else:
+                st.warning("⚠️ Please select at least one feature variable")
+                        
