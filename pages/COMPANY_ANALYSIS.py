@@ -1092,6 +1092,25 @@ if not search_button or not ticker_input:
     </div>
     """, unsafe_allow_html=True)
     
+    # Examples - Simple display
+    st.markdown("#### 🔍 POPULAR TICKERS")
+    st.markdown("""
+    <div style="background-color: #0a0a0a; border: 1px solid #333; padding: 15px; margin: 10px 0;">
+        <p style="margin: 0 0 10px 0; font-size: 10px; color: #FFAA00;">
+        Try these popular tickers:
+        </p>
+        <ul style="margin: 0; font-size: 11px; color: #999; list-style: none; padding: 0;">
+            <li style="margin: 5px 0;">🇺🇸 <strong style="color: #00FFFF;">AAPL</strong> - Apple Inc.</li>
+            <li style="margin: 5px 0;">🇺🇸 <strong style="color: #00FFFF;">MSFT</strong> - Microsoft Corp.</li>
+            <li style="margin: 5px 0;">🇺🇸 <strong style="color: #00FFFF;">TSLA</strong> - Tesla Inc.</li>
+            <li style="margin: 5px 0;">🇫🇷 <strong style="color: #00FFFF;">MC.PA</strong> - LVMH</li>
+            <li style="margin: 5px 0;">🇫🇷 <strong style="color: #00FFFF;">AIR.PA</strong> - Airbus</li>
+            <li style="margin: 5px 0;">🇨🇭 <strong style="color: #00FFFF;">NESN.SW</strong> - Nestlé</li>
+            <li style="margin: 5px 0;">🇨🇭 <strong style="color: #00FFFF;">NOVN.SW</strong> - Novartis</li>
+            <li style="margin: 5px 0;">🇬🇧 <strong style="color: #00FFFF;">SHEL.L</strong> - Shell</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)    
     # Examples
     st.markdown("#### 🔍 EXAMPLE TICKERS")
     
