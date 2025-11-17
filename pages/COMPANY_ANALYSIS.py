@@ -311,16 +311,12 @@ if search_button and ticker_input:
                 with col_ov4:
                     dividend_yield = info.get('dividendYield', 0)
                     if dividend_yield:
-                        # Yahoo Finance retourne en décimal (0.0034 = 0.34%)
-                        # Donc on multiplie par 100 pour avoir le pourcentage
-                        # Si vous voyez 34% au lieu de 0.34%, c'est que la valeur est déjà
-                        # multipliée par 100 dans certains cas
-                        if dividend_yield > 1:  # Si > 1, c'est probablement déjà en %
-                            display_value = dividend_yield / 100
-                        else:  # Sinon c'est un décimal normal
-                            display_value = dividend_yield
-                        
-                        st.metric("DIVIDEND YIELD", f"{display_value*100:.2f}%")
+                        # Yahoo Finance retourne généralement en décimal (0.0034 = 0.34%)
+                        # mais parfois peut varier selon l'action
+                        if dividend_yield < 1:  # Si < 1, c'est un décimal
+                            st.metric("DIVIDEND YIELD", f"{dividend_yield*100:.2f}%")
+                        else:  # Si >= 1, c'est déjà en pourcentage
+                            st.metric("DIVIDEND YIELD", f"{dividend_yield:.2f}%")
                     else:
                         st.metric("DIVIDEND YIELD", "N/A")
                 
