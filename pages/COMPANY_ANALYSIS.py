@@ -167,6 +167,7 @@ st.markdown(f'''
 
 # Fonctions pour récupérer les données
 @st.cache_data(ttl=300)
+@st.cache_resource(ttl=300)
 def get_company_info(ticker):
     """Récupère les informations de l'entreprise via yfinance"""
     try:
@@ -181,7 +182,8 @@ def get_company_info(ticker):
         st.error(f"Error fetching data for {ticker}: {e}")
         return None, None
 
-@st.cache_data(ttl=300)
+
+@st.cache_resource(ttl=300)
 def get_financial_statements(ticker):
     """Récupère les états financiers"""
     try:
