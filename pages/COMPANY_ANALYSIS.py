@@ -356,25 +356,37 @@ if search_button and ticker_input:
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Key People
-                st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-                st.markdown("#### 👥 KEY EXECUTIVES")
-                
-                officers = info.get('companyOfficers', [])
-                
-                if officers:
-                    exec_data = []
-                    for officer in officers[:5]:  # Top 5
-                        exec_data.append({
-                            'Name': officer.get('name', 'N/A'),
-                            'Title': officer.get('title', 'N/A'),
-                            'Pay': f"${officer.get('totalPay', {}).get('fmt', 'N/A')}" if officer.get('totalPay') else 'N/A'
-                        })
-                    
-                    exec_df = pd.DataFrame(exec_data)
-                    st.dataframe(exec_df, use_container_width=True, hide_index=True)
-                else:
-                    st.info("Executive information not available")
+                # Remplacez cette section (lignes 365-375 environ) par :
+
+# Key People
+st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+st.markdown("#### 👥 KEY EXECUTIVES")
+
+officers = info.get('companyOfficers', [])
+
+if officers:
+    exec_data = []
+    for officer in officers[:5]:  # Top 5
+        # Correction : totalPay peut être un int directement ou un dict
+        total_pay = officer.get('totalPay', None)
+        
+        if isinstance(total_pay, dict):
+            pay_display = f"${total_pay.get('fmt', 'N/A')}"
+        elif isinstance(total_pay, (int, float)):
+            pay_display = f"${total_pay:,.0f}" if total_pay else 'N/A'
+        else:
+            pay_display = 'N/A'
+        
+        exec_data.append({
+            'Name': officer.get('name', 'N/A'),
+            'Title': officer.get('title', 'N/A'),
+            'Pay': pay_display
+        })
+    
+    exec_df = pd.DataFrame(exec_data)
+    st.dataframe(exec_df, use_container_width=True, hide_index=True)
+else:
+    st.info("Executive information not available")
             
             # ===== TAB 2: FINANCIALS =====
             with tab2:
