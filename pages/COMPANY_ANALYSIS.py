@@ -221,44 +221,8 @@ def get_price_history(ticker, period='1y'):
         st.error(f"Error fetching price history: {e}")
         return None
 
-# ===== BARRE DE RECHERCHE =====
-st.markdown("### 🔍 COMPANY SEARCH")
-
-col_search1, col_search2 = st.columns([4, 1])
-
-with col_search1:
-    ticker_input = st.text_input(
-        "",
-        placeholder="Enter ticker symbol (e.g., AAPL, MSFT, TSLA, MC.PA...)",
-        key="ticker_search",
-        label_visibility="collapsed"
-    ).upper()
-
-with col_search2:
-    search_button = st.button("🔍 ANALYZE", use_container_width=True, key="search_company")
-
-st.markdown('<div style="border-bottom: 1px solid #333; margin: 8px 0;"></div>', unsafe_allow_html=True)
-
-@st.cache_data(ttl=300)
-def get_price_history(ticker, period='1y'):
-    """Récupère l'historique des prix"""
-    try:
-        import yfinance as yf
-        
-        stock = yf.Ticker(ticker)
-        hist = stock.history(period=period)
-        
-        return hist
-        
-    except Exception as e:
-        st.error(f"Error fetching price history: {e}")
-        return None
-
-# ⭐ AJOUTEZ LA FONCTION ICI ⭐
 def analyze_financials_with_ai(data_type, dataframe, company_name, ticker):
-    """
-    Analyse les données financières avec Groq AI
-    """
+    """Analyse les données financières avec Groq AI"""
     try:
         # Récupérer la clé API depuis les secrets
         api_key = st.secrets.get("GROQ_API_KEY", None)
@@ -345,6 +309,24 @@ Use emojis and be concise but insightful. Format with clear sections."""
     except Exception as e:
         return f"❌ Error during AI analysis: {str(e)}\n\nPlease check:\n- Your GROQ_API_KEY is correctly set in Streamlit secrets\n- You have internet connection\n- The Groq API is available"
 
+# ===== BARRE DE RECHERCHE =====
+st.markdown("### 🔍 COMPANY SEARCH")
+
+col_search1, col_search2 = st.columns([4, 1])
+
+with col_search1:
+    ticker_input = st.text_input(
+        "",
+        placeholder="Enter ticker symbol (e.g., AAPL, MSFT, TSLA, MC.PA...)",
+        key="ticker_search",
+        label_visibility="collapsed"
+    ).upper()
+
+with col_search2:
+    search_button = st.button("🔍 ANALYZE", use_container_width=True, key="search_company")
+
+st.markdown('<div style="border-bottom: 1px solid #333; margin: 8px 0;"></div>', unsafe_allow_html=True)
+
 # ===== AFFICHAGE DES DONNÉES =====
 if search_button and ticker_input:
     with st.spinner(f'🔍 Analyzing {ticker_input}...'):
@@ -419,6 +401,9 @@ if search_button and ticker_input:
                 with col_ov4:
                     dividend_yield = info.get('dividendYield', 0)
                     if dividend_yield:
+                        if dividend_yield < 1:
+                            st.metric("DIVIDEND YIELD", f"{dividend_yield*100:.2f}%")
+                        else:
                             st.metric("DIVIDEND YIELD", f"{dividend_yield:.2f}%")
                     else:
                         st.metric("DIVIDEND YIELD", "N/A")
@@ -472,8 +457,7 @@ if search_button and ticker_input:
                 
                 if officers:
                     exec_data = []
-                    for officer in officers[:5]:  # Top 5
-                        # Correction : totalPay peut être un int directement ou un dict
+                    for officer in officers[:5]:
                         total_pay = officer.get('totalPay', None)
                         
                         if isinstance(total_pay, dict):
@@ -493,8 +477,6 @@ if search_button and ticker_input:
                     st.dataframe(exec_df, use_container_width=True, hide_index=True)
                 else:
                     st.info("Executive information not available")
-
-
             
             # ===== TAB 2: FINANCIALS =====
             with tab2:
@@ -503,14 +485,13 @@ if search_button and ticker_input:
                 financials = get_financial_statements(ticker_input)
                 
                 if financials:
-                    # Sous-onglets pour les états financiers
                     fin_tab1, fin_tab2, fin_tab3 = st.tabs([
                         "📊 INCOME STATEMENT",
                         "📊 BALANCE SHEET",
                         "📊 CASH FLOW"
                     ])
                     
-                    # Income Statement
+                    # ===== INCOME STATEMENT =====
                     with fin_tab1:
                         st.markdown("#### 📊 INCOME STATEMENT")
                         
@@ -527,10 +508,8 @@ if search_button and ticker_input:
                             income_df = financials['quarterly_income']
                         
                         if income_df is not None and not income_df.empty:
-                            # Formatter les nombres
                             income_display = income_df.copy()
                             
-                            # Convertir en millions
                             for col in income_display.columns:
                                 income_display[col] = income_display[col].apply(
                                     lambda x: f"${x/1e6:,.0f}M" if pd.notna(x) and x != 0 else "-"
@@ -538,41 +517,7 @@ if search_button and ticker_input:
                             
                             st.dataframe(income_display, use_container_width=True)
                             
-                            # Key metrics from income statement
-                            st.markdown("#### 📊 KEY METRICS")
-                            
-                            col_inc1, col_inc2, col_inc3, col_inc4 = st.columns(4)
-                            
-                            try:
-                                revenue = income_df.loc['Total Revenue'].iloc[0]
-                                gross_profit = income_df.loc['Gross Profit'].iloc[0] if 'Gross Profit' in income_df.index else 0
-                                operating_income = income_df.loc['Operating Income'].iloc[0] if 'Operating Income' in income_df.index else 0
-                                net_income = income_df.loc['Net Income'].iloc[0] if 'Net Income' in income_df.index else 0
-                                
-                                with col_inc1:
-                                    st.metric("REVENUE", f"${revenue/1e9:.2f}B" if revenue else "N/A")
-                                
-                                with col_inc2:
-                                    gross_margin = (gross_profit / revenue * 100) if revenue and gross_profit else 0
-                                    st.metric("GROSS MARGIN", f"{gross_margin:.1f}%" if gross_margin else "N/A")
-                                
-                                with col_inc3:
-                                    operating_margin = (operating_income / revenue * 100) if revenue and operating_income else 0
-                                    st.metric("OPERATING MARGIN", f"{operating_margin:.1f}%" if operating_margin else "N/A")
-                                
-                                with col_inc4:
-                                    net_margin = (net_income / revenue * 100) if revenue and net_income else 0
-                                    st.metric("NET MARGIN", f"{net_margin:.1f}%" if net_margin else "N/A")
-                            
-                            except:
-                                st.warning("Could not calculate key metrics")
-                        
-                        else:
-                            st.warning("Income statement data not available")
-
-                    st.dataframe(income_display, use_container_width=True)
-                            
-                            # ⭐ AJOUTEZ ICI (APRÈS le st.dataframe) ⭐
+                            # ⭐ BOUTON AI POUR INCOME STATEMENT ⭐
                             st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
                             
                             col_ai1, col_ai2 = st.columns([1, 3])
@@ -603,10 +548,39 @@ if search_button and ticker_input:
                                     </div>
                                     """, unsafe_allow_html=True)
                             
-                            # Key metrics from income statement (code existant continue ici)
+                            # Key metrics
                             st.markdown("#### 📊 KEY METRICS")
+                            
+                            col_inc1, col_inc2, col_inc3, col_inc4 = st.columns(4)
+                            
+                            try:
+                                revenue = income_df.loc['Total Revenue'].iloc[0]
+                                gross_profit = income_df.loc['Gross Profit'].iloc[0] if 'Gross Profit' in income_df.index else 0
+                                operating_income = income_df.loc['Operating Income'].iloc[0] if 'Operating Income' in income_df.index else 0
+                                net_income = income_df.loc['Net Income'].iloc[0] if 'Net Income' in income_df.index else 0
+                                
+                                with col_inc1:
+                                    st.metric("REVENUE", f"${revenue/1e9:.2f}B" if revenue else "N/A")
+                                
+                                with col_inc2:
+                                    gross_margin = (gross_profit / revenue * 100) if revenue and gross_profit else 0
+                                    st.metric("GROSS MARGIN", f"{gross_margin:.1f}%" if gross_margin else "N/A")
+                                
+                                with col_inc3:
+                                    operating_margin = (operating_income / revenue * 100) if revenue and operating_income else 0
+                                    st.metric("OPERATING MARGIN", f"{operating_margin:.1f}%" if operating_margin else "N/A")
+                                
+                                with col_inc4:
+                                    net_margin = (net_income / revenue * 100) if revenue and net_income else 0
+                                    st.metric("NET MARGIN", f"{net_margin:.1f}%" if net_margin else "N/A")
+                            
+                            except:
+                                st.warning("Could not calculate key metrics")
+                        
+                        else:
+                            st.warning("Income statement data not available")
                     
-                    # Balance Sheet
+                    # ===== BALANCE SHEET =====
                     with fin_tab2:
                         st.markdown("#### 📊 BALANCE SHEET")
                         
@@ -623,7 +597,6 @@ if search_button and ticker_input:
                             balance_df = financials['quarterly_balance']
                         
                         if balance_df is not None and not balance_df.empty:
-                            # Formatter
                             balance_display = balance_df.copy()
                             
                             for col in balance_display.columns:
@@ -632,6 +605,37 @@ if search_button and ticker_input:
                                 )
                             
                             st.dataframe(balance_display, use_container_width=True)
+                            
+                            # ⭐ BOUTON AI POUR BALANCE SHEET ⭐
+                            st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+                            
+                            col_ai1, col_ai2 = st.columns([1, 3])
+                            
+                            with col_ai1:
+                                analyze_button_bs = st.button(
+                                    "🤖 ANALYZE WITH AI",
+                                    key="analyze_balance",
+                                    use_container_width=True
+                                )
+                            
+                            with col_ai2:
+                                st.caption("Get AI-powered insights on this financial statement")
+                            
+                            if analyze_button_bs:
+                                with st.spinner('🤖 AI is analyzing the financial data...'):
+                                    analysis = analyze_financials_with_ai(
+                                        "Balance Sheet",
+                                        balance_df,
+                                        company_name,
+                                        ticker_input
+                                    )
+                                    
+                                    st.markdown("#### 🤖 AI FINANCIAL ANALYSIS")
+                                    st.markdown(f"""
+                                    <div style="background-color: #0a0a0a; border-left: 3px solid #00FF00; padding: 15px; margin: 10px 0;">
+                                        {analysis.replace(chr(10), '<br>')}
+                                    </div>
+                                    """, unsafe_allow_html=True)
                             
                             # Key ratios
                             st.markdown("#### 📊 KEY RATIOS")
@@ -664,45 +668,8 @@ if search_button and ticker_input:
                         
                         else:
                             st.warning("Balance sheet data not available")
-
-                    st.dataframe(balance_display, use_container_width=True)
-                            
-                            # ⭐ AJOUTEZ ICI ⭐
-                            st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-                            
-                            col_ai1, col_ai2 = st.columns([1, 3])
-                            
-                            with col_ai1:
-                                analyze_button_bs = st.button(
-                                    "🤖 ANALYZE WITH AI",
-                                    key="analyze_balance",
-                                    use_container_width=True
-                                )
-                            
-                            with col_ai2:
-                                st.caption("Get AI-powered insights on this financial statement")
-                            
-                            if analyze_button_bs:
-                                with st.spinner('🤖 AI is analyzing the financial data...'):
-                                    analysis = analyze_financials_with_ai(
-                                        "Balance Sheet",
-                                        balance_df,
-                                        company_name,
-                                        ticker_input
-                                    )
-                                    
-                                    st.markdown("#### 🤖 AI FINANCIAL ANALYSIS")
-                                    st.markdown(f"""
-                                    <div style="background-color: #0a0a0a; border-left: 3px solid #00FF00; padding: 15px; margin: 10px 0;">
-                                        {analysis.replace(chr(10), '<br>')}
-                                    </div>
-                                    """, unsafe_allow_html=True)
-                            
-                            # Key ratios (code existant continue)
-                            st.markdown("#### 📊 KEY RATIOS")
-
                     
-                    # Cash Flow
+                    # ===== CASH FLOW =====
                     with fin_tab3:
                         st.markdown("#### 📊 CASH FLOW STATEMENT")
                         
@@ -719,7 +686,6 @@ if search_button and ticker_input:
                             cashflow_df = financials['quarterly_cashflow']
                         
                         if cashflow_df is not None and not cashflow_df.empty:
-                            # Formatter
                             cashflow_display = cashflow_df.copy()
                             
                             for col in cashflow_display.columns:
@@ -729,40 +695,7 @@ if search_button and ticker_input:
                             
                             st.dataframe(cashflow_display, use_container_width=True)
                             
-                            # Key cash flow metrics
-                            st.markdown("#### 📊 CASH FLOW METRICS")
-                            
-                            col_cf1, col_cf2, col_cf3 = st.columns(3)
-                            
-                            try:
-                                operating_cf = cashflow_df.loc['Operating Cash Flow'].iloc[0] if 'Operating Cash Flow' in cashflow_df.index else 0
-                                investing_cf = cashflow_df.loc['Investing Cash Flow'].iloc[0] if 'Investing Cash Flow' in cashflow_df.index else 0
-                                financing_cf = cashflow_df.loc['Financing Cash Flow'].iloc[0] if 'Financing Cash Flow' in cashflow_df.index else 0
-                                free_cf = cashflow_df.loc['Free Cash Flow'].iloc[0] if 'Free Cash Flow' in cashflow_df.index else 0
-                                
-                                with col_cf1:
-                                    st.metric("OPERATING CF", f"${operating_cf/1e9:.2f}B" if operating_cf else "N/A")
-                                
-                                with col_cf2:
-                                    st.metric("FREE CF", f"${free_cf/1e9:.2f}B" if free_cf else "N/A")
-                                
-                                with col_cf3:
-                                    fcf_margin = (free_cf / revenue * 100) if 'revenue' in locals() and revenue and free_cf else 0
-                                    st.metric("FCF MARGIN", f"{fcf_margin:.1f}%" if fcf_margin else "N/A")
-                            
-                            except:
-                                st.warning("Could not calculate cash flow metrics")
-                        
-                        else:
-                            st.warning("Cash flow data not available")
-                
-                else:
-                    st.error("Could not retrieve financial statements")
-
-
-            st.dataframe(cashflow_display, use_container_width=True)
-                            
-                            # ⭐ AJOUTEZ ICI ⭐
+                            # ⭐ BOUTON AI POUR CASH FLOW ⭐
                             st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
                             
                             col_ai1, col_ai2 = st.columns([1, 3])
@@ -793,15 +726,40 @@ if search_button and ticker_input:
                                     </div>
                                     """, unsafe_allow_html=True)
                             
-                            # Key cash flow metrics (code existant continue)
+                            # Key cash flow metrics
                             st.markdown("#### 📊 CASH FLOW METRICS")
-
+                            
+                            col_cf1, col_cf2, col_cf3 = st.columns(3)
+                            
+                            try:
+                                operating_cf = cashflow_df.loc['Operating Cash Flow'].iloc[0] if 'Operating Cash Flow' in cashflow_df.index else 0
+                                investing_cf = cashflow_df.loc['Investing Cash Flow'].iloc[0] if 'Investing Cash Flow' in cashflow_df.index else 0
+                                financing_cf = cashflow_df.loc['Financing Cash Flow'].iloc[0] if 'Financing Cash Flow' in cashflow_df.index else 0
+                                free_cf = cashflow_df.loc['Free Cash Flow'].iloc[0] if 'Free Cash Flow' in cashflow_df.index else 0
+                                
+                                with col_cf1:
+                                    st.metric("OPERATING CF", f"${operating_cf/1e9:.2f}B" if operating_cf else "N/A")
+                                
+                                with col_cf2:
+                                    st.metric("FREE CF", f"${free_cf/1e9:.2f}B" if free_cf else "N/A")
+                                
+                                with col_cf3:
+                                    fcf_margin = (free_cf / revenue * 100) if 'revenue' in locals() and revenue and free_cf else 0
+                                    st.metric("FCF MARGIN", f"{fcf_margin:.1f}%" if fcf_margin else "N/A")
+                            
+                            except:
+                                st.warning("Could not calculate cash flow metrics")
+                        
+                        else:
+                            st.warning("Cash flow data not available")
+                
+                else:
+                    st.error("Could not retrieve financial statements")
             
             # ===== TAB 3: PRICE & PERFORMANCE =====
             with tab3:
                 st.markdown("### 📈 PRICE & PERFORMANCE")
                 
-                # Sélection de période
                 col_perf1, col_perf2 = st.columns([3, 1])
                 
                 with col_perf1:
@@ -816,11 +774,9 @@ if search_button and ticker_input:
                     if st.button("📊 UPDATE CHART", use_container_width=True):
                         st.cache_data.clear()
                 
-                # Récupérer données de prix
                 price_hist = get_price_history(ticker_input, period=time_period)
                 
                 if price_hist is not None and not price_hist.empty:
-                    # Graphique prix + volume
                     fig = make_subplots(
                         rows=2, cols=1,
                         shared_xaxes=True,
@@ -829,7 +785,6 @@ if search_button and ticker_input:
                         row_heights=[0.7, 0.3]
                     )
                     
-                    # Candlestick chart
                     fig.add_trace(
                         go.Candlestick(
                             x=price_hist.index,
@@ -844,7 +799,6 @@ if search_button and ticker_input:
                         row=1, col=1
                     )
                     
-                    # Volume
                     colors = ['#00FF00' if price_hist['Close'].iloc[i] >= price_hist['Open'].iloc[i] 
                              else '#FF0000' for i in range(len(price_hist))]
                     
@@ -874,10 +828,8 @@ if search_button and ticker_input:
                     
                     st.plotly_chart(fig, use_container_width=True)
                     
-                    # Performance Statistics
                     st.markdown("#### 📊 PERFORMANCE STATISTICS")
                     
-                    # Calculer returns
                     returns = price_hist['Close'].pct_change()
                     
                     col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
@@ -898,7 +850,6 @@ if search_button and ticker_input:
                         max_drawdown = ((price_hist['Close'] / price_hist['Close'].cummax()) - 1).min() * 100
                         st.metric("MAX DRAWDOWN", f"{max_drawdown:.2f}%")
                     
-                    # Moving Averages
                     st.markdown("#### 📊 TECHNICAL INDICATORS")
                     
                     price_hist['MA50'] = price_hist['Close'].rolling(50).mean()
@@ -942,7 +893,6 @@ if search_button and ticker_input:
                     
                     st.plotly_chart(fig_ma, use_container_width=True)
                     
-                    # Current position vs MAs
                     current_price_val = price_hist['Close'].iloc[-1]
                     ma50_val = price_hist['MA50'].iloc[-1]
                     ma200_val = price_hist['MA200'].iloc[-1]
@@ -1015,7 +965,6 @@ if search_button and ticker_input:
                 
                 st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
                 
-                # Growth Metrics
                 st.markdown("#### 📈 GROWTH METRICS")
                 
                 col_growth1, col_growth2, col_growth3, col_growth4 = st.columns(4)
@@ -1048,7 +997,6 @@ if search_button and ticker_input:
                     else:
                         st.metric("REVENUE/SHARE", "N/A")
                 
-                # Analyst Targets
                 st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
                 st.markdown("#### 🎯 ANALYST TARGETS")
                 
@@ -1066,7 +1014,6 @@ if search_button and ticker_input:
                     target_low = info.get('targetLowPrice', 0)
                     st.metric("TARGET LOW", f"${target_low:.2f}" if target_low else "N/A")
                 
-                # Upside/Downside
                 if target_mean and current_price:
                     upside = ((target_mean / current_price) - 1) * 100
                     
@@ -1093,7 +1040,6 @@ if search_button and ticker_input:
                         </div>
                         """, unsafe_allow_html=True)
                 
-                # Recommendations
                 st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
                 st.markdown("#### 📊 ANALYST RECOMMENDATIONS")
                 
@@ -1112,7 +1058,6 @@ if search_button and ticker_input:
             with tab5:
                 st.markdown("### 📰 NEWS & EVENTS")
                 
-                # Recent News
                 try:
                     news = stock.news
                     
@@ -1149,7 +1094,6 @@ if search_button and ticker_input:
                 except:
                     st.warning("Could not retrieve news")
                 
-                # Calendar Events
                 st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
                 st.markdown("#### 📅 CALENDAR EVENTS")
                 
@@ -1164,7 +1108,6 @@ if search_button and ticker_input:
                 except:
                     st.info("Calendar data not available")
                 
-                # Earnings History
                 st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
                 st.markdown("#### 📊 EARNINGS HISTORY")
                 
@@ -1172,7 +1115,6 @@ if search_button and ticker_input:
                     earnings_dates = stock.earnings_dates
                     
                     if earnings_dates is not None and not earnings_dates.empty:
-                        # Limiter aux 8 derniers
                         recent_earnings = earnings_dates.head(8)
                         st.dataframe(recent_earnings, use_container_width=True)
                     else:
@@ -1185,7 +1127,6 @@ if search_button and ticker_input:
             with tab6:
                 st.markdown("### 🔍 DETAILED COMPANY INFORMATION")
                 
-                # Ownership & Institutional Holdings
                 st.markdown("#### 👥 OWNERSHIP STRUCTURE")
                 
                 col_own1, col_own2, col_own3 = st.columns(3)
@@ -1217,7 +1158,6 @@ if search_button and ticker_input:
                     else:
                         st.metric("FLOAT SHARES", "N/A")
                 
-                # Major Holders
                 st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
                 st.markdown("#### 🏦 MAJOR HOLDERS")
                 
@@ -1232,7 +1172,6 @@ if search_button and ticker_input:
                 except:
                     st.info("Major holders data not available")
                 
-                # Institutional Holders
                 st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
                 st.markdown("#### 🏢 TOP INSTITUTIONAL HOLDERS")
                 
@@ -1247,7 +1186,6 @@ if search_button and ticker_input:
                 except:
                     st.info("Institutional holders data not available")
                 
-                # Sustainability & ESG
                 st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
                 st.markdown("#### 🌱 ESG & SUSTAINABILITY")
                 
@@ -1274,12 +1212,10 @@ if search_button and ticker_input:
                 else:
                     st.info("ESG data not available for this company")
                 
-                # All Info (Raw Data)
                 st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
                 st.markdown("#### 📊 RAW DATA (ALL AVAILABLE INFO)")
                 
                 with st.expander("🔍 VIEW RAW DATA", expanded=False):
-                    # Convertir info dict en DataFrame pour affichage
                     info_items = []
                     for key, value in info.items():
                         if not isinstance(value, (dict, list)):
@@ -1294,7 +1230,7 @@ if search_button and ticker_input:
 elif not ticker_input and search_button:
     st.warning("⚠️ Please enter a ticker symbol")
 
-# ===== INFO SECTION (si aucun ticker recherché) =====
+# ===== INFO SECTION =====
 if not search_button or not ticker_input:
     st.markdown("""
     <div style="background-color: #111; border: 2px solid #FFAA00; padding: 20px; margin: 20px 0;">
@@ -1325,7 +1261,6 @@ if not search_button or not ticker_input:
     </div>
     """, unsafe_allow_html=True)
     
-    # Examples - Simple display
     st.markdown("#### 🔍 POPULAR TICKERS")
     st.markdown("""
     <div style="background-color: #0a0a0a; border: 1px solid #333; padding: 15px; margin: 10px 0;">
@@ -1343,8 +1278,8 @@ if not search_button or not ticker_input:
             <li style="margin: 5px 0;">🇬🇧 <strong style="color: #00FFFF;">SHEL.L</strong> - Shell</li>
         </ul>
     </div>
-    """, unsafe_allow_html=True)    
-    # Examples
+    """, unsafe_allow_html=True)
+    
     st.markdown("#### 🔍 EXAMPLE TICKERS")
     
     example_cols = st.columns(5)
