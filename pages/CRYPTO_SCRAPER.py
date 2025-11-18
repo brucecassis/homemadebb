@@ -5,6 +5,9 @@ from datetime import datetime, timedelta
 import time
 import requests
 import plotly.graph_objects as go
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 st.set_page_config(
     page_title="Crypto Scraper",
@@ -59,7 +62,7 @@ supabase = get_supabase_client()
 
 # Fonction pour récupérer les données Bybit
 def fetch_bybit_data(symbol, interval, days):
-    """Récupère les données OHLCV depuis Bybit"""
+    """Récupère les données OHLCV depuis Bybit avec anti-403"""
     try:
         # Calculer les timestamps
         end_time = datetime.now()
@@ -86,6 +89,31 @@ def fetch_bybit_data(symbol, interval, days):
         current_start = start_ts
         limit = 1000  # Max par appel
         
+        # Session avec retry et headers anti-bot
+        session = requests.Session()
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=2,
+            status_forcelist=[403, 429, 500, 502, 503, 504],
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        
+        # Headers pour simuler un browser (évite détection bot)
+        session.headers.update({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Referer": "https://www.bybit.com/",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-site",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache"
+        })
+        
         while current_start < end_ts:
             params = {
                 "category": "spot",
@@ -96,12 +124,19 @@ def fetch_bybit_data(symbol, interval, days):
                 "limit": limit
             }
            
-            response = requests.get(f"{base_url}/v5/market/kline", params=params, timeout=30)
-            response.raise_for_status()
+            response = session.get(f"{base_url}/v5/market/kline", params=params, timeout=30)
+            
+            # Log pour debug
+            if response.status_code != 200:
+                st.error(f"HTTP {response.status_code}: {response.text[:500]}")  # Premier 500 chars
+                return None
+            
             data = response.json()
            
             if data["retCode"] != 0:
-                st.error(f"Bybit API error: {data['retMsg']}")
+                st.error(f"Bybit API error (retCode {data['retCode']}): {data.get('retMsg', 'Unknown')}")
+                if "Request blocked" in data.get('retMsg', ''):
+                    st.warning("🔒 IP bloquée par Bybit. Essaie un proxy ou migre vers un serveur EU.")
                 return None
            
             klines = data["result"]["list"]
@@ -114,7 +149,7 @@ def fetch_bybit_data(symbol, interval, days):
             current_start = oldest_ts + 1  # +1 pour éviter doublons
            
             st.write(f"📄 Fetched {len(klines)} candles (total: {len(all_klines)})")
-            time.sleep(0.1)  # Rate limit gentle
+            time.sleep(1)  # Rate limit : 1s entre appels (sûr pour public)
         
         if not all_klines:
             st.error("No data returned from Bybit")
