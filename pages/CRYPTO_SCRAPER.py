@@ -3,7 +3,7 @@ from supabase import create_client, Client
 import pandas as pd
 from datetime import datetime, timedelta
 import time
-from binance.client import Client as BinanceClient
+import requests
 import plotly.graph_objects as go
 
 st.set_page_config(
@@ -19,7 +19,7 @@ st.markdown("""
         background-color: #000000;
         color: #FFAA00;
     }
-    
+   
     .stButton > button {
         background-color: #333;
         color: #FFAA00;
@@ -28,12 +28,12 @@ st.markdown("""
         border-radius: 0px;
         font-family: 'Courier New', monospace;
     }
-    
+   
     .stButton > button:hover {
         background-color: #FFAA00;
         color: #000;
     }
-    
+   
     h1, h2, h3 {
         color: #FFAA00 !important;
         font-family: 'Courier New', monospace !important;
@@ -57,68 +57,93 @@ def get_supabase_client():
 
 supabase = get_supabase_client()
 
-# Connexion Binance (API publique, pas besoin de clés)
-@st.cache_resource
-def get_binance_client():
-    return BinanceClient("", "")  # API publique
-
-binance_client = get_binance_client()
-
-# Fonction pour récupérer les données Binance
-def fetch_binance_data(symbol, interval, days):
-    """Récupère les données OHLCV depuis Binance"""
+# Fonction pour récupérer les données Bybit
+def fetch_bybit_data(symbol, interval, days):
+    """Récupère les données OHLCV depuis Bybit"""
     try:
         # Calculer les timestamps
         end_time = datetime.now()
         start_time = end_time - timedelta(days=days)
-        
+       
         # Convertir en millisecondes
         start_ts = int(start_time.timestamp() * 1000)
         end_ts = int(end_time.timestamp() * 1000)
-        
-        # Mapping des intervalles
+       
+        # Mapping des intervalles Bybit (minutes ou D/W/M)
         interval_map = {
-            "1m": "1m", "3m": "3m", "5m": "5m", "15m": "15m", "30m": "30m",
-            "1h": "1h", "2h": "2h", "4h": "4h", "6h": "6h", "8h": "8h", "12h": "12h",
-            "1d": "1d", "3d": "3d", "1w": "1w", "1M": "1M"
+            "1m": "1", "3m": "3", "5m": "5", "15m": "15", "30m": "30",
+            "1h": "60", "2h": "120", "4h": "240", "6h": "360", "8h": "480", "12h": "720",
+            "1d": "D", "3d": "D", "1w": "W", "1M": "M"
         }
-        
+       
         pair = f"{symbol}USDT"
+       
+        st.info(f"📥 Fetching {symbol} data from Bybit...")
+       
+        # Endpoint Bybit V5
+        base_url = "https://api.bybit.com"
+        all_klines = []
+        current_start = start_ts
+        limit = 1000  # Max par appel
         
-        st.info(f"📥 Fetching {symbol} data from Binance...")
+        while current_start < end_ts:
+            params = {
+                "category": "spot",
+                "symbol": pair,
+                "interval": interval_map[interval],
+                "start": current_start,
+                "end": end_ts,
+                "limit": limit
+            }
+           
+            response = requests.get(f"{base_url}/v5/market/kline", params=params, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+           
+            if data["retCode"] != 0:
+                st.error(f"Bybit API error: {data['retMsg']}")
+                return None
+           
+            klines = data["result"]["list"]
+            if not klines:
+                break
+           
+            all_klines.extend(klines)
+            # Mise à jour du start pour la prochaine page (basé sur le plus ancien timestamp)
+            oldest_ts = int(klines[-1][0])
+            current_start = oldest_ts + 1  # +1 pour éviter doublons
+           
+            st.write(f"📄 Fetched {len(klines)} candles (total: {len(all_klines)})")
+            time.sleep(0.1)  # Rate limit gentle
         
-        # Récupérer les klines (chandelier data)
-        klines = binance_client.get_historical_klines(
-            pair, 
-            interval_map[interval],
-            start_ts,
-            end_ts
-        )
-        
-        if not klines:
-            st.error("No data returned from Binance")
+        if not all_klines:
+            st.error("No data returned from Bybit")
             return None
-        
+       
+        # Inverser pour ordre chronologique croissant (Bybit renvoie descendant)
+        all_klines.reverse()
+       
         # Convertir en DataFrame
-        df = pd.DataFrame(klines, columns=[
+        df = pd.DataFrame(all_klines, columns=[
             'timestamp', 'open', 'high', 'low', 'close', 'volume',
-            'close_time', 'quote_volume', 'trades', 'taker_buy_base',
-            'taker_buy_quote', 'ignore'
+            'turnover'  # Équivalent quote_volume
         ])
-        
-        # Convertir les types
+       
+        # Ajouter close_time (dupliqué pour compatibilité)
+        df['close_time'] = pd.to_datetime(df['timestamp'], unit='ms')
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-        df['close_time'] = pd.to_datetime(df['close_time'], unit='ms')
-        
-        for col in ['open', 'high', 'low', 'close', 'volume', 'quote_volume']:
+       
+        # Convertir les types (tous strings chez Bybit)
+        for col in ['open', 'high', 'low', 'close', 'volume', 'turnover']:
             df[col] = df[col].astype(float)
-        
-        df['trades'] = df['trades'].astype(int)
-        
+       
+        # Ajouter trades (non disponible, set to 0)
+        df['trades'] = 0
+       
         st.success(f"✅ Fetched {len(df)} candles")
-        
+       
         return df
-        
+       
     except Exception as e:
         st.error(f"Error fetching data: {e}")
         return None
@@ -128,9 +153,9 @@ def save_to_supabase(df, symbol, interval, days):
     """Sauvegarde les données dans Supabase"""
     try:
         pair = f"{symbol}USDT"
-        
+       
         st.info("💾 Saving to database...")
-        
+       
         # Préparer les données
         records = []
         for _, row in df.iterrows():
@@ -146,23 +171,23 @@ def save_to_supabase(df, symbol, interval, days):
                 'low_price': float(row['low']),
                 'close_price': float(row['close']),
                 'volume': float(row['volume']),
-                'quote_volume': float(row['quote_volume']),
+                'quote_volume': float(row['turnover']),  # Utilise turnover comme quote_volume
                 'trades': int(row['trades'])
             })
-        
+       
         # Insérer par batch de 1000 (limite Supabase)
         batch_size = 1000
         total_inserted = 0
-        
+       
         for i in range(0, len(records), batch_size):
             batch = records[i:i+batch_size]
             response = supabase.table('crypto_data').upsert(batch).execute()
             total_inserted += len(batch)
-            st.write(f"  Inserted {total_inserted}/{len(records)} records...")
-        
+            st.write(f" Inserted {total_inserted}/{len(records)} records...")
+       
         # Calculer la taille approximative en MB
-        size_mb = len(df) * 100 / (1024 * 1024)  # Approximation
-        
+        size_mb = len(df) * 100 / (1024 * 1024) # Approximation
+       
         # Enregistrer le dataset
         dataset_record = {
             'symbol': symbol,
@@ -174,61 +199,54 @@ def save_to_supabase(df, symbol, interval, days):
             'total_candles': len(df),
             'size_mb': round(size_mb, 2)
         }
-        
+       
         supabase.table('crypto_datasets').upsert(dataset_record).execute()
-        
+       
         st.success(f"✅ Saved {len(df)} records to database!")
         return True
-        
+       
     except Exception as e:
         st.error(f"Error saving to database: {e}")
         return False
 
 # ===== INTERFACE =====
-
 st.title("📊 CRYPTO DATA SCRAPER")
 
 # Section 1: Paramètres de scraping
 st.markdown("### ⚙️ SCRAPING PARAMETERS")
-
 col1, col2, col3 = st.columns(3)
-
 with col1:
     symbol = st.selectbox(
         "Cryptocurrency",
         options=["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "MATIC", "DOT", "AVAX"],
         index=0
     )
-
 with col2:
     interval = st.selectbox(
         "Timeframe",
         options=["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"],
-        index=4  # Default: 1h
+        index=4 # Default: 1h
     )
-
 with col3:
     days = st.selectbox(
         "Period (days)",
         options=[1, 7, 30, 90, 180, 365, 730, 1095, 1825, 3650],
-        index=3  # Default: 90 days
+        index=3 # Default: 90 days
     )
-
 st.markdown("---")
 
 # Section 2: Actions
 col_action1, col_action2, col_action3 = st.columns([2, 1, 1])
-
 with col_action1:
     if st.button("📥 FETCH & STORE DATA", use_container_width=True):
-        with st.spinner("Fetching data from Binance..."):
-            df = fetch_binance_data(symbol, interval, days)
-            
+        with st.spinner("Fetching data from Bybit..."):
+            df = fetch_bybit_data(symbol, interval, days)
+           
             if df is not None:
                 # Afficher un aperçu
                 st.markdown("#### 📊 DATA PREVIEW")
                 st.dataframe(df.head(10))
-                
+               
                 # Graphique rapide
                 fig = go.Figure(data=[go.Candlestick(
                     x=df['timestamp'],
@@ -237,7 +255,7 @@ with col_action1:
                     low=df['low'],
                     close=df['close']
                 )])
-                
+               
                 fig.update_layout(
                     title=f"{symbol}/USDT - {interval}",
                     xaxis_title="Date",
@@ -245,9 +263,9 @@ with col_action1:
                     height=400,
                     template="plotly_dark"
                 )
-                
+               
                 st.plotly_chart(fig, use_container_width=True)
-                
+               
                 # Sauvegarder
                 if save_to_supabase(df, symbol, interval, days):
                     st.balloons()
@@ -256,37 +274,36 @@ st.markdown("---")
 
 # Section 3: Datasets existants
 st.markdown("### 📂 STORED DATASETS")
-
 try:
     response = supabase.table('crypto_datasets').select("*").order('created_at', desc=True).execute()
-    
+   
     if response.data:
         datasets_df = pd.DataFrame(response.data)
-        
+       
         # Formater l'affichage
         display_df = datasets_df[[
-            'symbol', 'timeframe', 'period_days', 'total_candles', 
+            'symbol', 'timeframe', 'period_days', 'total_candles',
             'size_mb', 'start_date', 'end_date', 'created_at'
         ]].copy()
-        
+       
         display_df['start_date'] = pd.to_datetime(display_df['start_date']).dt.strftime('%Y-%m-%d')
         display_df['end_date'] = pd.to_datetime(display_df['end_date']).dt.strftime('%Y-%m-%d')
         display_df['created_at'] = pd.to_datetime(display_df['created_at']).dt.strftime('%Y-%m-%d %H:%M')
-        
+       
         st.dataframe(display_df, use_container_width=True, hide_index=True)
-        
+       
         # Actions sur les datasets
         st.markdown("#### 🔧 DATASET ACTIONS")
-        
+       
         col_del1, col_del2 = st.columns([3, 1])
-        
+       
         with col_del1:
             dataset_to_delete = st.selectbox(
                 "Select dataset to delete",
                 options=[f"{d['symbol']}-{d['timeframe']}-{d['period_days']}d" for d in response.data],
                 key="dataset_select"
             )
-        
+       
         with col_del2:
             if st.button("🗑️ DELETE", use_container_width=True):
                 # Parser la sélection
@@ -294,23 +311,23 @@ try:
                 sym = parts[0]
                 tf = parts[1]
                 pd_str = parts[2].replace('d', '')
-                
+               
                 try:
                     # Supprimer de crypto_data
                     supabase.table('crypto_data').delete().eq('symbol', sym).eq('timeframe', tf).execute()
-                    
+                   
                     # Supprimer de crypto_datasets
                     supabase.table('crypto_datasets').delete().eq('symbol', sym).eq('timeframe', tf).eq('period_days', int(pd_str)).execute()
-                    
+                   
                     st.success(f"✅ Deleted {dataset_to_delete}")
                     st.rerun()
-                    
+                   
                 except Exception as e:
                     st.error(f"Error deleting: {e}")
-    
+   
     else:
         st.info("📭 No datasets stored yet. Create your first one above!")
-        
+       
 except Exception as e:
     st.error(f"Error loading datasets: {e}")
 
@@ -318,6 +335,6 @@ except Exception as e:
 st.markdown("---")
 st.markdown(f"""
 <div style='text-align: center; color: #666; font-size: 9px; font-family: "Courier New", monospace;'>
-    © 2025 CRYPTO SCRAPER | Data from Binance API | Stored in Supabase
+    © 2025 CRYPTO SCRAPER | Data from Bybit API | Stored in Supabase
 </div>
 """, unsafe_allow_html=True)
