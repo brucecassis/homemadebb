@@ -327,8 +327,15 @@ with col_search2:
 
 st.markdown('<div style="border-bottom: 1px solid #333; margin: 8px 0;"></div>', unsafe_allow_html=True)
 
-# ===== AFFICHAGE DES DONNÉES =====
+# ⭐ SAUVEGARDER LE TICKER DANS SESSION STATE ⭐
 if search_button and ticker_input:
+    st.session_state['current_ticker'] = ticker_input
+
+# ⭐ UTILISER LE TICKER SAUVEGARDÉ ⭐
+display_ticker = st.session_state.get('current_ticker', None)
+
+# ===== AFFICHAGE DES DONNÉES =====
+if display_ticker:
     with st.spinner(f'🔍 Analyzing {ticker_input}...'):
         stock, info = get_company_info(ticker_input)
         
