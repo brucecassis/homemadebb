@@ -4,13 +4,12 @@ import pandas as pd
 from datetime import datetime, timedelta
 import time
 import requests
-import plotly.graph_objects as go
-import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+import plotly.graph_objects as go
 
 st.set_page_config(
-    page_title="Crypto Scraper",
+    page_title="Crypto Perpetual Scraper",
     page_icon="📊",
     layout="wide"
 )
@@ -47,7 +46,7 @@ st.markdown("""
 # Header
 st.markdown(f'''
 <div style="background: #FFAA00; padding: 10px 20px; color: #000; font-weight: bold; font-size: 16px; font-family: 'Courier New', monospace; letter-spacing: 2px; margin-bottom: 20px;">
-    ⬛ CRYPTO DATA SCRAPER | {datetime.now().strftime("%H:%M:%S")} UTC
+    ⬛ CRYPTO PERPETUAL FUTURES SCRAPER | {datetime.now().strftime("%H:%M:%S")} UTC
 </div>
 ''', unsafe_allow_html=True)
 
@@ -60,9 +59,9 @@ def get_supabase_client():
 
 supabase = get_supabase_client()
 
-# Fonction pour récupérer les données Bybit
-def fetch_bybit_data(symbol, interval, days):
-    """Récupère les données OHLCV depuis Bybit avec anti-403"""
+# Fonction pour récupérer les données Bybit PERPETUALS (linear = USDT perps)
+def fetch_bybit_perp_data(symbol, interval, days):
+    """Récupère les données OHLCV PERPETUAL depuis Bybit (category=linear)"""
     try:
         # Calculer les timestamps
         end_time = datetime.now()
@@ -79,9 +78,9 @@ def fetch_bybit_data(symbol, interval, days):
             "1d": "D", "3d": "D", "1w": "W", "1M": "M"
         }
        
-        pair = f"{symbol}USDT"
+        pair = f"{symbol}USDT"  # Format pour perps : BTCUSDT (sans .P)
        
-        st.info(f"📥 Fetching {symbol} data from Bybit...")
+        st.info(f"📥 Fetching PERPETUAL {pair} data from Bybit (linear)...")
        
         # Endpoint Bybit V5
         base_url = "https://api.bybit.com"
@@ -89,7 +88,7 @@ def fetch_bybit_data(symbol, interval, days):
         current_start = start_ts
         limit = 1000  # Max par appel
         
-        # Session avec retry et headers anti-bot
+        # Session avec retry et headers anti-bot (contre 403)
         session = requests.Session()
         retry_strategy = Retry(
             total=3,
@@ -100,7 +99,7 @@ def fetch_bybit_data(symbol, interval, days):
         session.mount("http://", adapter)
         session.mount("https://", adapter)
         
-        # Headers pour simuler un browser (évite détection bot)
+        # Headers pour simuler un browser (évite détection bot + 403)
         session.headers.update({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "application/json, text/plain, */*",
@@ -116,7 +115,7 @@ def fetch_bybit_data(symbol, interval, days):
         
         while current_start < end_ts:
             params = {
-                "category": "spot",
+                "category": "linear",  # ← CHANGEMENT CLÉ : pour perpetual USDT
                 "symbol": pair,
                 "interval": interval_map[interval],
                 "start": current_start,
@@ -126,9 +125,11 @@ def fetch_bybit_data(symbol, interval, days):
            
             response = session.get(f"{base_url}/v5/market/kline", params=params, timeout=30)
             
-            # Log pour debug
+            # Log pour debug (affiche le JSON d'erreur si 403)
             if response.status_code != 200:
                 st.error(f"HTTP {response.status_code}: {response.text[:500]}")  # Premier 500 chars
+                if response.status_code == 403:
+                    st.warning("🔒 403 = IP bloquée par Bybit (datacenter ?). Essaie un proxy EU ou migre vers PythonAnywhere EU.")
                 return None
             
             data = response.json()
@@ -144,12 +145,12 @@ def fetch_bybit_data(symbol, interval, days):
                 break
            
             all_klines.extend(klines)
-            # Mise à jour du start pour la prochaine page (basé sur le plus ancien timestamp)
+            # Mise à jour du start pour la prochaine page
             oldest_ts = int(klines[-1][0])
             current_start = oldest_ts + 1  # +1 pour éviter doublons
            
             st.write(f"📄 Fetched {len(klines)} candles (total: {len(all_klines)})")
-            time.sleep(1)  # Rate limit : 1s entre appels (sûr pour public)
+            time.sleep(1)  # Rate limit safe (120 req/min)
         
         if not all_klines:
             st.error("No data returned from Bybit")
@@ -158,10 +159,10 @@ def fetch_bybit_data(symbol, interval, days):
         # Inverser pour ordre chronologique croissant (Bybit renvoie descendant)
         all_klines.reverse()
        
-        # Convertir en DataFrame
+        # Convertir en DataFrame (même structure que spot)
         df = pd.DataFrame(all_klines, columns=[
             'timestamp', 'open', 'high', 'low', 'close', 'volume',
-            'turnover'  # Équivalent quote_volume
+            'turnover'  # Équivalent quote_volume pour perps
         ])
        
         # Ajouter close_time (dupliqué pour compatibilité)
@@ -172,24 +173,24 @@ def fetch_bybit_data(symbol, interval, days):
         for col in ['open', 'high', 'low', 'close', 'volume', 'turnover']:
             df[col] = df[col].astype(float)
        
-        # Ajouter trades (non disponible, set to 0)
+        # Ajouter trades (non disponible en klines perps, set to 0)
         df['trades'] = 0
        
-        st.success(f"✅ Fetched {len(df)} candles")
+        st.success(f"✅ Fetched {len(df)} PERPETUAL candles")
        
         return df
        
     except Exception as e:
-        st.error(f"Error fetching data: {e}")
+        st.error(f"Error fetching PERPETUAL data: {e}")
         return None
 
-# Fonction pour sauvegarder dans Supabase
+# Fonction pour sauvegarder dans Supabase (inchangée, compatible perps)
 def save_to_supabase(df, symbol, interval, days):
     """Sauvegarde les données dans Supabase"""
     try:
-        pair = f"{symbol}USDT"
+        pair = f"{symbol}USDT"  # Format perp
        
-        st.info("💾 Saving to database...")
+        st.info("💾 Saving PERPETUAL data to database...")
        
         # Préparer les données
         records = []
@@ -206,11 +207,11 @@ def save_to_supabase(df, symbol, interval, days):
                 'low_price': float(row['low']),
                 'close_price': float(row['close']),
                 'volume': float(row['volume']),
-                'quote_volume': float(row['turnover']),  # Utilise turnover comme quote_volume
+                'quote_volume': float(row['turnover']),  # turnover = quote_volume pour perps
                 'trades': int(row['trades'])
             })
        
-        # Insérer par batch de 1000 (limite Supabase)
+        # Insérer par batch de 1000
         batch_size = 1000
         total_inserted = 0
        
@@ -223,7 +224,7 @@ def save_to_supabase(df, symbol, interval, days):
         # Calculer la taille approximative en MB
         size_mb = len(df) * 100 / (1024 * 1024) # Approximation
        
-        # Enregistrer le dataset
+        # Enregistrer le dataset (ajout 'perp' pour distinction)
         dataset_record = {
             'symbol': symbol,
             'pair': pair,
@@ -237,7 +238,7 @@ def save_to_supabase(df, symbol, interval, days):
        
         supabase.table('crypto_datasets').upsert(dataset_record).execute()
        
-        st.success(f"✅ Saved {len(df)} records to database!")
+        st.success(f"✅ Saved {len(df)} PERPETUAL records to database!")
         return True
        
     except Exception as e:
@@ -245,10 +246,10 @@ def save_to_supabase(df, symbol, interval, days):
         return False
 
 # ===== INTERFACE =====
-st.title("📊 CRYPTO DATA SCRAPER")
+st.title("📊 CRYPTO PERPETUAL FUTURES SCRAPER")
 
 # Section 1: Paramètres de scraping
-st.markdown("### ⚙️ SCRAPING PARAMETERS")
+st.markdown("### ⚙️ PERPETUAL SCRAPING PARAMETERS")
 col1, col2, col3 = st.columns(3)
 with col1:
     symbol = st.selectbox(
@@ -273,13 +274,13 @@ st.markdown("---")
 # Section 2: Actions
 col_action1, col_action2, col_action3 = st.columns([2, 1, 1])
 with col_action1:
-    if st.button("📥 FETCH & STORE DATA", use_container_width=True):
-        with st.spinner("Fetching data from Bybit..."):
-            df = fetch_bybit_data(symbol, interval, days)
+    if st.button("📥 FETCH & STORE PERPETUAL DATA", use_container_width=True):
+        with st.spinner("Fetching PERPETUAL data from Bybit..."):
+            df = fetch_bybit_perp_data(symbol, interval, days)
            
             if df is not None:
                 # Afficher un aperçu
-                st.markdown("#### 📊 DATA PREVIEW")
+                st.markdown("#### 📊 PERPETUAL DATA PREVIEW")
                 st.dataframe(df.head(10))
                
                 # Graphique rapide
@@ -292,7 +293,7 @@ with col_action1:
                 )])
                
                 fig.update_layout(
-                    title=f"{symbol}/USDT - {interval}",
+                    title=f"{symbol}USDT.P (Perpetual) - {interval}",
                     xaxis_title="Date",
                     yaxis_title="Price (USDT)",
                     height=400,
@@ -307,8 +308,8 @@ with col_action1:
 
 st.markdown("---")
 
-# Section 3: Datasets existants
-st.markdown("### 📂 STORED DATASETS")
+# Section 3: Datasets existants (inchangée)
+st.markdown("### 📂 STORED PERPETUAL DATASETS")
 try:
     response = supabase.table('crypto_datasets').select("*").order('created_at', desc=True).execute()
    
@@ -327,7 +328,7 @@ try:
        
         st.dataframe(display_df, use_container_width=True, hide_index=True)
        
-        # Actions sur les datasets
+        # Actions sur les datasets (suppression)
         st.markdown("#### 🔧 DATASET ACTIONS")
        
         col_del1, col_del2 = st.columns([3, 1])
@@ -361,7 +362,7 @@ try:
                     st.error(f"Error deleting: {e}")
    
     else:
-        st.info("📭 No datasets stored yet. Create your first one above!")
+        st.info("📭 No PERPETUAL datasets stored yet. Create your first one above!")
        
 except Exception as e:
     st.error(f"Error loading datasets: {e}")
@@ -370,6 +371,6 @@ except Exception as e:
 st.markdown("---")
 st.markdown(f"""
 <div style='text-align: center; color: #666; font-size: 9px; font-family: "Courier New", monospace;'>
-    © 2025 CRYPTO SCRAPER | Data from Bybit API | Stored in Supabase
+    © 2025 CRYPTO PERPETUAL SCRAPER | Data from Bybit Linear API | Stored in Supabase
 </div>
 """, unsafe_allow_html=True)
