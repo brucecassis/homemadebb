@@ -5,6 +5,8 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
+from groq import Groq
+import json
 
 # Configuration de la page
 st.set_page_config(
@@ -237,6 +239,112 @@ with col_search2:
 
 st.markdown('<div style="border-bottom: 1px solid #333; margin: 8px 0;"></div>', unsafe_allow_html=True)
 
+@st.cache_data(ttl=300)
+def get_price_history(ticker, period='1y'):
+    """Récupère l'historique des prix"""
+    try:
+        import yfinance as yf
+        
+        stock = yf.Ticker(ticker)
+        hist = stock.history(period=period)
+        
+        return hist
+        
+    except Exception as e:
+        st.error(f"Error fetching price history: {e}")
+        return None
+
+# ⭐ AJOUTEZ LA FONCTION ICI ⭐
+def analyze_financials_with_ai(data_type, dataframe, company_name, ticker):
+    """
+    Analyse les données financières avec Groq AI
+    """
+    try:
+        # Récupérer la clé API depuis les secrets
+        api_key = st.secrets.get("GROQ_API_KEY", None)
+        
+        if not api_key:
+            return "❌ Error: GROQ_API_KEY not found in secrets. Please add it in Streamlit settings."
+        
+        # Initialiser le client Groq
+        client = Groq(api_key=api_key)
+        
+        # Convertir le DataFrame en format lisible
+        df_recent = dataframe.iloc[:, :3] if len(dataframe.columns) >= 3 else dataframe
+        data_str = df_recent.to_string()
+        
+        # Prompts selon le type
+        prompts = {
+            "Income Statement": f"""You are a financial analyst. Analyze this Income Statement for {company_name} ({ticker}).
+
+Data (in millions):
+{data_str}
+
+Provide a comprehensive analysis covering:
+1. 📊 Revenue Trends: Growth rate, consistency
+2. 💰 Profitability Analysis: Gross, Operating, and Net margins
+3. 📈 Key Strengths: What's performing well
+4. 🚨 Concerns: Areas of weakness or risk
+5. 🎯 Recommendations: Actionable insights
+
+Use emojis and be concise but insightful. Format with clear sections.""",
+
+            "Balance Sheet": f"""You are a financial analyst. Analyze this Balance Sheet for {company_name} ({ticker}).
+
+Data (in millions):
+{data_str}
+
+Provide a comprehensive analysis covering:
+1. 💪 Asset Quality: Composition and trends
+2. 💳 Liability Structure: Debt levels and management
+3. 📊 Financial Ratios: Current ratio, Debt-to-Equity, etc.
+4. 🏦 Liquidity Position: Cash and working capital
+5. ⚠️ Risks & Strengths: Key observations
+6. 🎯 Recommendations: Strategic insights
+
+Use emojis and be concise but insightful. Format with clear sections.""",
+
+            "Cash Flow": f"""You are a financial analyst. Analyze this Cash Flow Statement for {company_name} ({ticker}).
+
+Data (in millions):
+{data_str}
+
+Provide a comprehensive analysis covering:
+1. 💵 Operating Cash Flow: Quality and trends
+2. 📊 Free Cash Flow: Generation capability
+3. 💰 Investment Activities: CAPEX and strategy
+4. 🏦 Financing Activities: Debt and dividends
+5. 🔄 Cash Management: Efficiency and sustainability
+6. 🎯 Recommendations: Key insights
+
+Use emojis and be concise but insightful. Format with clear sections."""
+        }
+        
+        prompt = prompts.get(data_type, prompts["Income Statement"])
+        
+        # Appel API Groq
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert financial analyst with deep knowledge of financial statements, ratios, and investment analysis. Provide clear, actionable insights."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            model="llama-3.3-70b-versatile",
+            temperature=0.7,
+            max_tokens=2000
+        )
+        
+        analysis = chat_completion.choices[0].message.content
+        return analysis
+        
+    except Exception as e:
+        return f"❌ Error during AI analysis: {str(e)}\n\nPlease check:\n- Your GROQ_API_KEY is correctly set in Streamlit secrets\n- You have internet connection\n- The Groq API is available"
+
 # ===== AFFICHAGE DES DONNÉES =====
 if search_button and ticker_input:
     with st.spinner(f'🔍 Analyzing {ticker_input}...'):
@@ -461,6 +569,42 @@ if search_button and ticker_input:
                         
                         else:
                             st.warning("Income statement data not available")
+
+                    st.dataframe(income_display, use_container_width=True)
+                            
+                            # ⭐ AJOUTEZ ICI (APRÈS le st.dataframe) ⭐
+                            st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+                            
+                            col_ai1, col_ai2 = st.columns([1, 3])
+                            
+                            with col_ai1:
+                                analyze_button = st.button(
+                                    "🤖 ANALYZE WITH AI",
+                                    key="analyze_income",
+                                    use_container_width=True
+                                )
+                            
+                            with col_ai2:
+                                st.caption("Get AI-powered insights on this financial statement")
+                            
+                            if analyze_button:
+                                with st.spinner('🤖 AI is analyzing the financial data...'):
+                                    analysis = analyze_financials_with_ai(
+                                        "Income Statement",
+                                        income_df,
+                                        company_name,
+                                        ticker_input
+                                    )
+                                    
+                                    st.markdown("#### 🤖 AI FINANCIAL ANALYSIS")
+                                    st.markdown(f"""
+                                    <div style="background-color: #0a0a0a; border-left: 3px solid #00FF00; padding: 15px; margin: 10px 0;">
+                                        {analysis.replace(chr(10), '<br>')}
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                            
+                            # Key metrics from income statement (code existant continue ici)
+                            st.markdown("#### 📊 KEY METRICS")
                     
                     # Balance Sheet
                     with fin_tab2:
@@ -520,6 +664,43 @@ if search_button and ticker_input:
                         
                         else:
                             st.warning("Balance sheet data not available")
+
+                    st.dataframe(balance_display, use_container_width=True)
+                            
+                            # ⭐ AJOUTEZ ICI ⭐
+                            st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+                            
+                            col_ai1, col_ai2 = st.columns([1, 3])
+                            
+                            with col_ai1:
+                                analyze_button_bs = st.button(
+                                    "🤖 ANALYZE WITH AI",
+                                    key="analyze_balance",
+                                    use_container_width=True
+                                )
+                            
+                            with col_ai2:
+                                st.caption("Get AI-powered insights on this financial statement")
+                            
+                            if analyze_button_bs:
+                                with st.spinner('🤖 AI is analyzing the financial data...'):
+                                    analysis = analyze_financials_with_ai(
+                                        "Balance Sheet",
+                                        balance_df,
+                                        company_name,
+                                        ticker_input
+                                    )
+                                    
+                                    st.markdown("#### 🤖 AI FINANCIAL ANALYSIS")
+                                    st.markdown(f"""
+                                    <div style="background-color: #0a0a0a; border-left: 3px solid #00FF00; padding: 15px; margin: 10px 0;">
+                                        {analysis.replace(chr(10), '<br>')}
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                            
+                            # Key ratios (code existant continue)
+                            st.markdown("#### 📊 KEY RATIOS")
+
                     
                     # Cash Flow
                     with fin_tab3:
@@ -577,6 +758,44 @@ if search_button and ticker_input:
                 
                 else:
                     st.error("Could not retrieve financial statements")
+
+
+            st.dataframe(cashflow_display, use_container_width=True)
+                            
+                            # ⭐ AJOUTEZ ICI ⭐
+                            st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+                            
+                            col_ai1, col_ai2 = st.columns([1, 3])
+                            
+                            with col_ai1:
+                                analyze_button_cf = st.button(
+                                    "🤖 ANALYZE WITH AI",
+                                    key="analyze_cashflow",
+                                    use_container_width=True
+                                )
+                            
+                            with col_ai2:
+                                st.caption("Get AI-powered insights on this financial statement")
+                            
+                            if analyze_button_cf:
+                                with st.spinner('🤖 AI is analyzing the financial data...'):
+                                    analysis = analyze_financials_with_ai(
+                                        "Cash Flow",
+                                        cashflow_df,
+                                        company_name,
+                                        ticker_input
+                                    )
+                                    
+                                    st.markdown("#### 🤖 AI FINANCIAL ANALYSIS")
+                                    st.markdown(f"""
+                                    <div style="background-color: #0a0a0a; border-left: 3px solid #00FF00; padding: 15px; margin: 10px 0;">
+                                        {analysis.replace(chr(10), '<br>')}
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                            
+                            # Key cash flow metrics (code existant continue)
+                            st.markdown("#### 📊 CASH FLOW METRICS")
+
             
             # ===== TAB 3: PRICE & PERFORMANCE =====
             with tab3:
