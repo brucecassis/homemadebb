@@ -1,5 +1,5 @@
 # pages/CHATBOT.py
-# Version corrigée – plus aucune erreur
+# Version finale – zéro erreur, zéro warning
 
 import streamlit as st
 from groq import Groq
@@ -50,25 +50,31 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
         if msg.get("image"):
-            st.image(msg["image"], width=400)
+            st.image(msg["image"], width=500)
 
 # =============================================
-# INPUT + UPLOAD IMAGE
+# INPUT + UPLOAD IMAGE (sans warning)
 # =============================================
 col_text, col_img = st.columns([5, 1])
 
 with col_text:
-    prompt = st.chat_input("Pose ta question (ou upload une image)")
+    prompt = st.chat_input("Pose ta question ou demande une analyse d'image")
 
 with col_img:
-    uploaded_img = st.file_uploader("", type=["png", "jpg", "jpeg", "webp"], label_visibility="collapsed")
+    # Label non vide + caché proprement → plus de warning
+    uploaded_img = st.file_uploader(
+        "Image",  # ← label obligatoire
+        type=["png", "jpg", "jpeg", "webp"],
+        label_visibility="collapsed",  # ← cache le label
+        key="img_upload"
+    )
 
 # =============================================
-# ENVOI
+# TRAITEMENT DE L'ENVOI
 # =============================================
 if prompt or uploaded_img:
-    # Préparation du message utilisateur
-    user_text = prompt or "Analyse cette image"
+    # Préparation du contenu utilisateur
+    user_text = prompt or "Analyse cette image en détail"
     user_content = [{"type": "text", "text": user_text}]
     image_display = None
 
@@ -85,7 +91,7 @@ if prompt or uploaded_img:
     with st.chat_message("user"):
         st.markdown(user_text)
         if uploaded_img:
-            st.image(uploaded_img, width=400)
+            st.image(uploaded_img, width=500)
 
     # Ajout à l'historique
     st.session_state.messages.append({
@@ -96,8 +102,8 @@ if prompt or uploaded_img:
 
     # Réponse Groq
     with st.chat_message("assistant"):
-        with st.spinner("Grok réfléchit..."):
-            answer = ""  # ← On initialise la variable ici
+        with st.spinner("Grok répond..."):
+            answer = "Erreur inconnue"
             try:
                 response = client.chat.completions.create(
                     model="llama-3.2-90b-vision-preview" if uploaded_img else "llama-3.2-90b-text-preview",
@@ -111,7 +117,7 @@ if prompt or uploaded_img:
                 answer = f"Erreur Groq : {str(e)}"
                 st.error(answer)
 
-    # Sauvegarde réponse assistant (maintenant answer existe toujours)
+    # Sauvegarde réponse (answer existe toujours)
     st.session_state.messages.append({
         "role": "assistant",
         "content": answer
@@ -124,4 +130,4 @@ if st.button("Effacer la conversation", type="secondary"):
     st.session_state.messages = []
     st.rerun()
 
-st.caption("Groq API • Llama 3.2 90B Vision • Latence < 1s • Upload images OK")
+st.caption("Groq API • Llama 3.2 90B Vision • Réponses < 1s • Analyse d'images")
