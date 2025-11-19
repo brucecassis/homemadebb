@@ -1,158 +1,125 @@
 # pages/Chatbot.py
-# Page Chatbot avec style Bloomberg et intégration Grok API
-# Ajoute dans .streamlit/secrets.toml : XAI_API_KEY = "ta_cle_xai_api"
+# Chatbot ultra-rapide avec Groq (Llama 3.2 90B + Vision) + upload image
+# Ta clé est déjà dans secrets.toml → GROQ_API_KEY
 
 import streamlit as st
-import os
-from openai import OpenAI
+from groq import Groq
 import base64
-import io
 import time
 
-# Configuration de la page
-st.set_page_config(
-    page_title="Chatbot Grok",
-    page_icon="🤖",
-    layout="wide"
-)
+# =============================================
+# PAGE CONFIG + STYLE BLOOMBERG
+# =============================================
+st.set_page_config(page_title="Grok Chatbot", page_icon="Robot", layout="wide")
 
-# Style Bloomberg (noir/orange)
 st.markdown("""
 <style>
-    .main {
-        background-color: #000000;
-        color: #FFAA00;
-        padding: 20px;
-    }
-    .stButton > button {
-        background-color: #333333;
-        color: #FFAA00;
-        border: 1px solid #FFAA00;
-        font-weight: bold;
-        border-radius: 0;
-        font-family: 'Courier New', monospace;
-    }
-    .stButton > button:hover {
-        background-color: #FFAA00;
-        color: #000000;
-    }
-    h1, h2, h3 {
-        color: #FFAA00 !important;
-        font-family: 'Courier New', monospace !important;
-    }
-    .stChatMessage {
-        background-color: #1a1a1a;
-        border: 1px solid #FFAA00;
-        border-radius: 5px;
-        padding: 10px;
-        margin: 5px 0;
-    }
+    .main {background:#000;color:#FFAA00;padding:20px;}
+    .stButton>button {background:#333;color:#FFAA00;border:2px solid #FFAA00;font-weight:bold;border-radius:0;}
+    .stButton>button:hover {background:#FFAA00;color:#000;}
+    h1,h2,h3 {color:#FFAA00 !important;font-family:'Courier New',monospace !important;}
+    .stChatMessage {background:#111;padding:15px;border-left:4px solid #FFAA00;border-radius:0;}
 </style>
 """, unsafe_allow_html=True)
 
-# Header Bloomberg
 st.markdown(f"""
-<div style="background: linear-gradient(90deg, #FFAA00, #FF6600); padding: 15px; color: #000000; font-weight: bold; font-size: 20px; font-family: 'Courier New', monospace; text-align: center; margin-bottom: 20px;">
-    🤖 BLOOMBERG GROK CHATBOT | {time.strftime("%H:%M:%S UTC")}
+<div style="background:#FFAA00;padding:15px;color:#000;font-weight:bold;font-size:22px;font-family:'Courier New';text-align:center;">
+    GROQ CHATBOT • LLAMA 3.2 90B + VISION • {time.strftime("%H:%M:%S")} UTC
 </div>
 """, unsafe_allow_html=True)
 
-# Initialisation de la session
+# =============================================
+# CLIENT GROQ (ta clé GROQ_API_KEY)
+# =============================================
+if "groq_client" not in st.session_state:
+    api_key = st.secrets.get("GROQ_API_KEY")
+    if not api_key:
+        st.error("Clé GROQ_API_KEY manquante dans secrets.toml")
+        st.stop()
+    st.session_state.groq_client = Groq(api_key=api_key)
+
+client = st.session_state.groq_client
+
+# Historique
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-if "client" not in st.session_state:
-    api_key = st.secrets.get("XAI_API_KEY")
-    if not api_key:
-        st.error("❌ Ajoute XAI_API_KEY dans .streamlit/secrets.toml (obtiens-la sur https://x.ai/api)")
-        st.stop()
-    st.session_state.client = OpenAI(
-        api_key=api_key,
-        base_url="https://api.x.ai/v1"
-    )
+# =============================================
+# AFFICHAGE HISTORIQUE
+# =============================================
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+        if msg.get("image"):
+            st.image(msg["image"], width=400)
 
-# Fonction pour encoder l'image en base64
-def encode_image(image_file):
-    if image_file is not None:
-        image_bytes = image_file.read()
-        image_base64 = base64.b64encode(image_bytes).decode('utf-8')
-        mime_type = image_file.type or 'image/jpeg'
-        return f"data:{mime_type};base64,{image_base64}"
-    return None
+# =============================================
+# INPUT + UPLOAD IMAGE
+# =============================================
+col_text, col_img = st.columns([5, 1])
 
-# Affichage des messages précédents
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-        if "image" in message and message["image"]:
-            st.image(message["image"], caption="Uploaded Image")
+with col_text:
+    prompt = st.chat_input("Pose ta question (ou upload une image ci-contre)")
 
-# Barre de chat avec upload image
-col1, col2 = st.columns([4, 1])
-with col1:
-    user_input = st.chat_input("Pose ta question à Grok... (ou upload une image pour analyse)")
+with col_img:
+    uploaded_img = st.file_uploader("", type=["png", "jpg", "jpeg", "webp"])
 
-with col2:
-    uploaded_file = st.file_uploader("📷 Image", type=["png", "jpg", "jpeg"], key="file_uploader")
-
-if user_input or uploaded_file:
+# =============================================
+# ENVOI
+# =============================================
+if prompt or uploaded_img:
     # Message utilisateur
-    user_message = {"role": "user", "content": user_input or "", "image": None}
-    if uploaded_file:
-        user_image_b64 = encode_image(uploaded_file)
-        if user_image_b64:
-            user_message["content"] = user_input or "Analyse cette image :"
-            user_message["image"] = uploaded_file.getvalue()  # Pour affichage
+    user_content = []
+    user_text = prompt or "Analyse cette image"
+    user_content.append({"type": "text", "text": user_text})
 
+    image_b64 = None
+    image_display = None
+
+    if uploaded_img:
+        image_bytes = uploaded_img.read()
+        image_b64 = base64.b64encode(image_bytes).decode()
+        image_display = image_bytes
+        user_content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}
+        })
+
+    # Affichage utilisateur
     with st.chat_message("user"):
-        st.markdown(user_message["content"])
-        if uploaded_file:
-            st.image(uploaded_file, caption="Uploaded Image")
+        st.markdown(user_text)
+        if uploaded_img:
+            st.image(uploaded_img, width=400)
 
-    st.session_state.messages.append(user_message)
+    st.session_state.messages.append({
+        "role": "user",
+        "content": user_text,
+        "image": image_display
+    })
 
-    # Appel à Grok API
+    # Réponse Groq
     with st.chat_message("assistant"):
-        with st.spinner("Grok réfléchit..."):
-            if user_message["image"]:
-                # Multimodal : texte + image
-                response = st.session_state.client.chat.completions.create(
-                    model="grok-vision-beta",  # Modèle vision si dispo, sinon fallback
-                    messages=[
-                        {"role": "system", "content": "Tu es Grok, un assistant intelligent et utile. Réponds de manière concise et précise."},
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": user_message["content"]},
-                                {
-                                    "type": "image_url",
-                                    "image_url": {"url": user_image_b64}
-                                }
-                            ]
-                        }
-                    ],
-                    max_tokens=1000,
-                    temperature=0.7
+        with st.spinner("Grok réfléchit (0.2s en moyenne)..."):
+            try:
+                response = client.chat.completions.create(
+                    model="llama-3.2-90b-vision-preview" if uploaded_img else "llama-3.2-90b-text-preview",
+                    messages=[{"role": "user", "content": user_content}],
+                    temperature=0.7,
+                    max_tokens=1500
                 )
-            else:
-                # Texte seulement
-                response = st.session_state.client.chat.completions.create(
-                    model="grok-beta",  # Modèle par défaut
-                    messages=[
-                        {"role": "system", "content": "Tu es Grok, un assistant intelligent et utile. Réponds de manière concise et précise."},
-                        {"role": "user", "content": user_message["content"]}
-                    ],
-                    max_tokens=1000,
-                    temperature=0.7
-                )
+                answer = response.choices[0].message.content
+                st.markdown(answer)
+            except Exception as e:
+                st.error(f"Erreur Groq : {e}")
 
-            grok_response = response.choices[0].message.content
-            st.markdown(grok_response)
+    # Sauvegarde réponse
+    st.session_state.messages.append({"role": "assistant", "content": answer})
 
-    # Ajout à la session
-    st.session_state.messages.append({"role": "assistant", "content": grok_response})
-
-# Bouton pour effacer la conversation
-if st.button("🗑️ Effacer la conversation", type="secondary"):
+# =============================================
+# BOUTON EFFACER
+# =============================================
+if st.button("Effacer la conversation", type="secondary"):
     st.session_state.messages = []
     st.rerun()
+
+st.caption("Groq API • Llama 3.2 90B Vision • Latence < 1s • Upload images OK")
