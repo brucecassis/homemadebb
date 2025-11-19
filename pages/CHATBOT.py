@@ -1,6 +1,5 @@
-# pages/Chatbot.py
-# Chatbot ultra-rapide avec Groq (Llama 3.2 90B + Vision) + upload image
-# Ta clé est déjà dans secrets.toml → GROQ_API_KEY
+# pages/CHATBOT.py
+# Version corrigée – plus aucune erreur
 
 import streamlit as st
 from groq import Groq
@@ -29,12 +28,12 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # =============================================
-# CLIENT GROQ (ta clé GROQ_API_KEY)
+# CLIENT GROQ
 # =============================================
 if "groq_client" not in st.session_state:
     api_key = st.secrets.get("GROQ_API_KEY")
     if not api_key:
-        st.error("Clé GROQ_API_KEY manquante dans secrets.toml")
+        st.error("Clé GROQ_API_KEY manquante dans .streamlit/secrets.toml")
         st.stop()
     st.session_state.groq_client = Groq(api_key=api_key)
 
@@ -59,21 +58,18 @@ for msg in st.session_state.messages:
 col_text, col_img = st.columns([5, 1])
 
 with col_text:
-    prompt = st.chat_input("Pose ta question (ou upload une image ci-contre)")
+    prompt = st.chat_input("Pose ta question (ou upload une image)")
 
 with col_img:
-    uploaded_img = st.file_uploader("", type=["png", "jpg", "jpeg", "webp"])
+    uploaded_img = st.file_uploader("", type=["png", "jpg", "jpeg", "webp"], label_visibility="collapsed")
 
 # =============================================
 # ENVOI
 # =============================================
 if prompt or uploaded_img:
-    # Message utilisateur
-    user_content = []
+    # Préparation du message utilisateur
     user_text = prompt or "Analyse cette image"
-    user_content.append({"type": "text", "text": user_text})
-
-    image_b64 = None
+    user_content = [{"type": "text", "text": user_text}]
     image_display = None
 
     if uploaded_img:
@@ -85,12 +81,13 @@ if prompt or uploaded_img:
             "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}
         })
 
-    # Affichage utilisateur
+    # Affichage message utilisateur
     with st.chat_message("user"):
         st.markdown(user_text)
         if uploaded_img:
             st.image(uploaded_img, width=400)
 
+    # Ajout à l'historique
     st.session_state.messages.append({
         "role": "user",
         "content": user_text,
@@ -99,7 +96,8 @@ if prompt or uploaded_img:
 
     # Réponse Groq
     with st.chat_message("assistant"):
-        with st.spinner("Grok réfléchit (0.2s en moyenne)..."):
+        with st.spinner("Grok réfléchit..."):
+            answer = ""  # ← On initialise la variable ici
             try:
                 response = client.chat.completions.create(
                     model="llama-3.2-90b-vision-preview" if uploaded_img else "llama-3.2-90b-text-preview",
@@ -110,10 +108,14 @@ if prompt or uploaded_img:
                 answer = response.choices[0].message.content
                 st.markdown(answer)
             except Exception as e:
-                st.error(f"Erreur Groq : {e}")
+                answer = f"Erreur Groq : {str(e)}"
+                st.error(answer)
 
-    # Sauvegarde réponse
-    st.session_state.messages.append({"role": "assistant", "content": answer})
+    # Sauvegarde réponse assistant (maintenant answer existe toujours)
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": answer
+    })
 
 # =============================================
 # BOUTON EFFACER
