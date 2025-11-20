@@ -355,15 +355,214 @@ else:
 st.markdown('<hr>', unsafe_allow_html=True)
 
 # =============================================
-# BOUTONS ET INFO
+# GRAPHIQUE COMPARATIF + MATRICE CORRÉLATION
 # =============================================
-col_info1, col_info2, col_refresh = st.columns([4, 4, 2])
+st.markdown('<hr>', unsafe_allow_html=True)
+st.markdown("### 📈 COMPARATIVE CHART - PERFORMANCE %")
+
+col_chart1, col_chart2 = st.columns([3, 1])
+
+with col_chart1:
+    popular_tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'AMD', 'NFLX', 'DIS',
+                       'JPM', 'BAC', 'GS', 'MS', 'WFC', 'C', 'XOM', 'CVX', 'COP', 'SLB',
+                       'JNJ', 'PFE', 'UNH', 'ABBV', 'TMO', 'DHR', 'LLY', 'MRK', 'BMY', 'AMGN',
+                       'MC.PA', 'OR.PA', 'SAN.PA', 'AIR.PA', 'BNP.PA', 'TTE.PA', 'SAF.PA',
+                       'NESN.SW', 'ROG.SW', 'NOVN.SW', 'UBSG.SW', 'ZURN.SW',
+                       'BTC-USD', 'ETH-USD', 'SOL-USD', 'SPY', 'QQQ', 'IWM', 'DIA']
+    
+    selected_tickers = st.multiselect(
+        "Sélectionnez des tickers à comparer",
+        options=popular_tickers,
+        default=['AAPL', 'MSFT', 'TSLA'],
+        help="Sélectionnez jusqu'à 10 tickers"
+    )
+
+with col_chart2:
+    timeframe = st.selectbox(
+        "Timeframe",
+        options=['1d', '5d', '1mo', '3mo', '6mo', '1y', '5y'],
+        index=3,
+        help="Période d'analyse"
+    )
+
+# Fonction pour normaliser en %
+def normalize_to_percentage(df):
+    """Normalise les prix à 100% au début"""
+    if df is None or len(df) == 0:
+        return None
+    return (df / df.iloc[0]) * 100
+
+# Fonction pour récupérer les données historiques
+@st.cache_data(ttl=300)
+def get_historical_data(ticker, period):
+    """Récupère les données historiques pour un ticker"""
+    try:
+        stock = yf.Ticker(ticker)
+        hist = stock.history(period=period)
+        return hist
+    except:
+        return None
+
+# Génération du graphique
+if selected_tickers:
+    st.markdown('<div class="section-box">', unsafe_allow_html=True)
+    
+    fig = go.Figure()
+    
+    # Couleurs Bloomberg style
+    colors = ['#00FFFF', '#FF00FF', '#00FF00', '#FFA500', '#FF0000', '#FFFF00', 
+              '#FF1493', '#00CED1', '#32CD32', '#FFD700']
+    
+    # Stocker les données pour la corrélation
+    correlation_data = pd.DataFrame()
+    
+    with st.spinner('📊 Chargement des données...'):
+        for idx, ticker in enumerate(selected_tickers[:10]):
+            hist = get_historical_data(ticker, timeframe)
+            
+            if hist is not None and len(hist) > 0:
+                # Normaliser à 100%
+                normalized = normalize_to_percentage(hist['Close'])
+                
+                # Stocker pour corrélation
+                correlation_data[ticker] = hist['Close']
+                
+                # Ajouter la courbe
+                fig.add_trace(go.Scatter(
+                    x=hist.index,
+                    y=normalized,
+                    mode='lines',
+                    name=ticker,
+                    line=dict(color=colors[idx % len(colors)], width=2),
+                    hovertemplate=f'<b>{ticker}</b><br>%{{y:.2f}}%<br>%{{x}}<extra></extra>'
+                ))
+    
+    # Mise en forme du graphique
+    fig.update_layout(
+        title=f"Performance Comparison - {timeframe.upper()}",
+        paper_bgcolor='#000',
+        plot_bgcolor='#111',
+        font=dict(color='#FFAA00', size=10),
+        xaxis=dict(
+            gridcolor='#333',
+            showgrid=True,
+            title="Date"
+        ),
+        yaxis=dict(
+            gridcolor='#333',
+            showgrid=True,
+            title="Performance (%)"
+        ),
+        hovermode='x unified',
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        height=500
+    )
+    
+    # Ligne horizontale à 100%
+    fig.add_shape(
+        type="line",
+        x0=0, x1=1, xref="paper",
+        y0=100, y1=100,
+        line=dict(color="#666", width=1, dash="dash")
+    )
+    
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': True})
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Statistiques des performances
+    st.markdown("#### 📊 PERFORMANCE SUMMARY")
+    
+    cols_perf = st.columns(min(len(selected_tickers), 10))
+    
+    for idx, ticker in enumerate(selected_tickers[:10]):
+        with cols_perf[idx]:
+            hist = get_historical_data(ticker, timeframe)
+            if hist is not None and len(hist) > 1:
+                start_price = hist['Close'].iloc[0]
+                end_price = hist['Close'].iloc[-1]
+                perf = ((end_price - start_price) / start_price) * 100
+                
+                st.metric(
+                    label=ticker,
+                    value=f"{end_price:.2f}",
+                    delta=f"{perf:+.2f}%"
+                )
+    
+    # ===== MATRICE DE CORRÉLATION =====
+    if len(correlation_data.columns) > 1:
+        st.markdown('<div style="border-top: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+        st.markdown("#### 📊 CORRELATION MATRIX")
+        
+        # Calculer la matrice de corrélation
+        corr_matrix = correlation_data.corr()
+        
+        # Créer la heatmap
+        fig_corr = go.Figure(data=go.Heatmap(
+            z=corr_matrix.values,
+            x=corr_matrix.columns,
+            y=corr_matrix.columns,
+            colorscale=[
+                [0, '#FF0000'],      # Rouge pour corrélation négative
+                [0.5, '#000000'],    # Noir pour 0
+                [1, '#00FF00']       # Vert pour corrélation positive
+            ],
+            zmid=0,
+            text=corr_matrix.values,
+            texttemplate='%{text:.2f}',
+            textfont={"size": 10, "color": "#FFAA00"},
+            showscale=True,
+            colorbar=dict(
+                title="Corr",
+                tickvals=[-1, -0.5, 0, 0.5, 1],
+                ticktext=['-1.0', '-0.5', '0', '0.5', '1.0']
+            )
+        ))
+        
+        fig_corr.update_layout(
+            title="Correlation Matrix (1.0 = parfaitement corrélé, -1.0 = inversement corrélé)",
+            paper_bgcolor='#000',
+            plot_bgcolor='#111',
+            font=dict(color='#FFAA00', size=10),
+            xaxis=dict(
+                tickfont=dict(color='#FFAA00', size=9),
+                showgrid=False
+            ),
+            yaxis=dict(
+                tickfont=dict(color='#FFAA00', size=9),
+                showgrid=False
+            ),
+            height=400
+        )
+        
+        st.plotly_chart(fig_corr, use_container_width=True)
+        
+        # Interprétation
+        st.caption("""
+        **📖 Comment lire la matrice :**
+        - 🟢 **Vert (proche de 1.0)** : Les actions évoluent ensemble (forte corrélation positive)
+        - ⚫ **Noir (proche de 0)** : Pas de relation claire
+        - 🔴 **Rouge (proche de -1.0)** : Les actions évoluent en sens inverse (corrélation négative)
+        """)
+
+st.markdown('<hr>', unsafe_allow_html=True)
+
+# =============================================
+# INFO SYSTÈME
+# =============================================
+col_info1, col_info2 = st.columns([6, 6])
 
 with col_info1:
     st.markdown("""
     <div style="color:#666;font-size:10px;padding:5px;">
         📊 DONNÉES EN TEMPS RÉEL • YAHOO FINANCE + COINMARKETCAP<br>
-        🔄 RAFRAÎCHISSEMENT AUTOMATIQUE: 3 SECONDES
+        🔄 RAFRAÎCHISSEMENT AUTOMATIQUE: 3 SECONDES • AUCUNE ACTION REQUISE
     </div>
     """, unsafe_allow_html=True)
 
@@ -372,14 +571,9 @@ with col_info2:
     st.markdown(f"""
     <div style="color:#666;font-size:10px;padding:5px;">
         🕐 DERNIÈRE MAJ: {last_update}<br>
-        📍 CONNEXION: PARIS, FRANCE
+        📍 CONNEXION: PARIS, FRANCE • SYSTÈME OPÉRATIONNEL
     </div>
     """, unsafe_allow_html=True)
-
-with col_refresh:
-    if st.button("🔄 REFRESH NOW", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
 
 # =============================================
 # FOOTER
