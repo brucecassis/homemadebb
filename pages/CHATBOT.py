@@ -1,5 +1,5 @@
 # pages/CHATBOT.py
-# Version finale – zéro erreur, zéro warning
+# Version finale – modèles Groq à jour
 
 import streamlit as st
 from groq import Groq
@@ -9,7 +9,7 @@ import time
 # =============================================
 # PAGE CONFIG + STYLE BLOOMBERG
 # =============================================
-st.set_page_config(page_title="Grok Chatbot", page_icon="Robot", layout="wide")
+st.set_page_config(page_title="Grok Chatbot", page_icon="🤖", layout="wide")
 
 st.markdown("""
 <style>
@@ -23,7 +23,7 @@ st.markdown("""
 
 st.markdown(f"""
 <div style="background:#FFAA00;padding:15px;color:#000;font-weight:bold;font-size:22px;font-family:'Courier New';text-align:center;">
-    GROQ CHATBOT • LLAMA 3.2 90B + VISION • {time.strftime("%H:%M:%S")} UTC
+    GROQ CHATBOT • LLAMA 3.3 70B + VISION • {time.strftime("%H:%M:%S")} UTC
 </div>
 """, unsafe_allow_html=True)
 
@@ -61,11 +61,10 @@ with col_text:
     prompt = st.chat_input("Pose ta question ou demande une analyse d'image")
 
 with col_img:
-    # Label non vide + caché proprement → plus de warning
     uploaded_img = st.file_uploader(
-        "Image",  # ← label obligatoire
+        "Image",
         type=["png", "jpg", "jpeg", "webp"],
-        label_visibility="collapsed",  # ← cache le label
+        label_visibility="collapsed",
         key="img_upload"
     )
 
@@ -100,13 +99,16 @@ if prompt or uploaded_img:
         "image": image_display
     })
 
-    # Réponse Groq
+    # Réponse Groq avec modèles à jour
     with st.chat_message("assistant"):
-        with st.spinner("Grok répond..."):
+        with st.spinner("Groq répond..."):
             answer = "Erreur inconnue"
             try:
+                # Modèles mis à jour (novembre 2024)
+                model_name = "llama-3.2-90b-vision-preview" if uploaded_img else "llama-3.3-70b-versatile"
+                
                 response = client.chat.completions.create(
-                    model="llama-3.2-90b-vision-preview" if uploaded_img else "llama-3.2-90b-text-preview",
+                    model=model_name,
                     messages=[{"role": "user", "content": user_content}],
                     temperature=0.7,
                     max_tokens=1500
@@ -117,7 +119,7 @@ if prompt or uploaded_img:
                 answer = f"Erreur Groq : {str(e)}"
                 st.error(answer)
 
-    # Sauvegarde réponse (answer existe toujours)
+    # Sauvegarde réponse
     st.session_state.messages.append({
         "role": "assistant",
         "content": answer
@@ -130,4 +132,4 @@ if st.button("Effacer la conversation", type="secondary"):
     st.session_state.messages = []
     st.rerun()
 
-st.caption("Groq API • Llama 3.2 90B Vision • Réponses < 1s • Analyse d'images")
+st.caption("Groq API • Llama 3.3 70B / Vision 3.2 90B • Réponses < 1s • Analyse d'images")
