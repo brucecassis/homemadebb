@@ -1,15 +1,19 @@
 # pages/CHATBOT.py
-# Version finale – modèles Groq à jour
+# Support complet : Images (Llama 4 Scout) + Documents (PDF, Word, Excel, TXT...)
 
 import streamlit as st
 from groq import Groq
 import base64
 import time
+import PyPDF2
+import docx
+import pandas as pd
+from io import BytesIO
 
 # =============================================
 # PAGE CONFIG + STYLE BLOOMBERG
 # =============================================
-st.set_page_config(page_title="Grok Chatbot", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="Groq Chatbot", page_icon="🤖", layout="wide")
 
 st.markdown("""
 <style>
@@ -23,7 +27,7 @@ st.markdown("""
 
 st.markdown(f"""
 <div style="background:#FFAA00;padding:15px;color:#000;font-weight:bold;font-size:22px;font-family:'Courier New';text-align:center;">
-    GROQ CHATBOT • LLAMA 3.3 70B + VISION • {time.strftime("%H:%M:%S")} UTC
+    GROQ CHATBOT • LLAMA 4 SCOUT VISION + MULTIMODAL • {time.strftime("%H:%M:%S")} UTC
 </div>
 """, unsafe_allow_html=True)
 
@@ -44,6 +48,50 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # =============================================
+# FONCTIONS D'EXTRACTION DE TEXTE
+# =============================================
+def extract_text_from_pdf(file_bytes):
+    """Extrait le texte d'un PDF"""
+    try:
+        pdf_reader = PyPDF2.PdfReader(BytesIO(file_bytes))
+        text = ""
+        for page in pdf_reader.pages:
+            text += page.extract_text() + "\n"
+        return text.strip()
+    except Exception as e:
+        return f"Erreur lecture PDF : {str(e)}"
+
+def extract_text_from_docx(file_bytes):
+    """Extrait le texte d'un fichier Word"""
+    try:
+        doc = docx.Document(BytesIO(file_bytes))
+        text = "\n".join([para.text for para in doc.paragraphs])
+        return text.strip()
+    except Exception as e:
+        return f"Erreur lecture Word : {str(e)}"
+
+def extract_text_from_excel(file_bytes, filename):
+    """Extrait le texte d'un fichier Excel"""
+    try:
+        if filename.endswith('.xlsx'):
+            df = pd.read_excel(BytesIO(file_bytes), engine='openpyxl')
+        else:
+            df = pd.read_excel(BytesIO(file_bytes))
+        return df.to_string()
+    except Exception as e:
+        return f"Erreur lecture Excel : {str(e)}"
+
+def extract_text_from_txt(file_bytes):
+    """Extrait le texte d'un fichier texte"""
+    try:
+        return file_bytes.decode('utf-8')
+    except:
+        try:
+            return file_bytes.decode('latin-1')
+        except Exception as e:
+            return f"Erreur lecture TXT : {str(e)}"
+
+# =============================================
 # AFFICHAGE HISTORIQUE
 # =============================================
 for msg in st.session_state.messages:
@@ -53,44 +101,72 @@ for msg in st.session_state.messages:
             st.image(msg["image"], width=500)
 
 # =============================================
-# INPUT + UPLOAD IMAGE (sans warning)
+# INPUT + UPLOAD FICHIER
 # =============================================
-col_text, col_img = st.columns([5, 1])
+col_text, col_file = st.columns([5, 1])
 
 with col_text:
-    prompt = st.chat_input("Pose ta question ou demande une analyse d'image")
+    prompt = st.chat_input("Pose ta question ou envoie un document/image")
 
-with col_img:
-    uploaded_img = st.file_uploader(
-        "Image",
-        type=["png", "jpg", "jpeg", "webp"],
+with col_file:
+    uploaded_file = st.file_uploader(
+        "Fichier",
+        type=["png", "jpg", "jpeg", "webp", "pdf", "docx", "doc", "xlsx", "xls", "txt"],
         label_visibility="collapsed",
-        key="img_upload"
+        key="file_upload"
     )
 
 # =============================================
 # TRAITEMENT DE L'ENVOI
 # =============================================
-if prompt or uploaded_img:
-    # Préparation du contenu utilisateur
-    user_text = prompt or "Analyse cette image en détail"
+if prompt or uploaded_file:
+    user_text = prompt or "Analyse ce fichier en détail"
     user_content = [{"type": "text", "text": user_text}]
     image_display = None
+    use_vision = False
 
-    if uploaded_img:
-        image_bytes = uploaded_img.read()
-        image_b64 = base64.b64encode(image_bytes).decode()
-        image_display = image_bytes
-        user_content.append({
-            "type": "image_url",
-            "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}
-        })
+    if uploaded_file:
+        file_bytes = uploaded_file.read()
+        filename = uploaded_file.name.lower()
+
+        # IMAGES → Vision model
+        if filename.endswith(('.png', '.jpg', '.jpeg', '.webp')):
+            use_vision = True
+            image_b64 = base64.b64encode(file_bytes).decode()
+            image_display = file_bytes
+            user_content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}
+            })
+
+        # PDF
+        elif filename.endswith('.pdf'):
+            extracted_text = extract_text_from_pdf(file_bytes)
+            user_content[0]["text"] = f"{user_text}\n\n[Contenu PDF]\n{extracted_text[:8000]}"
+
+        # WORD
+        elif filename.endswith(('.docx', '.doc')):
+            extracted_text = extract_text_from_docx(file_bytes)
+            user_content[0]["text"] = f"{user_text}\n\n[Contenu Word]\n{extracted_text[:8000]}"
+
+        # EXCEL
+        elif filename.endswith(('.xlsx', '.xls')):
+            extracted_text = extract_text_from_excel(file_bytes, filename)
+            user_content[0]["text"] = f"{user_text}\n\n[Contenu Excel]\n{extracted_text[:8000]}"
+
+        # TXT
+        elif filename.endswith('.txt'):
+            extracted_text = extract_text_from_txt(file_bytes)
+            user_content[0]["text"] = f"{user_text}\n\n[Contenu TXT]\n{extracted_text[:8000]}"
 
     # Affichage message utilisateur
     with st.chat_message("user"):
         st.markdown(user_text)
-        if uploaded_img:
-            st.image(uploaded_img, width=500)
+        if uploaded_file:
+            if use_vision:
+                st.image(uploaded_file, width=500)
+            else:
+                st.info(f"📄 Document joint : {uploaded_file.name}")
 
     # Ajout à l'historique
     st.session_state.messages.append({
@@ -99,24 +175,27 @@ if prompt or uploaded_img:
         "image": image_display
     })
 
-    # Réponse Groq avec modèles à jour
+    # Réponse Groq
     with st.chat_message("assistant"):
-        with st.spinner("Groq répond..."):
+        with st.spinner("Groq analyse..."):
             answer = "Erreur inconnue"
             try:
-                # Modèles mis à jour (novembre 2024)
-                model_name = "llama-3.2-90b-vision-preview" if uploaded_img else "llama-3.3-70b-versatile"
-                
+                # Choix du modèle selon le type de contenu
+                if use_vision:
+                    model_name = "meta-llama/llama-4-scout-17b-16e-instruct"
+                else:
+                    model_name = "llama-3.3-70b-versatile"
+
                 response = client.chat.completions.create(
                     model=model_name,
                     messages=[{"role": "user", "content": user_content}],
                     temperature=0.7,
-                    max_tokens=1500
+                    max_tokens=2000
                 )
                 answer = response.choices[0].message.content
                 st.markdown(answer)
             except Exception as e:
-                answer = f"Erreur Groq : {str(e)}"
+                answer = f"❌ Erreur Groq : {str(e)}"
                 st.error(answer)
 
     # Sauvegarde réponse
@@ -128,8 +207,8 @@ if prompt or uploaded_img:
 # =============================================
 # BOUTON EFFACER
 # =============================================
-if st.button("Effacer la conversation", type="secondary"):
+if st.button("🗑️ Effacer la conversation", type="secondary"):
     st.session_state.messages = []
     st.rerun()
 
-st.caption("Groq API • Llama 3.3 70B / Vision 3.2 90B • Réponses < 1s • Analyse d'images")
+st.caption("Groq API • Llama 4 Scout Vision + Llama 3.3 70B • Analyse images, PDF, Word, Excel, TXT")
