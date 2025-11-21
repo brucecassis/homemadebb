@@ -3,6 +3,12 @@ from supabase import create_client, Client
 import pandas as pd
 from datetime import datetime
 import plotly.graph_objects as go
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+import xgboost as xgb
 
 st.set_page_config(
     page_title="Crypto Database Viewer",
@@ -114,6 +120,150 @@ def get_table_schema(table_name):
         st.error(f"Erreur lors de la récupération du schéma: {e}")
     return None
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ML TRADING STRATEGY CLASSES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class FeatureEngineer:
+    @staticmethod
+    def add_all_features(df):
+        df = df.copy()
+        for col in ['open', 'high', 'low', 'close', 'volume']:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Moving Averages
+        df['sma_10'] = df['close'].rolling(10).mean()
+        df['sma_20'] = df['close'].rolling(20).mean()
+        df['sma_50'] = df['close'].rolling(50).mean()
+        df['ema_9'] = df['close'].ewm(span=9).mean()
+        df['ema_21'] = df['close'].ewm(span=21).mean()
+        
+        # MACD
+        df['macd'] = df['close'].ewm(span=12).mean() - df['close'].ewm(span=26).mean()
+        df['macd_signal'] = df['macd'].ewm(span=9).mean()
+        
+        # RSI
+        delta = df['close'].diff()
+        gain = delta.where(delta > 0, 0).rolling(14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+        df['rsi'] = 100 - (100 / (1 + gain / loss))
+        
+        # Bollinger Bands
+        df['bb_middle'] = df['close'].rolling(20).mean()
+        bb_std = df['close'].rolling(20).std()
+        df['bb_upper'] = df['bb_middle'] + 2 * bb_std
+        df['bb_lower'] = df['bb_middle'] - 2 * bb_std
+        df['bb_position'] = (df['close'] - df['bb_lower']) / (df['bb_upper'] - df['bb_lower'])
+        
+        # ATR
+        tr = pd.concat([df['high'] - df['low'], 
+                        abs(df['high'] - df['close'].shift()), 
+                        abs(df['low'] - df['close'].shift())], axis=1).max(axis=1)
+        df['atr'] = tr.rolling(14).mean()
+        
+        # Returns
+        df['return_1'] = df['close'].pct_change(1)
+        df['return_5'] = df['close'].pct_change(5)
+        df['return_10'] = df['close'].pct_change(10)
+        
+        # Volume
+        df['volume_ratio'] = df['volume'] / df['volume'].rolling(20).mean()
+        
+        # Signals
+        df['ema_cross'] = (df['ema_9'] > df['ema_21']).astype(int)
+        df['rsi_oversold'] = (df['rsi'] < 30).astype(int)
+        df['rsi_overbought'] = (df['rsi'] > 70).astype(int)
+        
+        return df
+    
+    @staticmethod
+    def create_target(df, horizon=1, threshold=0.0):
+        df = df.copy()
+        df['future_return'] = df['close'].shift(-horizon) / df['close'] - 1
+        df['target'] = (df['future_return'] > threshold).astype(int)
+        return df
+
+
+class MLModels:
+    def __init__(self):
+        self.scaler = StandardScaler()
+        self.results = {}
+    
+    def get_models(self):
+        return {
+            'random_forest': ('Random Forest', RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42)),
+            'xgboost': ('XGBoost', xgb.XGBClassifier(n_estimators=100, max_depth=6, random_state=42, eval_metric='logloss')),
+            'gradient_boosting': ('Gradient Boosting', GradientBoostingClassifier(n_estimators=100, random_state=42)),
+            'logistic': ('Logistic Regression', LogisticRegression(max_iter=1000, random_state=42))
+        }
+    
+    def train(self, df, features, target='target', test_size=0.2):
+        df_clean = df.dropna(subset=features + [target])
+        X, y = df_clean[features].values, df_clean[target].values
+        
+        split = int(len(X) * (1 - test_size))
+        X_train, X_test = self.scaler.fit_transform(X[:split]), self.scaler.transform(X[split:])
+        y_train, y_test = y[:split], y[split:]
+        
+        return X_train, X_test, y_train, y_test, df_clean.iloc[split:]
+    
+    def evaluate(self, model, X_train, X_test, y_train, y_test):
+        model.fit(X_train, y_train)
+        pred = model.predict(X_test)
+        prob = model.predict_proba(X_test)[:, 1] if hasattr(model, 'predict_proba') else pred
+        
+        return {
+            'accuracy': accuracy_score(y_test, pred),
+            'precision': precision_score(y_test, pred, zero_division=0),
+            'recall': recall_score(y_test, pred, zero_division=0),
+            'f1': f1_score(y_test, pred, zero_division=0),
+            'predictions': pred,
+            'probabilities': prob,
+            'feature_importance': model.feature_importances_ if hasattr(model, 'feature_importances_') else None
+        }
+
+
+class Backtester:
+    def __init__(self, capital=10000, commission=0.001):
+        self.capital = capital
+        self.commission = commission
+    
+    def run(self, df, predictions, stop_loss=0.02, take_profit=0.04):
+        df = df.iloc[-len(predictions):].copy()
+        capital, position, entry_price = self.capital, 0, 0
+        equity = [capital]
+        trades = []
+        
+        for i, (_, row) in enumerate(df.iterrows()):
+            price = float(row['close'])
+            pred = predictions[i]
+            
+            if position == 1:
+                pnl = (price - entry_price) / entry_price
+                if pnl <= -stop_loss or pnl >= take_profit or pred == 0:
+                    capital *= (1 + pnl - self.commission)
+                    trades.append({'pnl': pnl})
+                    position = 0
+            elif pred == 1 and position == 0:
+                position, entry_price = 1, price
+                capital *= (1 - self.commission)
+            
+            equity.append(capital)
+        
+        equity = np.array(equity[1:])
+        bh = self.capital * (1 + df['close'].astype(float).pct_change().fillna(0)).cumprod().values
+        
+        win_trades = [t['pnl'] for t in trades if t['pnl'] > 0]
+        return {
+            'equity': equity,
+            'bh_equity': bh,
+            'total_return': (equity[-1] / self.capital - 1) * 100,
+            'bh_return': (bh[-1] / self.capital - 1) * 100,
+            'max_dd': ((np.maximum.accumulate(equity) - equity) / np.maximum.accumulate(equity)).max() * 100,
+            'trades': len(trades),
+            'win_rate': len(win_trades) / len(trades) * 100 if trades else 0
+        }
 
 # ===== INTERFACE =====
 
@@ -264,6 +414,101 @@ if tables_info:
             st.info("📭 Aucune donnée dans cette table")
     
     st.markdown("---")
+
+
+# ═══════════════════════════════════════════════════════════════
+            # SECTION ML TRADING STRATEGY
+            # ═══════════════════════════════════════════════════════════════
+            st.markdown("---")
+            st.markdown("### 🤖 ML TRADING STRATEGY")
+            
+            with st.expander("🧠 Configurer et lancer la stratégie ML", expanded=False):
+                
+                col_ml1, col_ml2, col_ml3 = st.columns(3)
+                with col_ml1:
+                    horizon = st.selectbox("Horizon prédiction", [1, 2, 3, 5, 10], index=0)
+                with col_ml2:
+                    threshold = st.slider("Seuil rendement (%)", 0.0, 1.0, 0.0, 0.1) / 100
+                with col_ml3:
+                    test_pct = st.slider("Test set (%)", 10, 40, 20)
+                
+                models_to_train = st.multiselect(
+                    "Modèles",
+                    ['random_forest', 'xgboost', 'gradient_boosting', 'logistic'],
+                    default=['random_forest', 'xgboost']
+                )
+                
+                if st.button("🚀 LANCER ML", type="primary", use_container_width=True):
+                    
+                    # Charger plus de données pour ML
+                    with st.spinner("Chargement des données..."):
+                        full_data = get_table_data(selected_table, limit=50000)
+                        df_ml = pd.DataFrame(full_data)
+                    
+                    # Features
+                    with st.spinner("Génération des features..."):
+                        fe = FeatureEngineer()
+                        df_ml = fe.add_all_features(df_ml)
+                        df_ml = fe.create_target(df_ml, horizon, threshold)
+                    
+                    features = ['sma_10', 'sma_20', 'ema_9', 'ema_21', 'macd', 'macd_signal',
+                               'rsi', 'bb_position', 'atr', 'return_1', 'return_5', 'volume_ratio',
+                               'ema_cross', 'rsi_oversold', 'rsi_overbought']
+                    
+                    # Train
+                    ml = MLModels()
+                    X_train, X_test, y_train, y_test, df_test = ml.train(df_ml, features, 'target', test_pct/100)
+                    
+                    st.success(f"✅ Train: {len(X_train):,} | Test: {len(X_test):,}")
+                    
+                    # Évaluer les modèles
+                    results = {}
+                    available = ml.get_models()
+                    
+                    for key in models_to_train:
+                        name, model = available[key]
+                        with st.spinner(f"Training {name}..."):
+                            results[key] = ml.evaluate(model, X_train, X_test, y_train, y_test)
+                            results[key]['name'] = name
+                    
+                    # Afficher résultats
+                    st.markdown("#### 📊 Résultats ML")
+                    res_df = pd.DataFrame([{
+                        'Modèle': r['name'],
+                        'Accuracy': f"{r['accuracy']:.2%}",
+                        'Precision': f"{r['precision']:.2%}",
+                        'Recall': f"{r['recall']:.2%}",
+                        'F1': f"{r['f1']:.2%}"
+                    } for r in results.values()])
+                    st.dataframe(res_df, use_container_width=True, hide_index=True)
+                    
+                    # Backtest du meilleur modèle
+                    best_key = max(results, key=lambda k: results[k]['accuracy'])
+                    st.markdown(f"#### 💰 Backtest ({results[best_key]['name']})")
+                    
+                    col_bt1, col_bt2 = st.columns(2)
+                    with col_bt1:
+                        sl = st.slider("Stop Loss %", 1.0, 5.0, 2.0) / 100
+                    with col_bt2:
+                        tp = st.slider("Take Profit %", 1.0, 10.0, 4.0) / 100
+                    
+                    bt = Backtester()
+                    bt_results = bt.run(df_test, results[best_key]['predictions'], sl, tp)
+                    
+                    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+                    col_m1.metric("Rendement", f"{bt_results['total_return']:.2f}%", 
+                                  delta=f"vs B&H: {bt_results['total_return'] - bt_results['bh_return']:.2f}%")
+                    col_m2.metric("Max Drawdown", f"-{bt_results['max_dd']:.2f}%")
+                    col_m3.metric("Trades", bt_results['trades'])
+                    col_m4.metric("Win Rate", f"{bt_results['win_rate']:.1f}%")
+                    
+                    # Equity curve
+                    fig_eq = go.Figure()
+                    fig_eq.add_trace(go.Scatter(y=bt_results['equity'], name='Strategy', line=dict(color='#00ff88')))
+                    fig_eq.add_trace(go.Scatter(y=bt_results['bh_equity'], name='Buy & Hold', line=dict(color='#ff8800', dash='dash')))
+                    fig_eq.update_layout(template='plotly_dark', height=400, title='Equity Curve')
+                    st.plotly_chart(fig_eq, use_container_width=True)
+
     
     # Section 3: Actions sur les données
     st.markdown("### 🗑️ GESTION DES DONNÉES")
