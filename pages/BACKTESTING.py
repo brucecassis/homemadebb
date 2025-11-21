@@ -1319,150 +1319,561 @@ with tab1:
                         </div>
                         """, unsafe_allow_html=True)
 
-# ===== TAB 2: MACRO BACKTESTING =====
+# ===== TAB 2: MACRO BACKTESTING - ML PREDICTION =====
 with tab2:
-    st.markdown("### 📊 MACRO STRATEGY BACKTESTING")
+    st.markdown("### 📊 MACRO ML PREDICTION")
     
     st.markdown("""
     <div style="background-color: #0a0a0a; border-left: 3px solid #FFAA00; padding: 10px; margin: 10px 0;">
         <p style="margin: 0; font-size: 10px; color: #FFAA00; font-weight: bold;">
-        📈 POINT-IN-TIME BACKTESTING (NO LOOKAHEAD BIAS)
+        🤖 MACHINE LEARNING PRICE PREDICTION
         </p>
         <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
-        Teste des stratégies macro avec données réellement disponibles à chaque date.
-        Évite le biais de lookahead en n'utilisant que l'information passée.
+        Prédit le cours d'actions/indices en fonction de facteurs macroéconomiques.
+        Modèles: Random Forest, Gradient Boosting, Ridge Regression.
         </p>
     </div>
     """, unsafe_allow_html=True)
     
-    st.markdown("#### 🎯 STRATEGY CONFIGURATION")
+    # Sous-onglets ML
+    ml_tab1, ml_tab2, ml_tab3 = st.tabs([
+        "🎯 MODEL TRAINING",
+        "📈 BACKTEST RESULTS",
+        "🔮 LIVE PREDICTION"
+    ])
     
-    col_strat1, col_strat2 = st.columns(2)
-    
-    with col_strat1:
-        strategy_type = st.selectbox(
-            "STRATEGY TYPE",
-            options=[
-                "Yield Curve Inversion → Short Equities",
-                "Inflation Momentum → Long Commodities",
-                "Recession Probability → Risk Off"
-            ],
-            key="strategy_type"
-        )
+    # ===== ML TAB 1: MODEL TRAINING =====
+    with ml_tab1:
+        st.markdown("#### 🎯 CONFIGURE ML MODEL")
         
-        backtest_start = st.date_input(
-            "BACKTEST START DATE",
-            value=datetime(2000, 1, 1),
-            key="backtest_start"
-        )
-    
-    with col_strat2:
-        backtest_end = st.date_input(
-            "BACKTEST END DATE",
-            value=datetime.now(),
-            key="backtest_end"
-        )
+        col_ml1, col_ml2 = st.columns(2)
         
-        rebalance_freq = st.selectbox(
-            "REBALANCE FREQUENCY",
-            options=["Monthly", "Quarterly"],
-            key="rebalance_freq"
-        )
-    
-    if st.button("📊 RUN BACKTEST", use_container_width=True, key="run_backtest"):
-        with st.spinner("Running backtest..."):
-            start_date_str = backtest_start.strftime('%Y-%m-%d')
-            end_date_str = backtest_end.strftime('%Y-%m-%d')
+        with col_ml1:
+            target_ticker = st.text_input(
+                "TARGET TICKER TO PREDICT",
+                value="SPY",
+                help="Stock or index to predict (Yahoo Finance)",
+                key="ml_target"
+            ).upper()
             
-            if "Yield Curve" in strategy_type:
-                st.markdown("### 📉 YIELD CURVE INVERSION STRATEGY")
-                st.caption("Signal: Short S&P 500 when 10Y-2Y < 0, Long otherwise")
+            prediction_horizon = st.selectbox(
+                "PREDICTION HORIZON",
+                options=["1 Week", "1 Month", "1 Quarter"],
+                index=1,
+                key="ml_horizon"
+            )
+            
+            ml_model = st.selectbox(
+                "ML MODEL",
+                options=["Random Forest", "Gradient Boosting", "Ridge Regression", "Ensemble (All)"],
+                index=0,
+                key="ml_model"
+            )
+        
+        with col_ml2:
+            st.markdown("**SELECT MACRO FEATURES:**")
+            
+            macro_features = st.multiselect(
+                "MACRO INDICATORS",
+                options=[
+                    "DGS10 - 10Y Treasury Rate",
+                    "DGS2 - 2Y Treasury Rate",
+                    "T10Y2Y - Yield Curve Spread",
+                    "FEDFUNDS - Fed Funds Rate",
+                    "CPIAUCSL - CPI Inflation",
+                    "UNRATE - Unemployment Rate",
+                    "INDPRO - Industrial Production",
+                    "UMCSENT - Consumer Sentiment",
+                    "M2SL - M2 Money Supply",
+                    "VIXCLS - VIX Volatility",
+                    "DCOILWTICO - WTI Oil Price",
+                    "DTWEXBGS - USD Index"
+                ],
+                default=[
+                    "DGS10 - 10Y Treasury Rate",
+                    "T10Y2Y - Yield Curve Spread",
+                    "CPIAUCSL - CPI Inflation",
+                    "UNRATE - Unemployment Rate",
+                    "VIXCLS - VIX Volatility"
+                ],
+                key="ml_features"
+            )
+            
+            train_years = st.slider(
+                "TRAINING PERIOD (years)",
+                min_value=3, max_value=20, value=10,
+                key="ml_train_years"
+            )
+        
+        # Paramètres avancés
+        with st.expander("⚙️ ADVANCED ML PARAMETERS"):
+            col_adv1, col_adv2 = st.columns(2)
+            
+            with col_adv1:
+                test_size = st.slider(
+                    "TEST SET SIZE (%)",
+                    min_value=10, max_value=40, value=20,
+                    key="ml_test_size"
+                )
                 
-                df_spread = get_fred_series('T10Y2Y', observation_start=start_date_str)
-                df_sp500 = get_fred_series('SP500', observation_start=start_date_str)
+                n_estimators = st.slider(
+                    "N_ESTIMATORS (RF/GB)",
+                    min_value=50, max_value=500, value=100, step=50,
+                    key="ml_estimators"
+                )
+            
+            with col_adv2:
+                max_depth = st.slider(
+                    "MAX_DEPTH",
+                    min_value=3, max_value=20, value=10,
+                    key="ml_depth"
+                )
                 
-                if df_spread is not None and df_sp500 is not None:
-                    df_backtest = pd.merge(
-                        df_spread[['date', 'value']].rename(columns={'value': 'spread'}),
-                        df_sp500[['date', 'value']].rename(columns={'value': 'sp500'}),
-                        on='date',
-                        how='inner'
-                    )
+                use_pct_change = st.checkbox(
+                    "USE % CHANGES (not levels)",
+                    value=True,
+                    help="Transform features to % changes",
+                    key="ml_pct"
+                )
+        
+        if st.button("🚀 TRAIN MODEL", use_container_width=True, key="train_ml"):
+            if macro_features and target_ticker:
+                with st.spinner("Training ML model..."):
+                    try:
+                        from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+                        from sklearn.linear_model import Ridge
+                        from sklearn.model_selection import train_test_split
+                        from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+                        from sklearn.preprocessing import StandardScaler
+                        
+                        # Période
+                        start_date = (datetime.now() - timedelta(days=train_years*365)).strftime('%Y-%m-%d')
+                        
+                        # Horizon en jours
+                        horizon_map = {"1 Week": 5, "1 Month": 21, "1 Quarter": 63}
+                        horizon_days = horizon_map[prediction_horizon]
+                        
+                        # Télécharger target
+                        df_target = yf.download(target_ticker, start=start_date, interval='1d', progress=False)
+                        
+                        if df_target.empty:
+                            st.error(f"❌ Could not download {target_ticker}")
+                        else:
+                            if isinstance(df_target.columns, pd.MultiIndex):
+                                df_target.columns = df_target.columns.get_level_values(0)
+                            
+                            df_target = df_target.reset_index()
+                            df_target['date'] = pd.to_datetime(df_target['Date']).dt.tz_localize(None)
+                            df_target = df_target[['date', 'Close']].rename(columns={'Close': 'target_price'})
+                            
+                            # Future return (ce qu'on prédit)
+                            df_target['future_return'] = df_target['target_price'].shift(-horizon_days) / df_target['target_price'] - 1
+                            df_target['future_return'] = df_target['future_return'] * 100  # En %
+                            
+                            # Télécharger features macro
+                            progress = st.progress(0)
+                            feature_dfs = []
+                            
+                            for i, feat in enumerate(macro_features):
+                                feat_id = feat.split(' - ')[0]
+                                df_feat = get_fred_series(feat_id, observation_start=start_date)
+                                
+                                if df_feat is not None:
+                                    df_feat = df_feat.rename(columns={'value': feat_id})
+                                    
+                                    if use_pct_change and feat_id not in ['T10Y2Y', 'UNRATE']:
+                                        df_feat[feat_id] = df_feat[feat_id].pct_change() * 100
+                                    
+                                    feature_dfs.append(df_feat[['date', feat_id]])
+                                
+                                progress.progress((i + 1) / len(macro_features))
+                            
+                            progress.empty()
+                            
+                            # Merge all features
+                            df_ml = df_target.copy()
+                            
+                            for feat_df in feature_dfs:
+                                df_ml = pd.merge_asof(
+                                    df_ml.sort_values('date'),
+                                    feat_df.sort_values('date'),
+                                    on='date',
+                                    direction='backward'
+                                )
+                            
+                            df_ml = df_ml.dropna()
+                            
+                            st.success(f"✅ Dataset created: {len(df_ml)} observations")
+                            
+                            # Préparer X et y
+                            feature_cols = [f.split(' - ')[0] for f in macro_features]
+                            X = df_ml[feature_cols]
+                            y = df_ml['future_return']
+                            dates = df_ml['date']
+                            
+                            # Train/test split (chronologique)
+                            split_idx = int(len(X) * (1 - test_size / 100))
+                            
+                            X_train, X_test = X.iloc[:split_idx], X.iloc[split_idx:]
+                            y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
+                            dates_train, dates_test = dates.iloc[:split_idx], dates.iloc[split_idx:]
+                            
+                            # Scaling
+                            scaler = StandardScaler()
+                            X_train_scaled = scaler.fit_transform(X_train)
+                            X_test_scaled = scaler.transform(X_test)
+                            
+                            # Train model(s)
+                            models = {}
+                            
+                            if ml_model == "Random Forest" or ml_model == "Ensemble (All)":
+                                rf = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, random_state=42, n_jobs=-1)
+                                rf.fit(X_train_scaled, y_train)
+                                models['Random Forest'] = rf
+                            
+                            if ml_model == "Gradient Boosting" or ml_model == "Ensemble (All)":
+                                gb = GradientBoostingRegressor(n_estimators=n_estimators, max_depth=max_depth, random_state=42)
+                                gb.fit(X_train_scaled, y_train)
+                                models['Gradient Boosting'] = gb
+                            
+                            if ml_model == "Ridge Regression" or ml_model == "Ensemble (All)":
+                                ridge = Ridge(alpha=1.0)
+                                ridge.fit(X_train_scaled, y_train)
+                                models['Ridge'] = ridge
+                            
+                            # Predictions
+                            predictions = {}
+                            for name, model in models.items():
+                                predictions[name] = model.predict(X_test_scaled)
+                            
+                            # Ensemble
+                            if ml_model == "Ensemble (All)":
+                                ensemble_pred = np.mean([predictions[name] for name in predictions], axis=0)
+                                predictions['Ensemble'] = ensemble_pred
+                            
+                            # Metrics
+                            st.markdown("### 📊 MODEL PERFORMANCE")
+                            
+                            metrics_data = []
+                            for name, pred in predictions.items():
+                                mae = mean_absolute_error(y_test, pred)
+                                rmse = np.sqrt(mean_squared_error(y_test, pred))
+                                r2 = r2_score(y_test, pred)
+                                
+                                # Direction accuracy
+                                direction_acc = np.mean(np.sign(pred) == np.sign(y_test)) * 100
+                                
+                                metrics_data.append({
+                                    'Model': name,
+                                    'MAE (%)': f"{mae:.2f}",
+                                    'RMSE (%)': f"{rmse:.2f}",
+                                    'R²': f"{r2:.3f}",
+                                    'Direction Acc.': f"{direction_acc:.1f}%"
+                                })
+                            
+                            metrics_df = pd.DataFrame(metrics_data)
+                            st.dataframe(metrics_df, use_container_width=True, hide_index=True)
+                            
+                            # Feature importance
+                            st.markdown("#### 📊 FEATURE IMPORTANCE")
+                            
+                            if 'Random Forest' in models:
+                                importance = models['Random Forest'].feature_importances_
+                            elif 'Gradient Boosting' in models:
+                                importance = models['Gradient Boosting'].feature_importances_
+                            else:
+                                importance = np.abs(models['Ridge'].coef_)
+                            
+                            importance_df = pd.DataFrame({
+                                'Feature': feature_cols,
+                                'Importance': importance
+                            }).sort_values('Importance', ascending=True)
+                            
+                            fig_imp = go.Figure()
+                            fig_imp.add_trace(go.Bar(
+                                y=importance_df['Feature'],
+                                x=importance_df['Importance'],
+                                orientation='h',
+                                marker=dict(color='#FFAA00')
+                            ))
+                            
+                            fig_imp.update_layout(
+                                title="Feature Importance",
+                                paper_bgcolor='#000',
+                                plot_bgcolor='#111',
+                                font=dict(color='#FFAA00', size=10),
+                                xaxis=dict(gridcolor='#333'),
+                                yaxis=dict(gridcolor='#333'),
+                                height=300
+                            )
+                            
+                            st.plotly_chart(fig_imp, use_container_width=True)
+                            
+                            # Store for backtest tab
+                            best_model_name = min(metrics_data, key=lambda x: float(x['MAE (%)']))['Model']
+                            
+                            st.session_state['ml_model'] = models[best_model_name] if best_model_name != 'Ensemble' else models
+                            st.session_state['ml_scaler'] = scaler
+                            st.session_state['ml_features'] = feature_cols
+                            st.session_state['ml_predictions'] = predictions
+                            st.session_state['ml_y_test'] = y_test
+                            st.session_state['ml_dates_test'] = dates_test
+                            st.session_state['ml_target'] = target_ticker
+                            st.session_state['ml_horizon'] = prediction_horizon
+                            st.session_state['ml_df'] = df_ml
+                            
+                            st.success(f"✅ Best model: {best_model_name} - Go to 'BACKTEST RESULTS' tab")
                     
-                    df_backtest['sp500_return'] = df_backtest['sp500'].pct_change()
-                    df_backtest['signal'] = np.where(df_backtest['spread'] < 0, -1, 1)
-                    df_backtest['strategy_return'] = df_backtest['signal'].shift(1) * df_backtest['sp500_return']
-                    df_backtest['strategy_cumul'] = (1 + df_backtest['strategy_return'].fillna(0)).cumprod()
-                    df_backtest['buy_hold_cumul'] = (1 + df_backtest['sp500_return'].fillna(0)).cumprod()
+                    except Exception as e:
+                        st.error(f"❌ Error: {e}")
+                        import traceback
+                        st.code(traceback.format_exc())
+            else:
+                st.warning("⚠️ Select target and at least one macro feature")
+    
+    # ===== ML TAB 2: BACKTEST RESULTS =====
+    with ml_tab2:
+        st.markdown("#### 📈 PREDICTION vs ACTUAL (BACKTEST)")
+        
+        if 'ml_predictions' not in st.session_state:
+            st.warning("⚠️ Please train a model first in 'MODEL TRAINING' tab")
+        else:
+            predictions = st.session_state['ml_predictions']
+            y_test = st.session_state['ml_y_test']
+            dates_test = st.session_state['ml_dates_test']
+            target_ticker = st.session_state['ml_target']
+            horizon = st.session_state['ml_horizon']
+            
+            st.markdown(f"**Target:** {target_ticker} | **Horizon:** {horizon}")
+            
+            # Sélection du modèle à afficher
+            model_to_show = st.selectbox(
+                "SELECT MODEL TO DISPLAY",
+                options=list(predictions.keys()),
+                key="bt_model_select"
+            )
+            
+            pred = predictions[model_to_show]
+            
+            # Graphique Prediction vs Actual
+            fig_bt = make_subplots(
+                rows=2, cols=1,
+                row_heights=[0.6, 0.4],
+                shared_xaxes=True,
+                vertical_spacing=0.05,
+                subplot_titles=(f'{target_ticker} Return Prediction vs Actual', 'Prediction Error')
+            )
+            
+            # Actual
+            fig_bt.add_trace(go.Scatter(
+                x=dates_test,
+                y=y_test,
+                mode='lines',
+                name='Actual Return',
+                line=dict(color='#FFAA00', width=2)
+            ), row=1, col=1)
+            
+            # Predicted
+            fig_bt.add_trace(go.Scatter(
+                x=dates_test,
+                y=pred,
+                mode='lines',
+                name='Predicted Return',
+                line=dict(color='#00FF00', width=2, dash='dash')
+            ), row=1, col=1)
+            
+            # Zero line
+            fig_bt.add_hline(y=0, line_dash="solid", line_color="#666", row=1, col=1)
+            
+            # Error
+            error = pred - y_test.values
+            colors = ['#00FF00' if e >= 0 else '#FF0000' for e in error]
+            
+            fig_bt.add_trace(go.Bar(
+                x=dates_test,
+                y=error,
+                marker_color=colors,
+                name='Error',
+                showlegend=False
+            ), row=2, col=1)
+            
+            fig_bt.add_hline(y=0, line_dash="dash", line_color="#FFAA00", row=2, col=1)
+            
+            fig_bt.update_layout(
+                paper_bgcolor='#000',
+                plot_bgcolor='#111',
+                font=dict(color='#FFAA00', size=10),
+                height=600,
+                hovermode='x unified'
+            )
+            
+            fig_bt.update_xaxes(gridcolor='#333')
+            fig_bt.update_yaxes(gridcolor='#333')
+            fig_bt.update_yaxes(title_text="Return (%)", row=1, col=1)
+            fig_bt.update_yaxes(title_text="Error (%)", row=2, col=1)
+            
+            st.plotly_chart(fig_bt, use_container_width=True)
+            
+            # Scatter plot
+            st.markdown("#### 📊 PREDICTED vs ACTUAL SCATTER")
+            
+            fig_scatter = go.Figure()
+            
+            fig_scatter.add_trace(go.Scatter(
+                x=y_test,
+                y=pred,
+                mode='markers',
+                marker=dict(color='#FFAA00', size=6, opacity=0.6),
+                name='Predictions'
+            ))
+            
+            # Perfect prediction line
+            min_val = min(y_test.min(), pred.min())
+            max_val = max(y_test.max(), pred.max())
+            
+            fig_scatter.add_trace(go.Scatter(
+                x=[min_val, max_val],
+                y=[min_val, max_val],
+                mode='lines',
+                line=dict(color='#FF0000', dash='dash'),
+                name='Perfect Prediction'
+            ))
+            
+            fig_scatter.update_layout(
+                title="Predicted vs Actual Returns",
+                paper_bgcolor='#000',
+                plot_bgcolor='#111',
+                font=dict(color='#FFAA00', size=10),
+                xaxis=dict(gridcolor='#333', title="Actual Return (%)"),
+                yaxis=dict(gridcolor='#333', title="Predicted Return (%)"),
+                height=400
+            )
+            
+            st.plotly_chart(fig_scatter, use_container_width=True)
+            
+            # Trading simulation
+            st.markdown("#### 💰 SIMULATED TRADING PERFORMANCE")
+            
+            # Si prediction > 0, on achète; sinon on vend
+            df_sim = pd.DataFrame({
+                'date': dates_test,
+                'actual': y_test.values,
+                'predicted': pred
+            })
+            
+            df_sim['position'] = np.where(df_sim['predicted'] > 0, 1, -1)
+            df_sim['strategy_return'] = df_sim['position'] * df_sim['actual']
+            df_sim['cumul_strategy'] = (1 + df_sim['strategy_return'] / 100).cumprod()
+            df_sim['cumul_buyhold'] = (1 + df_sim['actual'] / 100).cumprod()
+            
+            col_perf1, col_perf2, col_perf3, col_perf4 = st.columns(4)
+            
+            strat_return = (df_sim['cumul_strategy'].iloc[-1] - 1) * 100
+            bh_return = (df_sim['cumul_buyhold'].iloc[-1] - 1) * 100
+            
+            with col_perf1:
+                st.metric("STRATEGY RETURN", f"{strat_return:.2f}%")
+            
+            with col_perf2:
+                st.metric("BUY & HOLD RETURN", f"{bh_return:.2f}%")
+            
+            with col_perf3:
+                outperformance = strat_return - bh_return
+                st.metric("OUTPERFORMANCE", f"{outperformance:+.2f}%")
+            
+            with col_perf4:
+                win_rate = np.mean(df_sim['strategy_return'] > 0) * 100
+                st.metric("WIN RATE", f"{win_rate:.1f}%")
+            
+            # Equity curve
+            fig_equity = go.Figure()
+            
+            fig_equity.add_trace(go.Scatter(
+                x=df_sim['date'],
+                y=df_sim['cumul_strategy'],
+                mode='lines',
+                name='ML Strategy',
+                line=dict(color='#00FF00', width=2)
+            ))
+            
+            fig_equity.add_trace(go.Scatter(
+                x=df_sim['date'],
+                y=df_sim['cumul_buyhold'],
+                mode='lines',
+                name='Buy & Hold',
+                line=dict(color='#FFAA00', width=2, dash='dash')
+            ))
+            
+            fig_equity.update_layout(
+                title="Cumulative Returns: ML Strategy vs Buy & Hold",
+                paper_bgcolor='#000',
+                plot_bgcolor='#111',
+                font=dict(color='#FFAA00', size=10),
+                xaxis=dict(gridcolor='#333'),
+                yaxis=dict(gridcolor='#333', title="Cumulative Return"),
+                height=400
+            )
+            
+            st.plotly_chart(fig_equity, use_container_width=True)
+    
+    # ===== ML TAB 3: LIVE PREDICTION =====
+    with ml_tab3:
+        st.markdown("#### 🔮 LIVE PREDICTION")
+        
+        if 'ml_model' not in st.session_state:
+            st.warning("⚠️ Please train a model first")
+        else:
+            st.markdown(f"**Target:** {st.session_state['ml_target']} | **Horizon:** {st.session_state['ml_horizon']}")
+            
+            if st.button("🔮 GENERATE LIVE PREDICTION", use_container_width=True, key="live_pred"):
+                with st.spinner("Fetching latest data..."):
+                    try:
+                        scaler = st.session_state['ml_scaler']
+                        feature_cols = st.session_state['ml_features']
+                        model = st.session_state['ml_model']
+                        
+                        # Récupérer dernières valeurs macro
+                        latest_features = {}
+                        
+                        for feat in feature_cols:
+                            df_feat = get_fred_series(feat)
+                            if df_feat is not None:
+                                latest_features[feat] = df_feat['value'].iloc[-1]
+                        
+                        if len(latest_features) == len(feature_cols):
+                            X_live = pd.DataFrame([latest_features])[feature_cols]
+                            X_live_scaled = scaler.transform(X_live)
+                            
+                            # Prediction
+                            if isinstance(model, dict):  # Ensemble
+                                preds = [m.predict(X_live_scaled)[0] for m in model.values()]
+                                prediction = np.mean(preds)
+                            else:
+                                prediction = model.predict(X_live_scaled)[0]
+                            
+                            # Affichage
+                            pred_color = "#00FF00" if prediction > 0 else "#FF0000"
+                            direction = "📈 BULLISH" if prediction > 0 else "📉 BEARISH"
+                            
+                            st.markdown(f"""
+                            <div style="background: #111; border: 3px solid {pred_color}; padding: 20px; border-radius: 10px; text-align: center;">
+                                <p style="color: #999; margin: 0; font-size: 12px;">PREDICTED {st.session_state['ml_horizon'].upper()} RETURN</p>
+                                <p style="color: {pred_color}; margin: 10px 0; font-size: 48px; font-weight: bold;">{prediction:+.2f}%</p>
+                                <p style="color: {pred_color}; margin: 0; font-size: 20px;">{direction}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Current macro values
+                            st.markdown("#### 📊 CURRENT MACRO VALUES USED")
+                            
+                            for feat, val in latest_features.items():
+                                st.caption(f"• {feat}: {val:.4f}")
+                        
+                        else:
+                            st.error("❌ Could not fetch all macro features")
                     
-                    fig_bt = go.Figure()
-                    
-                    fig_bt.add_trace(go.Scatter(
-                        x=df_backtest['date'],
-                        y=df_backtest['strategy_cumul'],
-                        mode='lines',
-                        name='Yield Curve Strategy',
-                        line=dict(color='#00FF00', width=2)
-                    ))
-                    
-                    fig_bt.add_trace(go.Scatter(
-                        x=df_backtest['date'],
-                        y=df_backtest['buy_hold_cumul'],
-                        mode='lines',
-                        name='Buy & Hold S&P 500',
-                        line=dict(color='#FFAA00', width=2, dash='dash')
-                    ))
-                    
-                    fig_bt.update_layout(
-                        title="Cumulative Returns: Strategy vs Buy & Hold",
-                        paper_bgcolor='#000',
-                        plot_bgcolor='#111',
-                        font=dict(color='#FFAA00', size=10),
-                        xaxis=dict(gridcolor='#333', title="Date"),
-                        yaxis=dict(gridcolor='#333', title="Cumulative Return"),
-                        height=400,
-                        hovermode='x unified'
-                    )
-                    
-                    st.plotly_chart(fig_bt, use_container_width=True)
-                    
-                    st.markdown("#### 📊 BACKTEST STATISTICS")
-                    
-                    strategy_returns = df_backtest['strategy_return'].dropna()
-                    bh_returns = df_backtest['sp500_return'].dropna()
-                    
-                    total_return_strat = (df_backtest['strategy_cumul'].iloc[-1] - 1) * 100
-                    total_return_bh = (df_backtest['buy_hold_cumul'].iloc[-1] - 1) * 100
-                    
-                    annual_return_strat = strategy_returns.mean() * 252 * 100
-                    annual_return_bh = bh_returns.mean() * 252 * 100
-                    
-                    volatility_strat = strategy_returns.std() * np.sqrt(252) * 100
-                    volatility_bh = bh_returns.std() * np.sqrt(252) * 100
-                    
-                    sharpe_strat = (annual_return_strat / volatility_strat) if volatility_strat > 0 else 0
-                    sharpe_bh = (annual_return_bh / volatility_bh) if volatility_bh > 0 else 0
-                    
-                    max_dd_strat = ((df_backtest['strategy_cumul'] / df_backtest['strategy_cumul'].cummax()) - 1).min() * 100
-                    max_dd_bh = ((df_backtest['buy_hold_cumul'] / df_backtest['buy_hold_cumul'].cummax()) - 1).min() * 100
-                    
-                    col_bt1, col_bt2 = st.columns(2)
-                    
-                    with col_bt1:
-                        st.markdown("**🎯 STRATEGY**")
-                        st.metric("Total Return", f"{total_return_strat:.2f}%")
-                        st.metric("Annual Return", f"{annual_return_strat:.2f}%")
-                        st.metric("Volatility", f"{volatility_strat:.2f}%")
-                        st.metric("Sharpe Ratio", f"{sharpe_strat:.2f}")
-                        st.metric("Max Drawdown", f"{max_dd_strat:.2f}%")
-                    
-                    with col_bt2:
-                        st.markdown("**📈 BUY & HOLD**")
-                        st.metric("Total Return", f"{total_return_bh:.2f}%")
-                        st.metric("Annual Return", f"{annual_return_bh:.2f}%")
-                        st.metric("Volatility", f"{volatility_bh:.2f}%")
-                        st.metric("Sharpe Ratio", f"{sharpe_bh:.2f}")
-                        st.metric("Max Drawdown", f"{max_dd_bh:.2f}%")
+                    except Exception as e:
+                        st.error(f"❌ Error: {e}")
 
 # ===== TAB 3: TRADING SIGNALS - COINTEGRATION PAIRS TRADING =====
 with tab3:
@@ -2550,25 +2961,35 @@ with tab4:
         """, unsafe_allow_html=True)
         
         alt_data_type = st.selectbox(
-            "SELECT ALTERNATIVE DATA TYPE",
-            options=[
-                "Weekly Economic Index (WEI)",
-                "Financial Stress Index",
-                "Credit Spreads",
-                "Volatility Index (VIX proxy)",
-                "Custom FRED Series"
-            ],
+    "SELECT ALTERNATIVE DATA TYPE",
+    options=[
+        "Weekly Economic Index (WEI)",
+        "Financial Stress Index",
+        "Credit Spreads",
+        "Volatility Index (VIX proxy)",
+        "Crude Oil Stocks (EIA)",
+        "Natural Gas Storage",
+        "WTI Crude Oil Price",
+        "Gasoline Prices",
+        "Baltic Dry Index Proxy",
+        "Custom FRED Series"
+    ],
             key="alt_data_type"
         )
         
         # Mapping des séries
         alt_series_map = {
-            "Weekly Economic Index (WEI)": "WEI",
-            "Financial Stress Index": "STLFSI4",
-            "Credit Spreads": "BAA10Y",
-            "Volatility Index (VIX proxy)": "VIXCLS",
-            "Custom FRED Series": None
-        }
+    "Weekly Economic Index (WEI)": "WEI",
+    "Financial Stress Index": "STLFSI4",
+    "Credit Spreads": "BAA10Y",
+    "Volatility Index (VIX proxy)": "VIXCLS",
+    "Crude Oil Stocks (EIA)": "WCESTUS1",
+    "Natural Gas Storage": "NGTOSTUS1W",
+    "WTI Crude Oil Price": "DCOILWTICO",
+    "Gasoline Prices": "GASREGW",
+    "Baltic Dry Index Proxy": "DCOILBRENTEU",
+    "Custom FRED Series": None
+}
         
         if alt_data_type == "Custom FRED Series":
             custom_series = st.text_input(
