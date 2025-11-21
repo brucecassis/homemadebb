@@ -6,6 +6,9 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
 from scipy import stats
+import yfinance as yf
+import statsmodels.api as sm
+from statsmodels.tsa.stattools import adfuller
 
 # Configuration de la page
 st.set_page_config(
@@ -1461,10 +1464,783 @@ with tab2:
                         st.metric("Sharpe Ratio", f"{sharpe_bh:.2f}")
                         st.metric("Max Drawdown", f"{max_dd_bh:.2f}%")
 
-# ===== TAB 3: TRADING SIGNALS =====
+# ===== TAB 3: TRADING SIGNALS - COINTEGRATION PAIRS TRADING =====
 with tab3:
-    st.markdown("### 📈 MACRO TRADING SIGNALS")
-    st.info("Cette section reste inchangée - voir le code original")
+    st.markdown("### 📈 PAIRS TRADING - COINTEGRATION ANALYSIS")
+    
+    st.markdown("""
+    <div style="background-color: #0a0a0a; border-left: 3px solid #00FFFF; padding: 10px; margin: 10px 0;">
+        <p style="margin: 0; font-size: 10px; color: #00FFFF; font-weight: bold;">
+        🔗 ENGLE-GRANGER COINTEGRATION TEST
+        </p>
+        <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
+        Test de cointégration entre deux actifs pour identifier des opportunités de pairs trading.
+        Méthode : Test ADF sur les résidus de la régression OLS.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Sous-onglets pour le pairs trading
+    pairs_tab1, pairs_tab2, pairs_tab3 = st.tabs([
+        "🔬 COINTEGRATION TEST", 
+        "📊 BACKTEST STRATEGY",
+        "📈 LIVE SIGNALS"
+    ])
+    
+    # ===== PAIRS TAB 1: COINTEGRATION TEST =====
+    with pairs_tab1:
+        st.markdown("#### 🔬 COINTEGRATION ANALYSIS")
+        
+        col_pair1, col_pair2 = st.columns(2)
+        
+        with col_pair1:
+            st.markdown("**ASSET 1 (X - Independent)**")
+            ticker1 = st.text_input(
+                "TICKER 1",
+                value="XOM",
+                help="Yahoo Finance ticker (ex: XOM, AAPL, MSFT)",
+                key="ticker1_coint"
+            ).upper()
+            
+            # Suggestions de paires connues
+            st.markdown("**💡 Suggested Pairs:**")
+            suggested_pairs = {
+                "Energy": "XOM/CVX, SHEL/BP",
+                "Tech": "MSFT/AAPL",
+                "Banks": "JPM/GS, BAC/MS",
+                "Auto": "F/GM",
+                "Consumer": "PEP/KO"
+            }
+            for sector, pairs in suggested_pairs.items():
+                st.caption(f"• {sector}: {pairs}")
+        
+        with col_pair2:
+            st.markdown("**ASSET 2 (Y - Dependent)**")
+            ticker2 = st.text_input(
+                "TICKER 2",
+                value="CVX",
+                help="Yahoo Finance ticker",
+                key="ticker2_coint"
+            ).upper()
+            
+            period_coint = st.selectbox(
+                "DATA PERIOD",
+                options=["6mo", "1y", "2y", "5y"],
+                index=1,
+                key="period_coint"
+            )
+            
+            interval_coint = st.selectbox(
+                "DATA INTERVAL",
+                options=["1d", "1h", "4h"],
+                index=0,
+                help="Daily recommended for cointegration",
+                key="interval_coint"
+            )
+        
+        # Paramètres avancés
+        with st.expander("⚙️ ADVANCED PARAMETERS"):
+            col_adv1, col_adv2 = st.columns(2)
+            
+            with col_adv1:
+                adf_significance = st.selectbox(
+                    "ADF SIGNIFICANCE LEVEL",
+                    options=["1%", "5%", "10%"],
+                    index=1,
+                    key="adf_sig"
+                )
+                
+                outlier_threshold = st.slider(
+                    "OUTLIER THRESHOLD (σ)",
+                    min_value=2.0, max_value=6.0, value=4.0, step=0.5,
+                    help="Remove returns > X standard deviations",
+                    key="outlier_thresh"
+                )
+            
+            with col_adv2:
+                signal_threshold = st.slider(
+                    "SIGNAL THRESHOLD (residuals)",
+                    min_value=0.5, max_value=10.0, value=5.0, step=0.5,
+                    help="Entry signal when |residuals| > threshold",
+                    key="signal_thresh"
+                )
+                
+                use_zscore = st.checkbox(
+                    "USE Z-SCORE FOR SIGNALS",
+                    value=True,
+                    help="Normalize residuals to z-score",
+                    key="use_zscore"
+                )
+        
+        if st.button("🔬 RUN COINTEGRATION TEST", use_container_width=True, key="run_coint"):
+            if ticker1 and ticker2:
+                with st.spinner(f"Analyzing cointegration between {ticker1} and {ticker2}..."):
+                    try:
+                        # Télécharger les données
+                        st.markdown("##### 📥 DOWNLOADING DATA...")
+                        
+                        df1 = yf.download(ticker1, period=period_coint, interval=interval_coint, progress=False)
+                        df2 = yf.download(ticker2, period=period_coint, interval=interval_coint, progress=False)
+                        
+                        if df1.empty or df2.empty:
+                            st.error(f"❌ Could not download data for {ticker1} or {ticker2}")
+                        else:
+                            # Nettoyer les données
+                            def clean_data(df, name):
+                                df = df.copy()
+                                # Handle MultiIndex columns from yfinance
+                                if isinstance(df.columns, pd.MultiIndex):
+                                    df.columns = df.columns.get_level_values(0)
+                                df = df[['Close']].dropna()
+                                df = df[df['Close'] > 0]
+                                df['returns'] = np.log(df['Close'] / df['Close'].shift(1))
+                                mean_ret = df['returns'].mean()
+                                std_ret = df['returns'].std()
+                                df = df[(df['returns'] > mean_ret - outlier_threshold * std_ret) & 
+                                       (df['returns'] < mean_ret + outlier_threshold * std_ret)]
+                                df = df.drop(columns=['returns'])
+                                df.columns = [name]
+                                return df
+                            
+                            df1_clean = clean_data(df1, ticker1)
+                            df2_clean = clean_data(df2, ticker2)
+                            
+                            # Merger les données
+                            df_merged = pd.merge(df1_clean, df2_clean, left_index=True, right_index=True, how='inner')
+                            
+                            st.success(f"✅ Data aligned: {len(df_merged)} observations")
+                            
+                            # ===== GRAPHIQUE DES PRIX NORMALISÉS =====
+                            st.markdown("##### 📈 NORMALIZED PRICE EVOLUTION")
+                            
+                            df_pct = df_merged / df_merged.iloc[0] * 100
+                            
+                            fig_prices = go.Figure()
+                            
+                            fig_prices.add_trace(go.Scatter(
+                                x=df_pct.index,
+                                y=df_pct[ticker1],
+                                mode='lines',
+                                name=ticker1,
+                                line=dict(color='#FFAA00', width=2)
+                            ))
+                            
+                            fig_prices.add_trace(go.Scatter(
+                                x=df_pct.index,
+                                y=df_pct[ticker2],
+                                mode='lines',
+                                name=ticker2,
+                                line=dict(color='#00FFFF', width=2)
+                            ))
+                            
+                            fig_prices.update_layout(
+                                title=f"Normalized Prices: {ticker1} vs {ticker2} (Base 100)",
+                                paper_bgcolor='#000',
+                                plot_bgcolor='#111',
+                                font=dict(color='#FFAA00', size=10),
+                                xaxis=dict(gridcolor='#333', title="Date"),
+                                yaxis=dict(gridcolor='#333', title="Normalized Price (%)"),
+                                height=350,
+                                hovermode='x unified'
+                            )
+                            
+                            st.plotly_chart(fig_prices, use_container_width=True)
+                            
+                            # ===== TEST DE STATIONNARITÉ =====
+                            st.markdown("##### 🧪 STATIONARITY TESTS (ADF)")
+                            
+                            def test_stationarity(series, name):
+                                """Test ADF pour stationnarité"""
+                                result_level = adfuller(series.dropna(), maxlag=1, regression='c')
+                                
+                                if result_level[1] < 0.05:
+                                    return {
+                                        'name': name,
+                                        'level_adf': result_level[0],
+                                        'level_pvalue': result_level[1],
+                                        'is_stationary': True,
+                                        'order': 0,
+                                        'status': '❌ I(0) - Not suitable'
+                                    }
+                                else:
+                                    diff_series = series.diff().dropna()
+                                    result_diff = adfuller(diff_series, maxlag=1, regression='c')
+                                    
+                                    if result_diff[1] < 0.05:
+                                        return {
+                                            'name': name,
+                                            'level_adf': result_level[0],
+                                            'level_pvalue': result_level[1],
+                                            'diff_adf': result_diff[0],
+                                            'diff_pvalue': result_diff[1],
+                                            'is_stationary': False,
+                                            'order': 1,
+                                            'status': '✅ I(1) - Suitable'
+                                        }
+                                    else:
+                                        return {
+                                            'name': name,
+                                            'level_adf': result_level[0],
+                                            'level_pvalue': result_level[1],
+                                            'is_stationary': False,
+                                            'order': -1,
+                                            'status': '❌ Not I(1)'
+                                        }
+                            
+                            test1 = test_stationarity(df_merged[ticker1], ticker1)
+                            test2 = test_stationarity(df_merged[ticker2], ticker2)
+                            
+                            col_test1, col_test2 = st.columns(2)
+                            
+                            with col_test1:
+                                status_color1 = "#00FF00" if test1['order'] == 1 else "#FF0000"
+                                st.markdown(f"""
+                                <div style="background: #111; border: 1px solid {status_color1}; padding: 10px; border-radius: 5px;">
+                                    <p style="color: #FFAA00; font-weight: bold; margin: 0;">{ticker1}</p>
+                                    <p style="color: #999; margin: 5px 0; font-size: 10px;">
+                                        Level ADF: {test1['level_adf']:.4f} (p={test1['level_pvalue']:.4f})
+                                    </p>
+                                    {'<p style="color: #999; margin: 5px 0; font-size: 10px;">Diff ADF: ' + f"{test1.get('diff_adf', 'N/A'):.4f}" + f" (p={test1.get('diff_pvalue', 'N/A'):.4f})</p>" if test1['order'] == 1 else ''}
+                                    <p style="color: {status_color1}; margin: 5px 0; font-weight: bold;">{test1['status']}</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            
+                            with col_test2:
+                                status_color2 = "#00FF00" if test2['order'] == 1 else "#FF0000"
+                                st.markdown(f"""
+                                <div style="background: #111; border: 1px solid {status_color2}; padding: 10px; border-radius: 5px;">
+                                    <p style="color: #FFAA00; font-weight: bold; margin: 0;">{ticker2}</p>
+                                    <p style="color: #999; margin: 5px 0; font-size: 10px;">
+                                        Level ADF: {test2['level_adf']:.4f} (p={test2['level_pvalue']:.4f})
+                                    </p>
+                                    {'<p style="color: #999; margin: 5px 0; font-size: 10px;">Diff ADF: ' + f"{test2.get('diff_adf', 'N/A'):.4f}" + f" (p={test2.get('diff_pvalue', 'N/A'):.4f})</p>" if test2['order'] == 1 else ''}
+                                    <p style="color: {status_color2}; margin: 5px 0; font-weight: bold;">{test2['status']}</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            
+                            # ===== TEST DE COINTEGRATION =====
+                            if test1['order'] == 1 and test2['order'] == 1:
+                                st.markdown("##### 🔗 COINTEGRATION REGRESSION")
+                                
+                                # Régression OLS: Y = α + βX + ε
+                                X = sm.add_constant(df_merged[ticker1])
+                                model = sm.OLS(df_merged[ticker2], X).fit()
+                                
+                                # Coefficients
+                                alpha = model.params['const']
+                                beta = model.params[ticker1]
+                                r_squared = model.rsquared
+                                
+                                col_reg1, col_reg2, col_reg3 = st.columns(3)
+                                
+                                with col_reg1:
+                                    st.metric("ALPHA (α)", f"{alpha:.4f}")
+                                
+                                with col_reg2:
+                                    st.metric("BETA (β)", f"{beta:.4f}")
+                                
+                                with col_reg3:
+                                    st.metric("R-SQUARED", f"{r_squared:.4f}")
+                                
+                                # Résidus
+                                df_merged['residuals'] = model.resid
+                                
+                                # Z-score des résidus
+                                if use_zscore:
+                                    df_merged['zscore'] = (df_merged['residuals'] - df_merged['residuals'].mean()) / df_merged['residuals'].std()
+                                    signal_col = 'zscore'
+                                    threshold = 2.0 if signal_threshold == 5.0 else signal_threshold / 2.5
+                                else:
+                                    signal_col = 'residuals'
+                                    threshold = signal_threshold
+                                
+                                # Test ADF sur résidus
+                                st.markdown("##### 🧪 RESIDUALS STATIONARITY TEST")
+                                
+                                adf_residuals = adfuller(df_merged['residuals'].dropna())
+                                
+                                sig_map = {"1%": 0.01, "5%": 0.05, "10%": 0.10}
+                                sig_level = sig_map[adf_significance]
+                                
+                                is_cointegrated = adf_residuals[1] < sig_level
+                                
+                                coint_color = "#00FF00" if is_cointegrated else "#FF0000"
+                                coint_status = "✅ COINTEGRATED" if is_cointegrated else "❌ NOT COINTEGRATED"
+                                
+                                st.markdown(f"""
+                                <div style="background: #111; border: 2px solid {coint_color}; padding: 15px; border-radius: 5px; text-align: center;">
+                                    <p style="color: {coint_color}; font-size: 24px; font-weight: bold; margin: 0;">{coint_status}</p>
+                                    <p style="color: #999; margin: 10px 0; font-size: 12px;">
+                                        ADF Statistic: {adf_residuals[0]:.4f} | p-value: {adf_residuals[1]:.4f}
+                                    </p>
+                                    <p style="color: #666; margin: 0; font-size: 10px;">
+                                        Critical values: 1%: {adf_residuals[4]['1%']:.4f} | 5%: {adf_residuals[4]['5%']:.4f} | 10%: {adf_residuals[4]['10%']:.4f}
+                                    </p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                
+                                # Graphique des résidus
+                                st.markdown("##### 📊 RESIDUALS / Z-SCORE")
+                                
+                                fig_resid = make_subplots(
+                                    rows=2, cols=1,
+                                    row_heights=[0.6, 0.4],
+                                    shared_xaxes=True,
+                                    vertical_spacing=0.05,
+                                    subplot_titles=('Residuals / Z-Score', 'Spread Ratio')
+                                )
+                                
+                                # Plot résidus ou z-score
+                                fig_resid.add_trace(go.Scatter(
+                                    x=df_merged.index,
+                                    y=df_merged[signal_col],
+                                    mode='lines',
+                                    name='Residuals' if not use_zscore else 'Z-Score',
+                                    line=dict(color='#FFAA00', width=1)
+                                ), row=1, col=1)
+                                
+                                # Lignes de seuil
+                                fig_resid.add_hline(y=0, line_dash="solid", line_color="#FFFFFF", row=1, col=1)
+                                fig_resid.add_hline(y=threshold, line_dash="dash", line_color="#FF0000", 
+                                                   annotation_text=f"Short Signal (+{threshold})", row=1, col=1)
+                                fig_resid.add_hline(y=-threshold, line_dash="dash", line_color="#00FF00",
+                                                   annotation_text=f"Long Signal (-{threshold})", row=1, col=1)
+                                
+                                # Spread ratio
+                                df_merged['spread_ratio'] = df_merged[ticker2] / df_merged[ticker1]
+                                
+                                fig_resid.add_trace(go.Scatter(
+                                    x=df_merged.index,
+                                    y=df_merged['spread_ratio'],
+                                    mode='lines',
+                                    name='Spread Ratio',
+                                    line=dict(color='#00FFFF', width=1)
+                                ), row=2, col=1)
+                                
+                                fig_resid.update_layout(
+                                    paper_bgcolor='#000',
+                                    plot_bgcolor='#111',
+                                    font=dict(color='#FFAA00', size=10),
+                                    height=500,
+                                    showlegend=False,
+                                    hovermode='x unified'
+                                )
+                                
+                                fig_resid.update_xaxes(gridcolor='#333')
+                                fig_resid.update_yaxes(gridcolor='#333')
+                                
+                                st.plotly_chart(fig_resid, use_container_width=True)
+                                
+                                # Signaux de trading
+                                st.markdown("##### 🎯 TRADING SIGNALS")
+                                
+                                df_merged['signal'] = 0
+                                df_merged.loc[df_merged[signal_col] > threshold, 'signal'] = -1  # Short spread
+                                df_merged.loc[df_merged[signal_col] < -threshold, 'signal'] = 1   # Long spread
+                                
+                                current_signal = df_merged['signal'].iloc[-1]
+                                current_zscore = df_merged[signal_col].iloc[-1]
+                                
+                                if current_signal == 1:
+                                    signal_text = "🟢 LONG SPREAD"
+                                    signal_desc = f"BUY {ticker2}, SHORT {ticker1}"
+                                    signal_color = "#00FF00"
+                                elif current_signal == -1:
+                                    signal_text = "🔴 SHORT SPREAD"
+                                    signal_desc = f"SHORT {ticker2}, BUY {ticker1}"
+                                    signal_color = "#FF0000"
+                                else:
+                                    signal_text = "⚪ NEUTRAL"
+                                    signal_desc = "No position"
+                                    signal_color = "#FFAA00"
+                                
+                                st.markdown(f"""
+                                <div style="background: #111; border: 2px solid {signal_color}; padding: 15px; border-radius: 5px;">
+                                    <p style="color: {signal_color}; font-size: 20px; font-weight: bold; margin: 0;">{signal_text}</p>
+                                    <p style="color: #999; margin: 5px 0;">{signal_desc}</p>
+                                    <p style="color: #666; margin: 0; font-size: 10px;">
+                                        Current {'Z-Score' if use_zscore else 'Residual'}: {current_zscore:.4f} | Threshold: ±{threshold}
+                                    </p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                
+                                # Stocker les données pour le backtest
+                                st.session_state['coint_data'] = df_merged
+                                st.session_state['coint_ticker1'] = ticker1
+                                st.session_state['coint_ticker2'] = ticker2
+                                st.session_state['coint_threshold'] = threshold
+                                st.session_state['coint_signal_col'] = signal_col
+                                st.session_state['coint_beta'] = beta
+                                st.session_state['coint_alpha'] = alpha
+                                
+                                st.success("✅ Data saved for backtest. Go to 'BACKTEST STRATEGY' tab.")
+                                
+                            else:
+                                st.error("⛔️ Both series must be I(1) for cointegration test. Cannot proceed.")
+                    
+                    except Exception as e:
+                        st.error(f"❌ Error: {e}")
+                        import traceback
+                        st.code(traceback.format_exc())
+            else:
+                st.warning("⚠️ Please enter both tickers")
+    
+    # ===== PAIRS TAB 2: BACKTEST =====
+    with pairs_tab2:
+        st.markdown("#### 📊 PAIRS TRADING BACKTEST")
+        
+        if 'coint_data' not in st.session_state:
+            st.warning("⚠️ Please run cointegration test first in the previous tab.")
+        else:
+            df_bt = st.session_state['coint_data'].copy()
+            ticker1 = st.session_state['coint_ticker1']
+            ticker2 = st.session_state['coint_ticker2']
+            threshold = st.session_state['coint_threshold']
+            signal_col = st.session_state['coint_signal_col']
+            
+            st.markdown(f"**Pair:** {ticker1} / {ticker2} | **Threshold:** ±{threshold}")
+            
+            col_bt1, col_bt2 = st.columns(2)
+            
+            with col_bt1:
+                initial_capital = st.number_input(
+                    "INITIAL CAPITAL ($)",
+                    min_value=1000, max_value=1000000, value=10000, step=1000,
+                    key="bt_capital"
+                )
+                
+                position_size = st.slider(
+                    "POSITION SIZE (% of capital per leg)",
+                    min_value=10, max_value=100, value=50, step=10,
+                    help="% of capital allocated to each leg",
+                    key="bt_pos_size"
+                )
+            
+            with col_bt2:
+                exit_threshold = st.slider(
+                    "EXIT THRESHOLD",
+                    min_value=0.0, max_value=float(threshold), value=0.0, step=0.1,
+                    help="Exit when signal crosses this level (0 = mean reversion)",
+                    key="bt_exit"
+                )
+                
+                include_costs = st.checkbox(
+                    "INCLUDE TRANSACTION COSTS",
+                    value=True,
+                    key="bt_costs"
+                )
+                
+                if include_costs:
+                    cost_per_trade = st.number_input(
+                        "COST PER TRADE (bps)",
+                        min_value=0, max_value=50, value=10,
+                        key="bt_cost_bps"
+                    ) / 10000
+                else:
+                    cost_per_trade = 0
+            
+            if st.button("📊 RUN BACKTEST", use_container_width=True, key="run_bt_pairs"):
+                with st.spinner("Running backtest..."):
+                    # Backtest logic
+                    capital = initial_capital
+                    position_capital = initial_capital * (position_size / 100)
+                    
+                    position = 0  # 0: flat, 1: long spread, -1: short spread
+                    entry_price_x = entry_price_y = 0
+                    entry_date = None
+                    qty_x = qty_y = 0
+                    
+                    trades = []
+                    equity_curve = [initial_capital]
+                    equity_dates = [df_bt.index[0]]
+                    
+                    for i in range(1, len(df_bt)):
+                        current_date = df_bt.index[i]
+                        signal_val = df_bt[signal_col].iloc[i]
+                        px_x = df_bt[ticker1].iloc[i]
+                        px_y = df_bt[ticker2].iloc[i]
+                        
+                        # Entry logic
+                        if position == 0:
+                            if signal_val < -threshold:  # Long spread
+                                entry_price_x = px_x
+                                entry_price_y = px_y
+                                qty_x = position_capital / entry_price_x
+                                qty_y = position_capital / entry_price_y
+                                position = 1
+                                entry_date = current_date
+                                
+                            elif signal_val > threshold:  # Short spread
+                                entry_price_x = px_x
+                                entry_price_y = px_y
+                                qty_x = position_capital / entry_price_x
+                                qty_y = position_capital / entry_price_y
+                                position = -1
+                                entry_date = current_date
+                        
+                        # Exit logic
+                        elif position == 1:  # Long spread: long Y, short X
+                            if signal_val >= exit_threshold:
+                                pnl_y = (px_y - entry_price_y) * qty_y
+                                pnl_x = (entry_price_x - px_x) * qty_x
+                                gross_pnl = pnl_y + pnl_x
+                                costs = 4 * position_capital * cost_per_trade  # 4 trades
+                                net_pnl = gross_pnl - costs
+                                capital += net_pnl
+                                
+                                duration = (current_date - entry_date).days
+                                trades.append({
+                                    'Entry': entry_date,
+                                    'Exit': current_date,
+                                    'Type': 'LONG',
+                                    'Entry_X': entry_price_x,
+                                    'Exit_X': px_x,
+                                    'Entry_Y': entry_price_y,
+                                    'Exit_Y': px_y,
+                                    'PnL': net_pnl,
+                                    'Duration': duration
+                                })
+                                position = 0
+                        
+                        elif position == -1:  # Short spread: short Y, long X
+                            if signal_val <= exit_threshold:
+                                pnl_y = (entry_price_y - px_y) * qty_y
+                                pnl_x = (px_x - entry_price_x) * qty_x
+                                gross_pnl = pnl_y + pnl_x
+                                costs = 4 * position_capital * cost_per_trade
+                                net_pnl = gross_pnl - costs
+                                capital += net_pnl
+                                
+                                duration = (current_date - entry_date).days
+                                trades.append({
+                                    'Entry': entry_date,
+                                    'Exit': current_date,
+                                    'Type': 'SHORT',
+                                    'Entry_X': entry_price_x,
+                                    'Exit_X': px_x,
+                                    'Entry_Y': entry_price_y,
+                                    'Exit_Y': px_y,
+                                    'PnL': net_pnl,
+                                    'Duration': duration
+                                })
+                                position = 0
+                        
+                        equity_curve.append(capital)
+                        equity_dates.append(current_date)
+                    
+                    # Results
+                    st.markdown("### 📊 BACKTEST RESULTS")
+                    
+                    if trades:
+                        trades_df = pd.DataFrame(trades)
+                        
+                        # Metrics
+                        total_pnl = capital - initial_capital
+                        total_return = (capital / initial_capital - 1) * 100
+                        num_trades = len(trades)
+                        win_trades = len(trades_df[trades_df['PnL'] > 0])
+                        win_rate = (win_trades / num_trades) * 100 if num_trades > 0 else 0
+                        avg_pnl = trades_df['PnL'].mean()
+                        avg_duration = trades_df['Duration'].mean()
+                        
+                        # Max drawdown
+                        equity_series = pd.Series(equity_curve, index=equity_dates)
+                        rolling_max = equity_series.cummax()
+                        drawdown = (equity_series - rolling_max) / rolling_max * 100
+                        max_dd = drawdown.min()
+                        
+                        col_res1, col_res2, col_res3, col_res4 = st.columns(4)
+                        
+                        with col_res1:
+                            pnl_color = "#00FF00" if total_pnl > 0 else "#FF0000"
+                            st.markdown(f"""
+                            <div style="background: #111; border: 1px solid {pnl_color}; padding: 10px; border-radius: 5px;">
+                                <p style="color: #999; margin: 0; font-size: 9px;">TOTAL P&L</p>
+                                <p style="color: {pnl_color}; margin: 0; font-size: 20px; font-weight: bold;">${total_pnl:,.2f}</p>
+                                <p style="color: #666; margin: 0; font-size: 10px;">{total_return:+.2f}%</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        with col_res2:
+                            st.markdown(f"""
+                            <div style="background: #111; border: 1px solid #FFAA00; padding: 10px; border-radius: 5px;">
+                                <p style="color: #999; margin: 0; font-size: 9px;">TRADES</p>
+                                <p style="color: #FFAA00; margin: 0; font-size: 20px; font-weight: bold;">{num_trades}</p>
+                                <p style="color: #666; margin: 0; font-size: 10px;">Avg: {avg_duration:.1f} days</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        with col_res3:
+                            wr_color = "#00FF00" if win_rate > 50 else "#FF0000"
+                            st.markdown(f"""
+                            <div style="background: #111; border: 1px solid {wr_color}; padding: 10px; border-radius: 5px;">
+                                <p style="color: #999; margin: 0; font-size: 9px;">WIN RATE</p>
+                                <p style="color: {wr_color}; margin: 0; font-size: 20px; font-weight: bold;">{win_rate:.1f}%</p>
+                                <p style="color: #666; margin: 0; font-size: 10px;">{win_trades}/{num_trades} wins</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        with col_res4:
+                            st.markdown(f"""
+                            <div style="background: #111; border: 1px solid #FF0000; padding: 10px; border-radius: 5px;">
+                                <p style="color: #999; margin: 0; font-size: 9px;">MAX DRAWDOWN</p>
+                                <p style="color: #FF0000; margin: 0; font-size: 20px; font-weight: bold;">{max_dd:.2f}%</p>
+                                <p style="color: #666; margin: 0; font-size: 10px;">Peak to trough</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        # Equity curve
+                        st.markdown("#### 📈 EQUITY CURVE")
+                        
+                        fig_equity = go.Figure()
+                        
+                        fig_equity.add_trace(go.Scatter(
+                            x=equity_dates,
+                            y=equity_curve,
+                            mode='lines',
+                            name='Portfolio Value',
+                            line=dict(color='#00FF00' if total_pnl > 0 else '#FF0000', width=2),
+                            fill='tozeroy',
+                            fillcolor='rgba(0, 255, 0, 0.1)' if total_pnl > 0 else 'rgba(255, 0, 0, 0.1)'
+                        ))
+                        
+                        fig_equity.add_hline(y=initial_capital, line_dash="dash", line_color="#FFAA00",
+                                            annotation_text="Initial Capital")
+                        
+                        fig_equity.update_layout(
+                            title="Portfolio Equity Curve",
+                            paper_bgcolor='#000',
+                            plot_bgcolor='#111',
+                            font=dict(color='#FFAA00', size=10),
+                            xaxis=dict(gridcolor='#333', title="Date"),
+                            yaxis=dict(gridcolor='#333', title="Portfolio Value ($)"),
+                            height=400
+                        )
+                        
+                        st.plotly_chart(fig_equity, use_container_width=True)
+                        
+                        # Trade log
+                        st.markdown("#### 📓 TRADE LOG")
+                        
+                        trades_display = trades_df.copy()
+                        trades_display['Entry'] = trades_display['Entry'].dt.strftime('%Y-%m-%d')
+                        trades_display['Exit'] = trades_display['Exit'].dt.strftime('%Y-%m-%d')
+                        trades_display['PnL'] = trades_display['PnL'].apply(lambda x: f"${x:,.2f}")
+                        
+                        st.dataframe(trades_display, use_container_width=True, hide_index=True)
+                        
+                        # Export
+                        csv_trades = trades_df.to_csv(index=False)
+                        st.download_button(
+                            label="📥 DOWNLOAD TRADE LOG",
+                            data=csv_trades,
+                            file_name=f"pairs_trades_{ticker1}_{ticker2}_{datetime.now().strftime('%Y%m%d')}.csv",
+                            mime="text/csv",
+                            use_container_width=True
+                        )
+                    
+                    else:
+                        st.warning("⚠️ No trades executed with current parameters. Try adjusting the threshold.")
+    
+    # ===== PAIRS TAB 3: LIVE SIGNALS =====
+    with pairs_tab3:
+        st.markdown("#### 📈 LIVE PAIRS MONITORING")
+        
+        st.markdown("""
+        <div style="background-color: #111; border: 1px solid #333; padding: 10px; margin: 10px 0;">
+            <p style="color: #FFAA00; font-size: 10px;">
+            🔄 Monitor multiple pairs in real-time for trading opportunities.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Paires prédéfinies
+        default_pairs = [
+            ("XOM", "CVX"),
+            ("MSFT", "AAPL"),
+            ("JPM", "GS"),
+            ("BAC", "MS"),
+            ("F", "GM"),
+            ("PEP", "KO")
+        ]
+        
+        if st.button("🔄 SCAN ALL PAIRS", use_container_width=True, key="scan_pairs"):
+            with st.spinner("Scanning pairs..."):
+                results = []
+                
+                for ticker1, ticker2 in default_pairs:
+                    try:
+                        df1 = yf.download(ticker1, period="1y", interval="1d", progress=False)
+                        df2 = yf.download(ticker2, period="1y", interval="1d", progress=False)
+                        
+                        if not df1.empty and not df2.empty:
+                            # Handle MultiIndex
+                            if isinstance(df1.columns, pd.MultiIndex):
+                                df1.columns = df1.columns.get_level_values(0)
+                            if isinstance(df2.columns, pd.MultiIndex):
+                                df2.columns = df2.columns.get_level_values(0)
+                            
+                            df1 = df1[['Close']].dropna()
+                            df2 = df2[['Close']].dropna()
+                            
+                            df_merged = pd.merge(df1, df2, left_index=True, right_index=True, how='inner', suffixes=('_1', '_2'))
+                            
+                            # Régression
+                            X = sm.add_constant(df_merged['Close_1'])
+                            model = sm.OLS(df_merged['Close_2'], X).fit()
+                            residuals = model.resid
+                            
+                            # ADF sur résidus
+                            adf = adfuller(residuals)
+                            
+                            # Z-score actuel
+                            zscore = (residuals.iloc[-1] - residuals.mean()) / residuals.std()
+                            
+                            # Signal
+                            if zscore < -2:
+                                signal = "🟢 LONG"
+                            elif zscore > 2:
+                                signal = "🔴 SHORT"
+                            else:
+                                signal = "⚪ NEUTRAL"
+                            
+                            results.append({
+                                'Pair': f"{ticker1}/{ticker2}",
+                                'ADF': f"{adf[0]:.3f}",
+                                'p-value': f"{adf[1]:.4f}",
+                                'Coint': "✅" if adf[1] < 0.05 else "❌",
+                                'Z-Score': f"{zscore:.2f}",
+                                'Signal': signal
+                            })
+                    
+                    except Exception as e:
+                        results.append({
+                            'Pair': f"{ticker1}/{ticker2}",
+                            'ADF': "Error",
+                            'p-value': str(e)[:20],
+                            'Coint': "❌",
+                            'Z-Score': "N/A",
+                            'Signal': "⚠️"
+                        })
+                
+                results_df = pd.DataFrame(results)
+                st.dataframe(results_df, use_container_width=True, hide_index=True)
+                
+                # Highlight actionable signals
+                actionable = [r for r in results if r['Signal'] in ["🟢 LONG", "🔴 SHORT"] and r['Coint'] == "✅"]
+                
+                if actionable:
+                    st.markdown("### 🎯 ACTIONABLE SIGNALS")
+                    for sig in actionable:
+                        st.markdown(f"""
+                        <div style="background: #0a1a0a; border: 1px solid #00FF00; padding: 10px; margin: 5px 0;">
+                            <p style="color: #00FF00; font-weight: bold; margin: 0;">
+                                {sig['Signal']} {sig['Pair']} | Z-Score: {sig['Z-Score']}
+                            </p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.info("No actionable signals at the moment.")
 
 # ===== TAB 4: DATA INTEGRATION =====
 with tab4:
