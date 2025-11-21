@@ -27,11 +27,7 @@ st.set_page_config(
 # =============================================
 st.markdown("""
 <style>
-    * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     
     body, .main, .stApp {
         font-family: 'Courier New', monospace;
@@ -40,9 +36,7 @@ st.markdown("""
         font-size: 12px;
     }
     
-    .block-container {
-        padding: 0rem 1rem !important;
-    }
+    .block-container { padding: 0rem 1rem !important; }
     
     h1, h2, h3, h4 {
         color: #FFAA00 !important;
@@ -63,11 +57,9 @@ st.markdown("""
         border: 2px solid #FFAA00 !important;
         padding: 6px 12px !important;
         text-transform: uppercase !important;
-        letter-spacing: 1px !important;
         border-radius: 0px !important;
         font-size: 10px !important;
         font-family: 'Courier New', monospace !important;
-        transition: all 0.3s !important;
     }
     
     .stButton > button:hover {
@@ -75,15 +67,36 @@ st.markdown("""
         color: #000 !important;
     }
     
-    .stMultiSelect > div {
+    .stTextInput > div > div > input {
         background-color: #111 !important;
-        border: 1px solid #FFAA00 !important;
         color: #FFAA00 !important;
+        border: 2px solid #FFAA00 !important;
+        border-radius: 0 !important;
+        font-family: 'Courier New', monospace !important;
+        font-size: 14px !important;
+        text-transform: uppercase !important;
     }
     
-    .stSelectbox > div {
-        background-color: #111 !important;
-        border: 1px solid #FFAA00 !important;
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0px;
+        background-color: #111;
+        border-bottom: 2px solid #FFAA00;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background-color: #222;
+        color: #FFAA00;
+        border: 1px solid #333;
+        border-bottom: none;
+        padding: 10px 30px;
+        font-family: 'Courier New', monospace;
+        font-weight: bold;
+        font-size: 12px;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background-color: #FFAA00 !important;
+        color: #000 !important;
     }
     
     p, div, span, label {
@@ -92,7 +105,6 @@ st.markdown("""
         color: #FFAA00;
     }
     
-    /* Style des news */
     .news-card {
         background: #111;
         border: 1px solid #333;
@@ -109,7 +121,7 @@ st.markdown("""
     
     .news-title {
         color: #FFAA00;
-        font-size: 14px;
+        font-size: 13px;
         font-weight: bold;
         margin-bottom: 8px;
         line-height: 1.4;
@@ -128,7 +140,7 @@ st.markdown("""
     .news-meta {
         color: #666;
         font-size: 10px;
-        margin-bottom: 8px;
+        margin-bottom: 5px;
     }
     
     .news-source {
@@ -139,16 +151,10 @@ st.markdown("""
     .news-ticker {
         background: #FFAA00;
         color: #000;
-        padding: 2px 6px;
-        font-size: 9px;
+        padding: 2px 8px;
+        font-size: 10px;
         font-weight: bold;
-        margin-right: 5px;
-    }
-    
-    .news-summary {
-        color: #CCC;
-        font-size: 11px;
-        line-height: 1.5;
+        margin-right: 8px;
     }
     
     .category-header {
@@ -162,15 +168,19 @@ st.markdown("""
         letter-spacing: 2px;
     }
     
-    hr {
-        border-color: #333;
-        margin: 10px 0;
+    .search-box {
+        background: #111;
+        border: 2px solid #FFAA00;
+        padding: 20px;
+        margin: 20px 0;
     }
+    
+    hr { border-color: #333; margin: 10px 0; }
 </style>
 """, unsafe_allow_html=True)
 
 # =============================================
-# FONCTION RÉCUPÉRATION NEWS
+# FONCTIONS
 # =============================================
 @st.cache_data(ttl=60)
 def get_ticker_news(ticker):
@@ -179,7 +189,7 @@ def get_ticker_news(ticker):
         stock = yf.Ticker(ticker)
         news = stock.news
         return news if news else []
-    except Exception as e:
+    except:
         return []
 
 def format_timestamp(timestamp):
@@ -197,20 +207,12 @@ def display_news_card(news_item, ticker=""):
     publisher = news_item.get('publisher', 'Source inconnue')
     timestamp = news_item.get('providerPublishTime', 0)
     
-    # Thumbnail si disponible
-    thumbnail = ""
-    if 'thumbnail' in news_item and news_item['thumbnail']:
-        try:
-            thumb_url = news_item['thumbnail']['resolutions'][0]['url']
-            thumbnail = f'<img src="{thumb_url}" style="width:100px;height:60px;object-fit:cover;float:right;margin-left:10px;border:1px solid #333;">'
-        except:
-            pass
-    
     st.markdown(f"""
     <div class="news-card">
-        {thumbnail}
-        <span class="news-ticker">{ticker}</span>
-        <span class="news-meta"><span class="news-source">{publisher}</span> • {format_timestamp(timestamp)}</span>
+        <div>
+            <span class="news-ticker">{ticker}</span>
+            <span class="news-meta"><span class="news-source">{publisher}</span> • {format_timestamp(timestamp)}</span>
+        </div>
         <div class="news-title"><a href="{link}" target="_blank">{title}</a></div>
     </div>
     """, unsafe_allow_html=True)
@@ -230,136 +232,147 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # =============================================
-# SÉLECTION DES TICKERS
+# ONGLETS PRINCIPAUX
 # =============================================
-st.markdown("### 📰 MARKET NEWS FEED")
+tab_global, tab_search = st.tabs(["📰 GLOBAL FEED", "🔍 SEARCH TICKER"])
 
-col_select, col_cat = st.columns([3, 1])
-
-with col_select:
-    # Catégories prédéfinies
-    ticker_categories = {
-        "🇺🇸 US TECH": ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA"],
-        "🇺🇸 US FINANCE": ["JPM", "BAC", "GS", "MS", "WFC"],
-        "🇺🇸 US INDICES": ["SPY", "QQQ", "DIA", "IWM"],
-        "🇪🇺 EUROPE": ["MC.PA", "OR.PA", "SAP", "ASML", "NESN.SW"],
-        "₿ CRYPTO": ["BTC-USD", "ETH-USD", "SOL-USD"],
-        "⛽ ENERGY": ["XOM", "CVX", "COP", "TTE.PA"],
-        "💊 PHARMA": ["JNJ", "PFE", "UNH", "LLY", "ABBV"]
+# =============================================
+# ONGLET 1 : GLOBAL FEED
+# =============================================
+with tab_global:
+    st.markdown("### 🌍 GLOBAL MARKET NEWS")
+    
+    # Liste des tickers pour le feed global
+    global_tickers = {
+        "US TECH": ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA"],
+        "US FINANCE": ["JPM", "BAC", "GS"],
+        "INDICES": ["SPY", "QQQ"],
+        "CRYPTO": ["BTC-USD", "ETH-USD"],
+        "EUROPE": ["MC.PA", "OR.PA", "ASML"],
+        "ENERGY": ["XOM", "CVX"]
     }
     
-    selected_category = st.selectbox(
-        "Catégorie",
-        options=list(ticker_categories.keys()),
-        index=0
-    )
-
-with col_cat:
-    max_news = st.selectbox(
-        "News par ticker",
-        options=[5, 10, 15, 20],
-        index=1
-    )
-
-# Tickers de la catégorie sélectionnée
-default_tickers = ticker_categories[selected_category]
-
-selected_tickers = st.multiselect(
-    "Sélectionnez les tickers à suivre",
-    options=["AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA", "AMD", "NFLX",
-             "JPM", "BAC", "GS", "MS", "WFC", "C",
-             "XOM", "CVX", "COP", "SLB", "TTE.PA",
-             "JNJ", "PFE", "UNH", "LLY", "ABBV", "MRK",
-             "MC.PA", "OR.PA", "BNP.PA", "SAP", "ASML", "NESN.SW",
-             "BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD",
-             "SPY", "QQQ", "DIA", "IWM", "GLD", "SLV"],
-    default=default_tickers,
-    help="Sélectionnez jusqu'à 10 tickers"
-)
-
-st.markdown('<hr>', unsafe_allow_html=True)
-
-# =============================================
-# AFFICHAGE DES NEWS
-# =============================================
-if selected_tickers:
+    # Collecter toutes les news
+    all_news = []
     
-    # Option d'affichage
-    view_mode = st.radio(
-        "Mode d'affichage",
-        options=["📋 Par ticker", "🕐 Chronologique"],
-        horizontal=True
+    with st.spinner("📡 Chargement du feed global..."):
+        for category, tickers in global_tickers.items():
+            for ticker in tickers:
+                news_list = get_ticker_news(ticker)
+                for news in news_list[:5]:  # 5 news max par ticker
+                    news['_ticker'] = ticker
+                    news['_category'] = category
+                    all_news.append(news)
+    
+    # Trier par date décroissante
+    all_news_sorted = sorted(
+        all_news,
+        key=lambda x: x.get('providerPublishTime', 0),
+        reverse=True
     )
+    
+    # Supprimer les doublons (même titre)
+    seen_titles = set()
+    unique_news = []
+    for news in all_news_sorted:
+        title = news.get('title', '')
+        if title not in seen_titles:
+            seen_titles.add(title)
+            unique_news.append(news)
+    
+    # Stats
+    col_s1, col_s2, col_s3 = st.columns(3)
+    with col_s1:
+        st.metric("ARTICLES", len(unique_news))
+    with col_s2:
+        st.metric("TICKERS", sum(len(t) for t in global_tickers.values()))
+    with col_s3:
+        st.metric("MAJ", datetime.now().strftime("%H:%M:%S"))
     
     st.markdown('<hr>', unsafe_allow_html=True)
     
-    all_news = []
+    # Afficher les news
+    st.markdown(f'<div class="category-header">🕐 LATEST NEWS - {len(unique_news)} ARTICLES</div>', unsafe_allow_html=True)
     
-    with st.spinner("📡 Chargement des news..."):
-        for ticker in selected_tickers[:10]:
-            news_list = get_ticker_news(ticker)
-            for news in news_list[:max_news]:
-                news['_ticker'] = ticker
-                all_news.append(news)
+    for news in unique_news[:50]:  # Limite à 50 articles
+        display_news_card(news, news['_ticker'])
+
+# =============================================
+# ONGLET 2 : SEARCH TICKER
+# =============================================
+with tab_search:
+    st.markdown("### 🔍 SEARCH NEWS BY TICKER")
     
-    if view_mode == "📋 Par ticker":
-        # Affichage par ticker
-        for ticker in selected_tickers[:10]:
-            ticker_news = [n for n in all_news if n['_ticker'] == ticker]
-            
-            if ticker_news:
-                st.markdown(f'<div class="category-header">📊 {ticker} - {len(ticker_news)} NEWS</div>', unsafe_allow_html=True)
-                
-                for news in ticker_news:
-                    display_news_card(news, ticker)
+    st.markdown("""
+    <div class="search-box">
+        <div style="color:#FFAA00;font-size:12px;margin-bottom:10px;">
+            Entrez un symbole ticker pour rechercher ses actualités
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    else:
-        # Affichage chronologique
-        # Trier par date décroissante
-        all_news_sorted = sorted(
-            all_news,
-            key=lambda x: x.get('providerPublishTime', 0),
-            reverse=True
+    col_input, col_btn = st.columns([4, 1])
+    
+    with col_input:
+        search_ticker = st.text_input(
+            "Ticker",
+            placeholder="Ex: AAPL, MSFT, BTC-USD, MC.PA...",
+            label_visibility="collapsed",
+            key="search_input"
         )
+    
+    with col_btn:
+        search_btn = st.button("🔍 SEARCH", use_container_width=True)
+    
+    # Exemples de tickers
+    st.markdown("""
+    <div style="color:#666;font-size:10px;margin:10px 0;">
+        <b>EXEMPLES:</b> AAPL • MSFT • GOOGL • TSLA • NVDA • META • JPM • BTC-USD • ETH-USD • MC.PA • OR.PA • NESN.SW
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown('<hr>', unsafe_allow_html=True)
+    
+    # Recherche
+    if search_ticker:
+        ticker_clean = search_ticker.upper().strip()
         
-        st.markdown(f'<div class="category-header">🕐 TOUTES LES NEWS - {len(all_news_sorted)} ARTICLES</div>', unsafe_allow_html=True)
+        with st.spinner(f"📡 Recherche des news pour {ticker_clean}..."):
+            search_news = get_ticker_news(ticker_clean)
         
-        for news in all_news_sorted:
-            display_news_card(news, news['_ticker'])
-
-else:
-    st.warning("⚠️ Sélectionnez au moins un ticker pour voir les news")
-
-# =============================================
-# STATISTIQUES
-# =============================================
-st.markdown('<hr>', unsafe_allow_html=True)
-
-col_stat1, col_stat2, col_stat3 = st.columns(3)
-
-with col_stat1:
-    st.markdown(f"""
-    <div style="background:#111;border:1px solid #333;padding:15px;text-align:center;">
-        <div style="color:#FFAA00;font-size:24px;font-weight:bold;">{len(selected_tickers)}</div>
-        <div style="color:#666;font-size:10px;">TICKERS SUIVIS</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col_stat2:
-    st.markdown(f"""
-    <div style="background:#111;border:1px solid #333;padding:15px;text-align:center;">
-        <div style="color:#00FF00;font-size:24px;font-weight:bold;">{len(all_news) if selected_tickers else 0}</div>
-        <div style="color:#666;font-size:10px;">ARTICLES CHARGÉS</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col_stat3:
-    st.markdown(f"""
-    <div style="background:#111;border:1px solid #333;padding:15px;text-align:center;">
-        <div style="color:#00FFFF;font-size:24px;font-weight:bold;">{datetime.now().strftime("%H:%M:%S")}</div>
-        <div style="color:#666;font-size:10px;">DERNIÈRE MAJ</div>
-    </div>
-    """, unsafe_allow_html=True)
+        if search_news:
+            # Info sur le ticker
+            try:
+                stock = yf.Ticker(ticker_clean)
+                info = stock.info
+                company_name = info.get('shortName', ticker_clean)
+                current_price = info.get('currentPrice', info.get('regularMarketPrice', 'N/A'))
+                
+                st.markdown(f"""
+                <div style="background:#111;border:2px solid #FFAA00;padding:15px;margin-bottom:20px;">
+                    <div style="color:#FFAA00;font-size:18px;font-weight:bold;">{ticker_clean}</div>
+                    <div style="color:#FFF;font-size:12px;">{company_name}</div>
+                    <div style="color:#00FF00;font-size:16px;margin-top:5px;">
+                        ${current_price if isinstance(current_price, (int, float)) else 'N/A'}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            except:
+                pass
+            
+            st.markdown(f'<div class="category-header">📊 {ticker_clean} - {len(search_news)} NEWS</div>', unsafe_allow_html=True)
+            
+            for news in search_news:
+                display_news_card(news, ticker_clean)
+        else:
+            st.warning(f"⚠️ Aucune news trouvée pour {ticker_clean}. Vérifiez le symbole du ticker.")
+    else:
+        st.markdown("""
+        <div style="text-align:center;padding:50px;color:#666;">
+            <div style="font-size:40px;margin-bottom:20px;">🔍</div>
+            <div style="font-size:14px;">Entrez un ticker ci-dessus pour rechercher ses actualités</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 # =============================================
 # FOOTER
