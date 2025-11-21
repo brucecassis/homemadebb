@@ -2281,11 +2281,10 @@ with tab3:
                                 ), row=1, col=1)
                                 
                                 # Lignes de seuil
-                                fig_resid.add_hline(y=0, line_dash="solid", line_color="#FFFFFF", row=1, col=1)
-                                fig_resid.add_hline(y=threshold, line_dash="dash", line_color="#FF0000", 
-                                                   annotation_text=f"Short Signal (+{threshold})", row=1, col=1)
-                                fig_resid.add_hline(y=-threshold, line_dash="dash", line_color="#00FF00",
-                                                   annotation_text=f"Long Signal (-{threshold})", row=1, col=1)
+                                fig_resid.add_hline(y=short_threshold, line_dash="dash", line_color="#FF0000", 
+                                                   annotation_text=f"Short Signal ({short_threshold})", row=1, col=1)
+                                fig_resid.add_hline(y=long_threshold, line_dash="dash", line_color="#00FF00",
+                                                   annotation_text=f"Long Signal ({long_threshold})", row=1, col=1)
                                 
                                 # Spread ratio
                                 df_merged['spread_ratio'] = df_merged[ticker2] / df_merged[ticker1]
