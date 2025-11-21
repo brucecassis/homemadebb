@@ -1444,6 +1444,7 @@ with tab2:
                 </p>
             </div>
             """, unsafe_allow_html=True)
+            
             col_adv1, col_adv2 = st.columns(2)
             
             with col_adv1:
