@@ -1691,14 +1691,39 @@ with tab2:
             
             st.markdown(f"**Target:** {target_ticker} | **Horizon:** {horizon}")
             
-            # Sélection du modèle à afficher
-            model_to_show = st.selectbox(
-                "SELECT MODEL TO DISPLAY",
-                options=list(predictions.keys()),
-                key="bt_model_select"
-            )
+            col_select1, col_select2 = st.columns(2)
+            
+            with col_select1:
+                # Sélection du modèle à afficher
+                model_to_show = st.selectbox(
+                    "SELECT MODEL TO DISPLAY",
+                    options=list(predictions.keys()),
+                    key="bt_model_select"
+                )
+            
+            with col_select2:
+                # Sélection de la période
+                timeframe_options = {
+                    "Last 3 months": 63,
+                    "Last 6 months": 126,
+                    "Last 1 year": 252,
+                    "Last 2 years": 504,
+                    "All data": len(dates_test)
+                }
+                timeframe_choice = st.selectbox(
+                    "SELECT TIMEFRAME",
+                    options=list(timeframe_options.keys()),
+                    index=len(timeframe_options) - 1,  # "All data" par défaut
+                    key="bt_timeframe"
+                )
+                n_points = min(timeframe_options[timeframe_choice], len(dates_test))
             
             pred = predictions[model_to_show]
+            
+            # Filtrer selon la timeframe choisie
+            dates_display = dates_test.iloc[-n_points:]
+            y_display = y_test.iloc[-n_points:]
+            pred_display = pred[-n_points:]
             
             # Graphique Prediction vs Actual
             fig_bt = make_subplots(
@@ -1711,8 +1736,8 @@ with tab2:
             
             # Actual
             fig_bt.add_trace(go.Scatter(
-                x=dates_test,
-                y=y_test,
+                x=dates_display,
+                y=y_display,
                 mode='lines',
                 name='Actual Return',
                 line=dict(color='#FFAA00', width=2)
@@ -1720,8 +1745,8 @@ with tab2:
             
             # Predicted
             fig_bt.add_trace(go.Scatter(
-                x=dates_test,
-                y=pred,
+                x=dates_display,
+                y=pred_display,
                 mode='lines',
                 name='Predicted Return',
                 line=dict(color='#00FF00', width=2, dash='dash')
@@ -1731,11 +1756,11 @@ with tab2:
             fig_bt.add_hline(y=0, line_dash="solid", line_color="#666", row=1, col=1)
             
             # Error
-            error = pred - y_test.values
+            error = pred_display - y_display.values
             colors = ['#00FF00' if e >= 0 else '#FF0000' for e in error]
             
             fig_bt.add_trace(go.Bar(
-                x=dates_test,
+                x=dates_display,
                 y=error,
                 marker_color=colors,
                 name='Error',
