@@ -1,11 +1,16 @@
 # pages/NEWS.py
-# Bloomberg Terminal - News Feed avec Yahoo Finance
+# Bloomberg Terminal - News Feed avec Finnhub API
 
 import streamlit as st
-import yfinance as yf
-from datetime import datetime
+import requests
+from datetime import datetime, timedelta
 import time
 from streamlit_autorefresh import st_autorefresh
+
+# =============================================
+# CONFIGURATION FINNHUB
+# =============================================
+FINNHUB_API_KEY = "d14re49r01qop9mf2algd14re49r01qop9mf2am0"
 
 # =============================================
 # AUTO-REFRESH TOUTES LES 60 SECONDES
@@ -157,6 +162,22 @@ st.markdown("""
         margin-right: 8px;
     }
     
+    .news-category {
+        background: #00FFFF;
+        color: #000;
+        padding: 2px 8px;
+        font-size: 10px;
+        font-weight: bold;
+        margin-right: 8px;
+    }
+    
+    .news-summary {
+        color: #AAA;
+        font-size: 11px;
+        line-height: 1.5;
+        margin-top: 8px;
+    }
+    
     .category-header {
         background: #FFAA00;
         color: #000;
@@ -180,16 +201,36 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =============================================
-# FONCTIONS
+# FONCTIONS FINNHUB
 # =============================================
 @st.cache_data(ttl=60)
-def get_ticker_news(ticker):
-    """Récupère les news d'un ticker via Yahoo Finance"""
+def get_market_news(category="general"):
+    """Récupère les news générales du marché via Finnhub"""
     try:
-        stock = yf.Ticker(ticker)
-        news = stock.news
-        return news if news else []
-    except:
+        url = f"https://finnhub.io/api/v1/news?category={category}&token={FINNHUB_API_KEY}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.json()
+        return []
+    except Exception as e:
+        st.error(f"Erreur Finnhub: {e}")
+        return []
+
+@st.cache_data(ttl=60)
+def get_company_news(ticker, days_back=7):
+    """Récupère les news d'une entreprise spécifique via Finnhub"""
+    try:
+        today = datetime.now()
+        from_date = (today - timedelta(days=days_back)).strftime("%Y-%m-%d")
+        to_date = today.strftime("%Y-%m-%d")
+        
+        url = f"https://finnhub.io/api/v1/company-news?symbol={ticker}&from={from_date}&to={to_date}&token={FINNHUB_API_KEY}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.json()
+        return []
+    except Exception as e:
+        st.error(f"Erreur Finnhub: {e}")
         return []
 
 def format_timestamp(timestamp):
@@ -200,20 +241,43 @@ def format_timestamp(timestamp):
     except:
         return "Date inconnue"
 
-def display_news_card(news_item, ticker=""):
+def display_news_card(news_item, ticker="", show_summary=True):
     """Affiche une carte de news style Bloomberg"""
-    title = news_item.get('title', 'Sans titre')
-    link = news_item.get('link', '#')
-    publisher = news_item.get('publisher', 'Source inconnue')
-    timestamp = news_item.get('providerPublishTime', 0)
+    headline = news_item.get('headline', 'Sans titre')
+    url = news_item.get('url', '#')
+    source = news_item.get('source', 'Source inconnue')
+    timestamp = news_item.get('datetime', 0)
+    summary = news_item.get('summary', '')
+    category = news_item.get('category', '')
+    image = news_item.get('image', '')
+    
+    # Image si disponible
+    img_html = ""
+    if image:
+        img_html = f'<img src="{image}" style="width:120px;height:80px;object-fit:cover;float:right;margin-left:15px;border:1px solid #333;">'
+    
+    # Badge ticker ou catégorie
+    badge = ""
+    if ticker:
+        badge = f'<span class="news-ticker">{ticker}</span>'
+    elif category:
+        badge = f'<span class="news-category">{category.upper()}</span>'
+    
+    # Summary
+    summary_html = ""
+    if show_summary and summary:
+        short_summary = summary[:200] + "..." if len(summary) > 200 else summary
+        summary_html = f'<div class="news-summary">{short_summary}</div>'
     
     st.markdown(f"""
     <div class="news-card">
+        {img_html}
         <div>
-            <span class="news-ticker">{ticker}</span>
-            <span class="news-meta"><span class="news-source">{publisher}</span> • {format_timestamp(timestamp)}</span>
+            {badge}
+            <span class="news-meta"><span class="news-source">{source}</span> • {format_timestamp(timestamp)}</span>
         </div>
-        <div class="news-title"><a href="{link}" target="_blank">{title}</a></div>
+        <div class="news-title"><a href="{url}" target="_blank">{headline}</a></div>
+        {summary_html}
     </div>
     """, unsafe_allow_html=True)
 
@@ -227,7 +291,7 @@ st.markdown(f"""
         <div>⬛ BLOOMBERG ENS® | NEWS TERMINAL</div>
         <a href="accueil.html" style="background:#333;color:#FFAA00;border:1px solid #000;padding:4px 12px;font-size:11px;text-decoration:none;">ACCUEIL</a>
     </div>
-    <div>{current_time} UTC • AUTO-REFRESH: 60s</div>
+    <div>{current_time} UTC • FINNHUB API • AUTO-REFRESH: 60s</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -240,62 +304,55 @@ tab_global, tab_search = st.tabs(["📰 GLOBAL FEED", "🔍 SEARCH TICKER"])
 # ONGLET 1 : GLOBAL FEED
 # =============================================
 with tab_global:
-    st.markdown("### 🌍 GLOBAL MARKET NEWS")
+    st.markdown("### 🌍 GLOBAL MARKET NEWS - FINNHUB")
     
-    # Liste des tickers pour le feed global
-    global_tickers = {
-        "US TECH": ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA"],
-        "US FINANCE": ["JPM", "BAC", "GS"],
-        "INDICES": ["SPY", "QQQ"],
-        "CRYPTO": ["BTC-USD", "ETH-USD"],
-        "EUROPE": ["MC.PA", "OR.PA", "ASML"],
-        "ENERGY": ["XOM", "CVX"]
-    }
+    # Sélection de catégorie
+    col_cat, col_info = st.columns([2, 4])
     
-    # Collecter toutes les news
-    all_news = []
+    with col_cat:
+        category = st.selectbox(
+            "Catégorie",
+            options=["general", "forex", "crypto", "merger"],
+            format_func=lambda x: {
+                "general": "📊 GENERAL MARKET",
+                "forex": "💱 FOREX",
+                "crypto": "₿ CRYPTO",
+                "merger": "🤝 MERGERS & ACQUISITIONS"
+            }.get(x, x)
+        )
     
-    with st.spinner("📡 Chargement du feed global..."):
-        for category, tickers in global_tickers.items():
-            for ticker in tickers:
-                news_list = get_ticker_news(ticker)
-                for news in news_list[:5]:  # 5 news max par ticker
-                    news['_ticker'] = ticker
-                    news['_category'] = category
-                    all_news.append(news)
-    
-    # Trier par date décroissante
-    all_news_sorted = sorted(
-        all_news,
-        key=lambda x: x.get('providerPublishTime', 0),
-        reverse=True
-    )
-    
-    # Supprimer les doublons (même titre)
-    seen_titles = set()
-    unique_news = []
-    for news in all_news_sorted:
-        title = news.get('title', '')
-        if title not in seen_titles:
-            seen_titles.add(title)
-            unique_news.append(news)
-    
-    # Stats
-    col_s1, col_s2, col_s3 = st.columns(3)
-    with col_s1:
-        st.metric("ARTICLES", len(unique_news))
-    with col_s2:
-        st.metric("TICKERS", sum(len(t) for t in global_tickers.values()))
-    with col_s3:
-        st.metric("MAJ", datetime.now().strftime("%H:%M:%S"))
+    with col_info:
+        st.markdown(f"""
+        <div style="color:#666;font-size:10px;padding:15px 0;">
+            📡 NEWS EN TEMPS RÉEL • FINNHUB API • RAFRAÎCHISSEMENT AUTO: 60 SEC
+        </div>
+        """, unsafe_allow_html=True)
     
     st.markdown('<hr>', unsafe_allow_html=True)
     
-    # Afficher les news
-    st.markdown(f'<div class="category-header">🕐 LATEST NEWS - {len(unique_news)} ARTICLES</div>', unsafe_allow_html=True)
+    # Récupérer les news
+    with st.spinner("📡 Chargement des news..."):
+        market_news = get_market_news(category)
     
-    for news in unique_news[:50]:  # Limite à 50 articles
-        display_news_card(news, news['_ticker'])
+    if market_news:
+        # Stats
+        col_s1, col_s2, col_s3 = st.columns(3)
+        with col_s1:
+            st.metric("ARTICLES", len(market_news))
+        with col_s2:
+            st.metric("CATÉGORIE", category.upper())
+        with col_s3:
+            st.metric("MAJ", datetime.now().strftime("%H:%M:%S"))
+        
+        st.markdown('<hr>', unsafe_allow_html=True)
+        
+        # Afficher les news
+        st.markdown(f'<div class="category-header">🕐 LATEST NEWS - {len(market_news)} ARTICLES</div>', unsafe_allow_html=True)
+        
+        for news in market_news[:50]:
+            display_news_card(news, show_summary=True)
+    else:
+        st.warning("⚠️ Aucune news disponible pour le moment")
 
 # =============================================
 # ONGLET 2 : SEARCH TICKER
@@ -306,19 +363,27 @@ with tab_search:
     st.markdown("""
     <div class="search-box">
         <div style="color:#FFAA00;font-size:12px;margin-bottom:10px;">
-            Entrez un symbole ticker pour rechercher ses actualités
+            Entrez un symbole ticker US pour rechercher ses actualités (ex: AAPL, MSFT, TSLA)
         </div>
     </div>
     """, unsafe_allow_html=True)
     
-    col_input, col_btn = st.columns([4, 1])
+    col_input, col_days, col_btn = st.columns([3, 1, 1])
     
     with col_input:
         search_ticker = st.text_input(
             "Ticker",
-            placeholder="Ex: AAPL, MSFT, BTC-USD, MC.PA...",
+            placeholder="Ex: AAPL, MSFT, GOOGL, TSLA...",
             label_visibility="collapsed",
             key="search_input"
+        )
+    
+    with col_days:
+        days_back = st.selectbox(
+            "Période",
+            options=[7, 14, 30, 60, 90],
+            format_func=lambda x: f"{x} jours",
+            label_visibility="collapsed"
         )
     
     with col_btn:
@@ -327,7 +392,7 @@ with tab_search:
     # Exemples de tickers
     st.markdown("""
     <div style="color:#666;font-size:10px;margin:10px 0;">
-        <b>EXEMPLES:</b> AAPL • MSFT • GOOGL • TSLA • NVDA • META • JPM • BTC-USD • ETH-USD • MC.PA • OR.PA • NESN.SW
+        <b>EXEMPLES:</b> AAPL • MSFT • GOOGL • TSLA • NVDA • META • AMZN • JPM • BAC • XOM • JNJ • V • WMT • DIS • NFLX
     </div>
     """, unsafe_allow_html=True)
     
@@ -338,39 +403,32 @@ with tab_search:
         ticker_clean = search_ticker.upper().strip()
         
         with st.spinner(f"📡 Recherche des news pour {ticker_clean}..."):
-            search_news = get_ticker_news(ticker_clean)
+            company_news = get_company_news(ticker_clean, days_back)
         
-        if search_news:
-            # Info sur le ticker
-            try:
-                stock = yf.Ticker(ticker_clean)
-                info = stock.info
-                company_name = info.get('shortName', ticker_clean)
-                current_price = info.get('currentPrice', info.get('regularMarketPrice', 'N/A'))
-                
-                st.markdown(f"""
-                <div style="background:#111;border:2px solid #FFAA00;padding:15px;margin-bottom:20px;">
-                    <div style="color:#FFAA00;font-size:18px;font-weight:bold;">{ticker_clean}</div>
-                    <div style="color:#FFF;font-size:12px;">{company_name}</div>
-                    <div style="color:#00FF00;font-size:16px;margin-top:5px;">
-                        ${current_price if isinstance(current_price, (int, float)) else 'N/A'}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-            except:
-                pass
+        if company_news:
+            # Stats
+            col_s1, col_s2, col_s3 = st.columns(3)
+            with col_s1:
+                st.metric("TICKER", ticker_clean)
+            with col_s2:
+                st.metric("ARTICLES", len(company_news))
+            with col_s3:
+                st.metric("PÉRIODE", f"{days_back} jours")
             
-            st.markdown(f'<div class="category-header">📊 {ticker_clean} - {len(search_news)} NEWS</div>', unsafe_allow_html=True)
+            st.markdown('<hr>', unsafe_allow_html=True)
             
-            for news in search_news:
-                display_news_card(news, ticker_clean)
+            st.markdown(f'<div class="category-header">📊 {ticker_clean} - {len(company_news)} NEWS</div>', unsafe_allow_html=True)
+            
+            for news in company_news[:50]:
+                display_news_card(news, ticker=ticker_clean, show_summary=True)
         else:
-            st.warning(f"⚠️ Aucune news trouvée pour {ticker_clean}. Vérifiez le symbole du ticker.")
+            st.warning(f"⚠️ Aucune news trouvée pour {ticker_clean}. Vérifiez le symbole (tickers US uniquement).")
     else:
         st.markdown("""
         <div style="text-align:center;padding:50px;color:#666;">
             <div style="font-size:40px;margin-bottom:20px;">🔍</div>
             <div style="font-size:14px;">Entrez un ticker ci-dessus pour rechercher ses actualités</div>
+            <div style="font-size:11px;margin-top:10px;color:#444;">Note: Finnhub supporte principalement les tickers US</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -380,7 +438,7 @@ with tab_search:
 st.markdown('<hr>', unsafe_allow_html=True)
 st.markdown(f"""
 <div style='text-align: center; color: #666; font-size: 9px; font-family: "Courier New", monospace; padding: 10px;'>
-    © 2025 BLOOMBERG ENS® | YAHOO FINANCE NEWS API | SYSTÈME OPÉRATIONNEL<br>
+    © 2025 BLOOMBERG ENS® | FINNHUB API | SYSTÈME OPÉRATIONNEL<br>
     AUTO-REFRESH: 60 SECONDES • DERNIÈRE MAJ: {datetime.now().strftime('%H:%M:%S')}
 </div>
 """, unsafe_allow_html=True)
