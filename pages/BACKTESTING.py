@@ -1407,43 +1407,50 @@ with tab2:
         
         # Paramètres avancés
         with st.expander("⚙️ ADVANCED ML PARAMETERS"):
+            st.markdown("---")
+            st.markdown("##### 📚 ML MODELS EXPLAINED")
+            
             st.markdown("""
-            <div style="background-color: #111; border: 1px solid #333; padding: 15px; margin-bottom: 15px; border-radius: 5px;">
-                <p style="color: #FFAA00; font-weight: bold; margin: 0 0 10px 0; font-size: 11px;">📚 ML MODELS EXPLAINED</p>
-                
-                <p style="color: #00FF00; font-weight: bold; margin: 10px 0 5px 0; font-size: 10px;">🌲 RANDOM FOREST</p>
-                <p style="color: #999; margin: 0; font-size: 9px;">
-                Ensemble de nombreux arbres de décision entraînés sur des sous-échantillons aléatoires. 
-                Chaque arbre "vote" et la prédiction finale est la moyenne des votes.
-                <br>✅ Robuste au surapprentissage, gère bien les relations non-linéaires
-                <br>❌ Moins performant sur les tendances extrapolées
-                </p>
-                
-                <p style="color: #00FFFF; font-weight: bold; margin: 15px 0 5px 0; font-size: 10px;">📈 GRADIENT BOOSTING</p>
-                <p style="color: #999; margin: 0; font-size: 9px;">
-                Construit des arbres séquentiellement, chaque nouvel arbre corrigeant les erreurs du précédent.
-                Optimise une fonction de perte par descente de gradient.
-                <br>✅ Souvent le plus précis, capture les patterns complexes
-                <br>❌ Plus lent à entraîner, risque de surapprentissage si mal configuré
-                </p>
-                
-                <p style="color: #FF00FF; font-weight: bold; margin: 15px 0 5px 0; font-size: 10px;">📐 RIDGE REGRESSION</p>
-                <p style="color: #999; margin: 0; font-size: 9px;">
-                Régression linéaire avec régularisation L2 (pénalise les grands coefficients).
-                Trouve une relation linéaire entre les features macro et le rendement cible.
-                <br>✅ Rapide, interprétable, stable avec features corrélées
-                <br>❌ Ne capture que les relations linéaires
-                </p>
-                
-                <p style="color: #FFAA00; font-weight: bold; margin: 15px 0 5px 0; font-size: 10px;">🎯 ENSEMBLE (ALL)</p>
-                <p style="color: #999; margin: 0; font-size: 9px;">
-                Combine les 3 modèles en moyennant leurs prédictions.
-                Réduit la variance et améliore souvent la robustesse.
-                <br>✅ Plus stable, réduit le risque d'un mauvais modèle unique
-                <br>❌ Plus lent, moins interprétable
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
+            **🌲 RANDOM FOREST**
+            
+            *Comment ça marche ?* Imagine 100 experts qui regardent chacun une partie différente des données. 
+            Chacun fait sa prédiction, puis on fait la moyenne de toutes les réponses.
+            
+            - ✅ **Avantages** : Très robuste, difficile à "tromper", gère bien les données complexes
+            - ❌ **Inconvénients** : A du mal à prédire au-delà des valeurs déjà vues dans le passé
+            
+            ---
+            
+            **📈 GRADIENT BOOSTING**
+            
+            *Comment ça marche ?* Un premier modèle fait une prédiction, puis un deuxième corrige ses erreurs, 
+            puis un troisième corrige les erreurs restantes, etc. C'est un apprentissage "en escalier".
+            
+            - ✅ **Avantages** : Souvent le plus précis, excellent pour détecter des patterns subtils
+            - ❌ **Inconvénients** : Plus lent, peut "sur-apprendre" les données passées (moins généralisable)
+            
+            ---
+            
+            **📐 RIDGE REGRESSION**
+            
+            *Comment ça marche ?* Cherche une formule simple du type : `Rendement = a×Taux + b×Inflation + c×Chômage + ...`
+            La "régularisation" empêche les coefficients de devenir trop grands (plus stable).
+            
+            - ✅ **Avantages** : Rapide, facile à interpréter ("le taux compte pour X%"), très stable
+            - ❌ **Inconvénients** : Ne voit que les relations linéaires (si taux monte → action baisse)
+            
+            ---
+            
+            **🎯 ENSEMBLE (ALL)**
+            
+            *Comment ça marche ?* Fait tourner les 3 modèles et prend la moyenne de leurs prédictions.
+            Comme demander l'avis à 3 experts différents puis faire la synthèse.
+            
+            - ✅ **Avantages** : Plus fiable car diversifié, réduit le risque d'un modèle "fou"
+            - ❌ **Inconvénients** : Plus lent (3 modèles à calculer), difficile de savoir "qui a raison"
+            """)
+            
+            st.markdown("---")
             
             col_adv1, col_adv2 = st.columns(2)
             
