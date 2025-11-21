@@ -1657,15 +1657,15 @@ with tab2:
                             # Store for backtest tab
                             best_model_name = min(metrics_data, key=lambda x: float(x['MAE (%)']))['Model']
                             
-                            st.session_state['ml_model'] = models[best_model_name] if best_model_name != 'Ensemble' else models
-                            st.session_state['ml_scaler'] = scaler
-                            st.session_state['ml_features'] = feature_cols
-                            st.session_state['ml_predictions'] = predictions
-                            st.session_state['ml_y_test'] = y_test
-                            st.session_state['ml_dates_test'] = dates_test
-                            st.session_state['ml_target'] = target_ticker
-                            st.session_state['ml_horizon'] = prediction_horizon
-                            st.session_state['ml_df'] = df_ml
+                            st.session_state['ml_model_trained'] = models[best_model_name] if best_model_name != 'Ensemble' else models
+                            st.session_state['ml_scaler_trained'] = scaler
+                            st.session_state['ml_features_trained'] = feature_cols
+                            st.session_state['ml_predictions_trained'] = predictions
+                            st.session_state['ml_y_test_trained'] = y_test
+                            st.session_state['ml_dates_test_trained'] = dates_test
+                            st.session_state['ml_target_trained'] = target_ticker
+                            st.session_state['ml_horizon_trained'] = prediction_horizon
+                            st.session_state['ml_df_trained'] = df_ml
                             
                             st.success(f"✅ Best model: {best_model_name} - Go to 'BACKTEST RESULTS' tab")
                     
@@ -1680,14 +1680,14 @@ with tab2:
     with ml_tab2:
         st.markdown("#### 📈 PREDICTION vs ACTUAL (BACKTEST)")
         
-        if 'ml_predictions' not in st.session_state:
+        if 'ml_predictions_trained' not in st.session_state:
             st.warning("⚠️ Please train a model first in 'MODEL TRAINING' tab")
         else:
-            predictions = st.session_state['ml_predictions']
-            y_test = st.session_state['ml_y_test']
-            dates_test = st.session_state['ml_dates_test']
-            target_ticker = st.session_state['ml_target']
-            horizon = st.session_state['ml_horizon']
+            predictions = st.session_state['ml_predictions_trained']
+            y_test = st.session_state['ml_y_test_trained']
+            dates_test = st.session_state['ml_dates_test_trained']
+            target_ticker = st.session_state['ml_target_trained']
+            horizon = st.session_state['ml_horizon_trained']
             
             st.markdown(f"**Target:** {target_ticker} | **Horizon:** {horizon}")
             
@@ -1865,17 +1865,17 @@ with tab2:
     with ml_tab3:
         st.markdown("#### 🔮 LIVE PREDICTION")
         
-        if 'ml_model' not in st.session_state:
+        if 'ml_model_trained' not in st.session_state:
             st.warning("⚠️ Please train a model first")
         else:
-            st.markdown(f"**Target:** {st.session_state['ml_target']} | **Horizon:** {st.session_state['ml_horizon']}")
+            st.markdown(f"**Target:** {st.session_state['ml_target_trained']} | **Horizon:** {st.session_state['ml_horizon_trained']}")
             
             if st.button("🔮 GENERATE LIVE PREDICTION", use_container_width=True, key="live_pred"):
                 with st.spinner("Fetching latest data..."):
                     try:
-                        scaler = st.session_state['ml_scaler']
-                        feature_cols = st.session_state['ml_features']
-                        model = st.session_state['ml_model']
+                        scaler = st.session_state['ml_scaler_trained']
+                        feature_cols = st.session_state['ml_features_trained']
+                        model = st.session_state['ml_model_trained']
                         
                         # Récupérer dernières valeurs macro
                         latest_features = {}
