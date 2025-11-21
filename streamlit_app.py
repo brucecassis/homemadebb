@@ -131,6 +131,75 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =============================================
+# BARRE DE COMMANDE BLOOMBERG
+# À ajouter après le header, avant les données de marché
+# =============================================
+
+# Style pour la barre de commande
+st.markdown("""
+<style>
+    .command-container {
+        background: #111;
+        border: 2px solid #FFAA00;
+        padding: 10px 15px;
+        margin: 10px 0 20px 0;
+    }
+    .command-prompt {
+        color: #FFAA00;
+        font-weight: bold;
+        font-size: 14px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Dictionnaire des commandes et leurs pages
+COMMANDS = {
+    "EDGAR": "pages/EDGAR.py",
+    "NEWS": "pages/NEWS.py",
+    "CHATBOT": "pages/CHATBOT.py",
+    "PRICING": "pages/PRICING.py",
+    "PRICE": "pages/PRICING.py",
+    "CHAT": "pages/CHATBOT.py",
+    "AI": "pages/CHATBOT.py",
+}
+
+# Affichage de la barre de commande
+st.markdown('<div class="command-container">', unsafe_allow_html=True)
+
+col_prompt, col_input = st.columns([1, 11])
+
+with col_prompt:
+    st.markdown('<span class="command-prompt">BBG&gt;</span>', unsafe_allow_html=True)
+
+with col_input:
+    command_input = st.text_input(
+        "Command",
+        placeholder="Tapez une commande: EDGAR, NEWS, CHATBOT, PRICING, HELP...",
+        label_visibility="collapsed",
+        key="bloomberg_command"
+    )
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+# Traitement de la commande
+if command_input:
+    cmd = command_input.upper().strip()
+    
+    if cmd == "HELP" or cmd == "H":
+        st.info("""
+        **📋 COMMANDES DISPONIBLES:**
+        - `EDGAR` → SEC Filings & Documents
+        - `NEWS` → Market News Feed
+        - `CHATBOT` ou `CHAT` ou `AI` → AI Assistant
+        - `PRICING` ou `PRICE` → Options Pricing
+        - `HELP` ou `H` → Afficher cette aide
+        """)
+    elif cmd in COMMANDS:
+        st.switch_page(COMMANDS[cmd])
+    else:
+        st.warning(f"⚠️ Commande '{cmd}' non reconnue. Tapez HELP pour voir les commandes disponibles.")
+
+# =============================================
 # API COINMARKETCAP
 # =============================================
 CMC_API_KEY = "09e527de-bfea-4816-8afe-ae6a37bf5799"
