@@ -65,30 +65,26 @@ supabase = get_supabase_client()
 
 
 def get_table_list():
-    """Récupère la liste des tables via la vue information_schema"""
-    try:
-        # Requête pour obtenir les tables publiques
-        response = supabase.rpc('get_tables_info').execute()
-        if response.data:
-            return response.data
-    except Exception:
-        pass
-    
-    # Fallback: liste des tables connues à vérifier
-    known_tables = ['crypto_data', 'crypto_datasets']
+    """Récupère la liste des tables depuis le registre"""
     tables_info = []
     
-    for table_name in known_tables:
-        try:
-            # Essayer de compter les lignes
-            count_response = supabase.table(table_name).select('*', count='exact', head=True).execute()
-            row_count = count_response.count if count_response.count else 0
-            tables_info.append({
-                'table_name': table_name,
-                'row_count': row_count
-            })
-        except Exception:
-            pass
+    try:
+        # Récupérer les tables depuis le registre
+        response = supabase.table('perp_datasets_registry').select('*').execute()
+        
+        if response.data:
+            for item in response.data:
+                tables_info.append({
+                    'table_name': item['table_name'],
+                    'row_count': item.get('total_candles', 0),
+                    'symbol': item.get('symbol', ''),
+                    'timeframe': item.get('timeframe', ''),
+                    'period_days': item.get('period_days', 0),
+                    'start_date': item.get('start_date', ''),
+                    'end_date': item.get('end_date', '')
+                })
+    except Exception as e:
+        st.error(f"Erreur registre: {e}")
     
     return tables_info
 
