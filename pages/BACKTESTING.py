@@ -2014,19 +2014,45 @@ with tab3:
                 )
             
             with col_adv2:
-                signal_threshold = st.slider(
-                    "SIGNAL THRESHOLD (residuals)",
-                    min_value=0.5, max_value=10.0, value=5.0, step=0.5,
-                    help="Entry signal when |residuals| > threshold",
-                    key="signal_thresh"
-                )
-                
                 use_zscore = st.checkbox(
                     "USE Z-SCORE FOR SIGNALS",
                     value=True,
                     help="Normalize residuals to z-score",
                     key="use_zscore"
                 )
+                
+                if use_zscore:
+                    st.caption("📊 Z-Score mode: thresholds in standard deviations")
+                    
+                    long_threshold = st.slider(
+                        "🟢 LONG THRESHOLD (Z-Score)",
+                        min_value=-4.0, max_value=0.0, value=-2.0, step=0.1,
+                        help="Enter LONG when Z-Score < this value",
+                        key="long_thresh"
+                    )
+                    
+                    short_threshold = st.slider(
+                        "🔴 SHORT THRESHOLD (Z-Score)",
+                        min_value=0.0, max_value=4.0, value=2.0, step=0.1,
+                        help="Enter SHORT when Z-Score > this value",
+                        key="short_thresh"
+                    )
+                else:
+                    st.caption("📊 Residual mode: thresholds in absolute values")
+                    
+                    long_threshold = st.slider(
+                        "🟢 LONG THRESHOLD (Residual)",
+                        min_value=-20.0, max_value=0.0, value=-5.0, step=0.5,
+                        help="Enter LONG when Residual < this value",
+                        key="long_thresh"
+                    )
+                    
+                    short_threshold = st.slider(
+                        "🔴 SHORT THRESHOLD (Residual)",
+                        min_value=0.0, max_value=20.0, value=5.0, step=0.5,
+                        help="Enter SHORT when Residual > this value",
+                        key="short_thresh"
+                    )
         
         if st.button("🔬 RUN COINTEGRATION TEST", use_container_width=True, key="run_coint"):
             if ticker1 and ticker2:
@@ -2289,60 +2315,10 @@ with tab3:
                                 
                                 # Signaux de trading
                                 # Signaux de trading
-                                st.markdown("##### 🎯 TRADING SIGNALS - ADJUST THRESHOLDS")
+                                # Signaux de trading
+                                st.markdown("##### 🎯 TRADING SIGNALS")
                                 
-                                st.markdown("""
-                                <div style="background-color: #111; border: 1px solid #333; padding: 10px; margin: 10px 0;">
-                                    <p style="color: #999; font-size: 9px; margin: 0;">
-                                    📊 Ajustez les seuils pour déclencher les signaux Long/Short.
-                                    <br>• <span style="color: #00FF00;">LONG SPREAD</span> = BUY {ticker2}, SHORT {ticker1} (quand résidu < seuil négatif)
-                                    <br>• <span style="color: #FF0000;">SHORT SPREAD</span> = SHORT {ticker2}, BUY {ticker1} (quand résidu > seuil positif)
-                                    </p>
-                                </div>
-                                """.format(ticker1=ticker1, ticker2=ticker2), unsafe_allow_html=True)
-                                
-                                col_thresh1, col_thresh2 = st.columns(2)
-                                
-                                # Calculer les stats des résidus pour les bornes
-                                resid_std = df_merged[signal_col].std()
-                                resid_min = df_merged[signal_col].min()
-                                resid_max = df_merged[signal_col].max()
-                                
-                                with col_thresh1:
-                                    long_threshold = st.slider(
-                                        "🟢 LONG THRESHOLD (enter when below)",
-                                        min_value=float(resid_min),
-                                        max_value=0.0,
-                                        value=float(-threshold),
-                                        step=0.1,
-                                        help=f"Signal LONG when {'Z-Score' if use_zscore else 'Residual'} < this value",
-                                        key="long_thresh_slider"
-                                    )
-                                
-                                with col_thresh2:
-                                    short_threshold = st.slider(
-                                        "🔴 SHORT THRESHOLD (enter when above)",
-                                        min_value=0.0,
-                                        max_value=float(resid_max),
-                                        value=float(threshold),
-                                        step=0.1,
-                                        help=f"Signal SHORT when {'Z-Score' if use_zscore else 'Residual'} > this value",
-                                        key="short_thresh_slider"
-                                    )
-                                
-                                # Afficher stats utiles
-                                col_stat1, col_stat2, col_stat3 = st.columns(3)
-                                
-                                with col_stat1:
-                                    st.caption(f"📊 Residual Std: {resid_std:.2f}")
-                                
-                                with col_stat2:
-                                    st.caption(f"📉 Min: {resid_min:.2f}")
-                                
-                                with col_stat3:
-                                    st.caption(f"📈 Max: {resid_max:.2f}")
-                                
-                                # Appliquer les nouveaux seuils
+                                # Appliquer les seuils définis dans les paramètres avancés
                                 df_merged['signal'] = 0
                                 df_merged.loc[df_merged[signal_col] > short_threshold, 'signal'] = -1  # Short spread
                                 df_merged.loc[df_merged[signal_col] < long_threshold, 'signal'] = 1   # Long spread
@@ -2355,16 +2331,13 @@ with tab3:
                                 st.markdown(f"""
                                 <div style="background-color: #0a0a0a; border: 1px solid #333; padding: 10px; margin: 10px 0;">
                                     <p style="color: #FFAA00; font-size: 10px; margin: 0;">
-                                    📊 SIGNAL DISTRIBUTION: 
+                                    📊 SIGNAL DISTRIBUTION (Long threshold: {long_threshold:.1f} | Short threshold: {short_threshold:.1f}): 
                                     <span style="color: #00FF00;">🟢 LONG: {n_long} days ({n_long/len(df_merged)*100:.1f}%)</span> | 
                                     <span style="color: #FF0000;">🔴 SHORT: {n_short} days ({n_short/len(df_merged)*100:.1f}%)</span> | 
                                     <span style="color: #FFAA00;">⚪ NEUTRAL: {n_neutral} days ({n_neutral/len(df_merged)*100:.1f}%)</span>
                                     </p>
                                 </div>
                                 """, unsafe_allow_html=True)
-                                
-                                # Mettre à jour le threshold pour le backtest
-                                threshold = short_threshold  # Pour compatibilité avec le backtest
                                 
                                 current_signal = df_merged['signal'].iloc[-1]
                                 current_zscore = df_merged[signal_col].iloc[-1]
@@ -2387,7 +2360,7 @@ with tab3:
                                     <p style="color: {signal_color}; font-size: 20px; font-weight: bold; margin: 0;">{signal_text}</p>
                                     <p style="color: #999; margin: 5px 0;">{signal_desc}</p>
                                     <p style="color: #666; margin: 0; font-size: 10px;">
-                                        Current {'Z-Score' if use_zscore else 'Residual'}: {current_zscore:.4f} | Threshold: ±{threshold}
+                                        Current {'Z-Score' if use_zscore else 'Residual'}: {current_zscore:.4f} | Long: {long_threshold:.1f} | Short: {short_threshold:.1f}
                                     </p>
                                 </div>
                                 """, unsafe_allow_html=True)
@@ -2396,7 +2369,6 @@ with tab3:
                                 st.session_state['coint_data'] = df_merged
                                 st.session_state['coint_ticker1'] = ticker1
                                 st.session_state['coint_ticker2'] = ticker2
-                                st.session_state['coint_threshold'] = short_threshold
                                 st.session_state['coint_long_threshold'] = long_threshold
                                 st.session_state['coint_short_threshold'] = short_threshold
                                 st.session_state['coint_signal_col'] = signal_col
