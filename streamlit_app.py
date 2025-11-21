@@ -9,12 +9,10 @@ import requests
 # =============================================
 # AUTO-REFRESH TOUTES LES 3 SECONDES
 # =============================================
-if 'last_refresh' not in st.session_state:
-    st.session_state.last_refresh = time.time()
+from streamlit_autorefresh import st_autorefresh
 
-if time.time() - st.session_state.last_refresh > 3:
-    st.session_state.last_refresh = time.time()
-    st.rerun()
+# Rafraîchissement automatique toutes les 3000ms (3 secondes)
+count = st_autorefresh(interval=3000, limit=None, key="market_refresh")
 
 # =============================================
 # PAGE CONFIG
@@ -582,11 +580,3 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Auto-refresh JavaScript
-st.markdown("""
-<script>
-    setTimeout(function(){
-        window.parent.location.reload();
-    }, 3000);
-</script>
-""", unsafe_allow_html=True)
