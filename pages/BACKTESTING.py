@@ -2399,7 +2399,7 @@ with tab3:
             short_threshold = st.session_state['coint_short_threshold']
             signal_col = st.session_state['coint_signal_col']
             
-            st.markdown(f"**Pair:** {ticker1} / {ticker2} | **Threshold:** ±{threshold}")
+            st.markdown(f"**Pair:** {ticker1} / {ticker2} | **Long:** {long_threshold} | **Short:** {short_threshold}")
             
             col_bt1, col_bt2 = st.columns(2)
             
