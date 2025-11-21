@@ -2395,7 +2395,8 @@ with tab3:
             df_bt = st.session_state['coint_data'].copy()
             ticker1 = st.session_state['coint_ticker1']
             ticker2 = st.session_state['coint_ticker2']
-            threshold = st.session_state['coint_threshold']
+            long_threshold = st.session_state['coint_long_threshold']
+            short_threshold = st.session_state['coint_short_threshold']
             signal_col = st.session_state['coint_signal_col']
             
             st.markdown(f"**Pair:** {ticker1} / {ticker2} | **Threshold:** ±{threshold}")
@@ -2462,7 +2463,7 @@ with tab3:
                         
                         # Entry logic
                         if position == 0:
-                            if signal_val < -threshold:  # Long spread
+                            if signal_val < long_threshold:  # Long spread
                                 entry_price_x = px_x
                                 entry_price_y = px_y
                                 qty_x = position_capital / entry_price_x
@@ -2480,7 +2481,7 @@ with tab3:
                         
                         # Exit logic
                         elif position == 1:  # Long spread: long Y, short X
-                            if signal_val >= exit_threshold:
+                            elif signal_val > short_threshold:  # Short spread
                                 pnl_y = (px_y - entry_price_y) * qty_y
                                 pnl_x = (entry_price_x - px_x) * qty_x
                                 gross_pnl = pnl_y + pnl_x
