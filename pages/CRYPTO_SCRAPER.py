@@ -102,8 +102,8 @@ def get_table_list():
     return tables_info
 
 
-def get_table_data(table_name, limit=1000):
-    """Récupère les données d'une table"""
+def get_table_data(table_name, limit=100000):
+    """Récupère les données d'une table - limite augmentée pour ML"""
     try:
         response = supabase.table(table_name).select('*').order('open_time').limit(limit).execute()
         return response.data
@@ -279,6 +279,62 @@ class Backtester:
         }
 
 
+class TradingJournal:
+    """Journal de trading pour enregistrer et analyser les trades"""
+    
+    @staticmethod
+    def create_journal(df_test, predictions, stop_loss=0.02, take_profit=0.04):
+        """Crée un journal détaillé des trades"""
+        df = df_test.iloc[-len(predictions):].copy()
+        df['prediction'] = predictions
+        
+        trades = []
+        position = 0
+        entry_price = 0
+        entry_date = None
+        entry_idx = 0
+        
+        for i, (idx, row) in enumerate(df.iterrows()):
+            price = float(row['close'])
+            pred = row['prediction']
+            date = row['open_time'] if 'open_time' in row else idx
+            
+            if position == 0 and pred == 1:
+                # Ouvrir une position
+                position = 1
+                entry_price = price
+                entry_date = date
+                entry_idx = i
+                
+            elif position == 1:
+                # Vérifier sortie
+                pnl_pct = (price - entry_price) / entry_price
+                exit_reason = None
+                
+                if pnl_pct <= -stop_loss:
+                    exit_reason = "Stop Loss"
+                elif pnl_pct >= take_profit:
+                    exit_reason = "Take Profit"
+                elif pred == 0:
+                    exit_reason = "Signal"
+                
+                if exit_reason:
+                    duration = i - entry_idx
+                    trades.append({
+                        'Entry Date': entry_date,
+                        'Exit Date': date,
+                        'Entry Price': round(entry_price, 2),
+                        'Exit Price': round(price, 2),
+                        'PnL (%)': round(pnl_pct * 100, 2),
+                        'Duration': duration,
+                        'Exit Reason': exit_reason,
+                        'Result': '✅ Win' if pnl_pct > 0 else '❌ Loss'
+                    })
+                    position = 0
+        
+        return pd.DataFrame(trades)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # INTERFACE PRINCIPALE
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -325,7 +381,7 @@ if tables_info:
     
     with col2:
         limit = st.number_input(
-            "Nombre de lignes",
+            "Nombre de lignes (aperçu)",
             min_value=10,
             max_value=10000,
             value=100,
@@ -341,9 +397,9 @@ if tables_info:
             schema_df = pd.DataFrame(schema)
             st.dataframe(schema_df, use_container_width=True, hide_index=True)
         
-        st.markdown("#### 📊 DONNÉES")
+        st.markdown("#### 📊 DONNÉES (Aperçu)")
         
-        # Récupérer et afficher les données
+        # Récupérer et afficher les données (aperçu limité)
         data = get_table_data(selected_table, limit)
         
         if data:
@@ -357,8 +413,9 @@ if tables_info:
             with col_stat2:
                 st.metric("Lignes affichées", len(df))
             with col_stat3:
-                size_kb = df.memory_usage(deep=True).sum() / 1024
-                st.metric("Taille (KB)", f"{size_kb:.1f}")
+                # Trouver le nombre total dans le registre
+                total_rows = next((t['row_count'] for t in tables_info if t['table_name'] == selected_table), len(df))
+                st.metric("Total dans la table", f"{total_rows:,}")
             
             # Afficher le dataframe
             st.dataframe(df, use_container_width=True, hide_index=True)
@@ -394,7 +451,7 @@ if tables_info:
             
             csv = df.to_csv(index=False)
             st.download_button(
-                label="📥 TÉLÉCHARGER CSV",
+                label="📥 TÉLÉCHARGER CSV (aperçu)",
                 data=csv,
                 file_name=f"{selected_table}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv",
@@ -406,6 +463,10 @@ if tables_info:
             # ═══════════════════════════════════════════════════════════════
             st.markdown("---")
             st.markdown("### 🤖 ML TRADING STRATEGY")
+            
+            # Info sur les données
+            total_rows = next((t['row_count'] for t in tables_info if t['table_name'] == selected_table), 0)
+            st.info(f"📊 Cette table contient **{total_rows:,}** lignes au total. Le ML utilisera toutes les données disponibles.")
             
             with st.expander("🧠 Configurer et lancer la stratégie ML", expanded=False):
                 
@@ -427,12 +488,12 @@ if tables_info:
                 
                 if st.button("🚀 LANCER L'ENTRAÎNEMENT ML", type="primary", use_container_width=True):
                     
-                    # Charger toutes les données pour ML
-                    with st.spinner("Chargement des données complètes..."):
-                        full_data = get_table_data(selected_table, limit=50000)
+                    # Charger TOUTES les données pour ML
+                    with st.spinner("Chargement de TOUTES les données..."):
+                        full_data = get_table_data(selected_table, limit=100000)
                         df_ml = pd.DataFrame(full_data)
                     
-                    st.info(f"📊 {len(df_ml):,} lignes chargées")
+                    st.success(f"✅ {len(df_ml):,} lignes chargées pour l'entraînement")
                     
                     # Feature Engineering
                     with st.spinner("Génération des features techniques..."):
@@ -444,13 +505,13 @@ if tables_info:
                                'rsi', 'bb_position', 'atr', 'return_1', 'return_5', 'volume_ratio',
                                'ema_cross', 'rsi_oversold', 'rsi_overbought']
                     
-                    st.success(f"✅ {len(features)} features générées")
+                    st.info(f"📊 {len(features)} features générées")
                     
                     # Entraînement
                     ml = MLModels()
                     X_train, X_test, y_train, y_test, df_test = ml.train(df_ml, features, 'target', test_pct/100)
                     
-                    st.success(f"✅ Train: {len(X_train):,} | Test: {len(X_test):,}")
+                    st.success(f"✅ Train: {len(X_train):,} lignes | Test: {len(X_test):,} lignes")
                     
                     # Évaluer les modèles
                     results = {}
@@ -511,9 +572,12 @@ if tables_info:
                     st.session_state['ml_results'] = results
                     st.session_state['df_test'] = df_test
                     st.session_state['best_model'] = best_key
+                    st.session_state['selected_table'] = selected_table
             
-            # Section Backtest (séparée de l'expander)
-            if 'ml_results' in st.session_state:
+            # ═══════════════════════════════════════════════════════════════
+            # SECTION BACKTESTING
+            # ═══════════════════════════════════════════════════════════════
+            if 'ml_results' in st.session_state and st.session_state.get('selected_table') == selected_table:
                 st.markdown("---")
                 st.markdown("### 💰 BACKTESTING")
                 
@@ -554,7 +618,6 @@ if tables_info:
                         col_m1, col_m2, col_m3, col_m4 = st.columns(4)
                         
                         with col_m1:
-                            delta_color = "normal" if bt_results['total_return'] >= bt_results['bh_return'] else "inverse"
                             st.metric(
                                 "Rendement Stratégie", 
                                 f"{bt_results['total_return']:.2f}%",
@@ -618,6 +681,67 @@ if tables_info:
                             yaxis_title='Drawdown (%)'
                         )
                         st.plotly_chart(fig_dd, use_container_width=True)
+                        
+                        # ═══════════════════════════════════════════════════
+                        # JOURNAL DE TRADING
+                        # ═══════════════════════════════════════════════════
+                        st.markdown("#### 📓 Journal de Trading")
+                        
+                        journal = TradingJournal.create_journal(
+                            st.session_state['df_test'],
+                            results[backtest_model]['predictions'],
+                            stop_loss,
+                            take_profit
+                        )
+                        
+                        if not journal.empty:
+                            # Stats du journal
+                            col_j1, col_j2, col_j3, col_j4 = st.columns(4)
+                            
+                            with col_j1:
+                                avg_win = journal[journal['PnL (%)'] > 0]['PnL (%)'].mean()
+                                st.metric("Gain moyen", f"{avg_win:.2f}%" if not pd.isna(avg_win) else "N/A")
+                            
+                            with col_j2:
+                                avg_loss = journal[journal['PnL (%)'] <= 0]['PnL (%)'].mean()
+                                st.metric("Perte moyenne", f"{avg_loss:.2f}%" if not pd.isna(avg_loss) else "N/A")
+                            
+                            with col_j3:
+                                avg_duration = journal['Duration'].mean()
+                                st.metric("Durée moyenne", f"{avg_duration:.1f} candles")
+                            
+                            with col_j4:
+                                best_trade = journal['PnL (%)'].max()
+                                st.metric("Meilleur trade", f"{best_trade:.2f}%")
+                            
+                            # Répartition des sorties
+                            st.markdown("##### 📊 Répartition des sorties")
+                            exit_counts = journal['Exit Reason'].value_counts()
+                            
+                            fig_pie = go.Figure(data=[go.Pie(
+                                labels=exit_counts.index,
+                                values=exit_counts.values,
+                                hole=0.4,
+                                marker_colors=['#00ff88', '#ff4444', '#ffaa00']
+                            )])
+                            fig_pie.update_layout(template='plotly_dark', height=300)
+                            st.plotly_chart(fig_pie, use_container_width=True)
+                            
+                            # Tableau des trades
+                            st.markdown("##### 📋 Détail des trades")
+                            st.dataframe(journal, use_container_width=True, hide_index=True)
+                            
+                            # Export du journal
+                            csv_journal = journal.to_csv(index=False)
+                            st.download_button(
+                                label="📥 TÉLÉCHARGER LE JOURNAL",
+                                data=csv_journal,
+                                file_name=f"trading_journal_{selected_table}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                                mime="text/csv",
+                                use_container_width=True
+                            )
+                        else:
+                            st.info("📭 Aucun trade enregistré pendant la période de test")
         
         else:
             st.info("📭 Aucune donnée dans cette table")
@@ -636,18 +760,15 @@ if tables_info:
             key="delete_table_select"
         )
         
-        col_del1, col_del2 = st.columns(2)
-        
-        with col_del1:
-            if st.button("🗑️ VIDER LA TABLE", type="secondary"):
-                confirm = st.checkbox(f"Je confirme vouloir supprimer TOUTES les données de {delete_table}")
-                if confirm:
-                    try:
-                        supabase.table(delete_table).delete().neq('id', -99999).execute()
-                        st.success(f"✅ Table {delete_table} vidée!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erreur: {e}")
+        if st.button("🗑️ VIDER LA TABLE", type="secondary"):
+            confirm = st.checkbox(f"Je confirme vouloir supprimer TOUTES les données de {delete_table}")
+            if confirm:
+                try:
+                    supabase.table(delete_table).delete().neq('id', -99999).execute()
+                    st.success(f"✅ Table {delete_table} vidée!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erreur: {e}")
 
 else:
     st.warning("⚠️ Impossible de récupérer la liste des tables. Vérifiez votre connexion Supabase.")
