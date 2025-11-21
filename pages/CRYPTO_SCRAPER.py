@@ -75,7 +75,7 @@ def get_table_list():
         if response.data:
             for item in response.data:
                 tables_info.append({
-                    'table_name': item['dataset_id'],
+                    'table_name': f"perp_{item['dataset_id']}", 
                     'row_count': item.get('total_candles', 0),
                     'symbol': item.get('symbol', ''),
                     'timeframe': item.get('timeframe', ''),
