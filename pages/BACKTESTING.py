@@ -2231,7 +2231,6 @@ with tab3:
                                 if use_zscore:
                                     df_merged['zscore'] = (df_merged['residuals'] - df_merged['residuals'].mean()) / df_merged['residuals'].std()
                                     signal_col = 'zscore'
-                                    threshold = 2.0 if signal_threshold == 5.0 else signal_threshold / 2.5
                                 else:
                                     signal_col = 'residuals'
                                     threshold = signal_threshold
