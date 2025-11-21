@@ -1,9 +1,9 @@
 import streamlit as st
 from supabase import create_client, Client
 import pandas as pd
+import numpy as np
 from datetime import datetime
 import plotly.graph_objects as go
-import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
@@ -60,7 +60,11 @@ st.markdown(f'''
 </div>
 ''', unsafe_allow_html=True)
 
-# Connexion Supabase
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SUPABASE CONNECTION
+# ═══════════════════════════════════════════════════════════════════════════════
+
 @st.cache_resource
 def get_supabase_client():
     supabase_url = st.secrets["SUPABASE_URL"]
@@ -70,12 +74,15 @@ def get_supabase_client():
 supabase = get_supabase_client()
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# DATABASE FUNCTIONS
+# ═══════════════════════════════════════════════════════════════════════════════
+
 def get_table_list():
     """Récupère la liste des tables depuis le registre"""
     tables_info = []
     
     try:
-        # Récupérer les tables depuis le registre
         response = supabase.table('perp_datasets_registry').select('*').execute()
         
         if response.data:
@@ -98,7 +105,7 @@ def get_table_list():
 def get_table_data(table_name, limit=1000):
     """Récupère les données d'une table"""
     try:
-        response = supabase.table(table_name).select('*').limit(limit).execute()
+        response = supabase.table(table_name).select('*').order('open_time').limit(limit).execute()
         return response.data
     except Exception as e:
         st.error(f"Erreur lors de la récupération des données: {e}")
@@ -126,6 +133,8 @@ def get_table_schema(table_name):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class FeatureEngineer:
+    """Génère les features techniques pour le ML"""
+    
     @staticmethod
     def add_all_features(df):
         df = df.copy()
@@ -186,14 +195,16 @@ class FeatureEngineer:
 
 
 class MLModels:
+    """Collection de modèles ML pour le trading"""
+    
     def __init__(self):
         self.scaler = StandardScaler()
         self.results = {}
     
     def get_models(self):
         return {
-            'random_forest': ('Random Forest', RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42)),
-            'xgboost': ('XGBoost', xgb.XGBClassifier(n_estimators=100, max_depth=6, random_state=42, eval_metric='logloss')),
+            'random_forest': ('Random Forest', RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42, n_jobs=-1)),
+            'xgboost': ('XGBoost', xgb.XGBClassifier(n_estimators=100, max_depth=6, random_state=42, eval_metric='logloss', verbosity=0)),
             'gradient_boosting': ('Gradient Boosting', GradientBoostingClassifier(n_estimators=100, random_state=42)),
             'logistic': ('Logistic Regression', LogisticRegression(max_iter=1000, random_state=42))
         }
@@ -225,6 +236,8 @@ class MLModels:
 
 
 class Backtester:
+    """Moteur de backtesting pour évaluer les stratégies"""
+    
     def __init__(self, capital=10000, commission=0.001):
         self.capital = capital
         self.commission = commission
@@ -265,7 +278,10 @@ class Backtester:
             'win_rate': len(win_trades) / len(trades) * 100 if trades else 0
         }
 
-# ===== INTERFACE =====
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# INTERFACE PRINCIPALE
+# ═══════════════════════════════════════════════════════════════════════════════
 
 st.title("📊 DATABASE VIEWER")
 
@@ -341,60 +357,34 @@ if tables_info:
             with col_stat2:
                 st.metric("Lignes affichées", len(df))
             with col_stat3:
-                # Taille approximative
                 size_kb = df.memory_usage(deep=True).sum() / 1024
                 st.metric("Taille (KB)", f"{size_kb:.1f}")
-            
-            # Filtres pour les tables crypto
-            if selected_table == 'crypto_data' and 'symbol' in df.columns:
-                st.markdown("#### 🔧 FILTRES")
-                
-                filter_col1, filter_col2 = st.columns(2)
-                
-                with filter_col1:
-                    symbols = ['Tous'] + sorted(df['symbol'].unique().tolist())
-                    selected_symbol = st.selectbox("Symbole", symbols)
-                
-                with filter_col2:
-                    if 'timeframe' in df.columns:
-                        timeframes = ['Tous'] + sorted(df['timeframe'].unique().tolist())
-                        selected_tf = st.selectbox("Timeframe", timeframes)
-                    else:
-                        selected_tf = 'Tous'
-                
-                # Appliquer les filtres
-                if selected_symbol != 'Tous':
-                    df = df[df['symbol'] == selected_symbol]
-                if selected_tf != 'Tous' and 'timeframe' in df.columns:
-                    df = df[df['timeframe'] == selected_tf]
             
             # Afficher le dataframe
             st.dataframe(df, use_container_width=True, hide_index=True)
             
-            # Graphique si c'est des données crypto avec prix
-            if selected_table == 'crypto_data' and all(col in df.columns for col in ['open_time', 'open_price', 'high_price', 'low_price', 'close_price']):
+            # Graphique candlestick si données OHLC disponibles
+            if all(col in df.columns for col in ['open_time', 'open', 'high', 'low', 'close']):
                 st.markdown("#### 📈 GRAPHIQUE")
                 
-                # Convertir les dates
                 df['open_time'] = pd.to_datetime(df['open_time'])
                 df = df.sort_values('open_time')
                 
                 fig = go.Figure(data=[go.Candlestick(
                     x=df['open_time'],
-                    open=df['open_price'],
-                    high=df['high_price'],
-                    low=df['low_price'],
-                    close=df['close_price']
+                    open=df['open'],
+                    high=df['high'],
+                    low=df['low'],
+                    close=df['close']
                 )])
                 
-                title = f"{selected_symbol}/USDT" if selected_symbol != 'Tous' else "Prix"
-                
                 fig.update_layout(
-                    title=title,
+                    title=f"{selected_table}",
                     xaxis_title="Date",
                     yaxis_title="Price (USDT)",
                     height=500,
-                    template="plotly_dark"
+                    template="plotly_dark",
+                    xaxis_rangeslider_visible=False
                 )
                 
                 st.plotly_chart(fig, use_container_width=True)
@@ -410,13 +400,8 @@ if tables_info:
                 mime="text/csv",
                 use_container_width=True
             )
-        else:
-            st.info("📭 Aucune donnée dans cette table")
-    
-    st.markdown("---")
-
-
-# ═══════════════════════════════════════════════════════════════
+            
+            # ═══════════════════════════════════════════════════════════════
             # SECTION ML TRADING STRATEGY
             # ═══════════════════════════════════════════════════════════════
             st.markdown("---")
@@ -433,20 +418,24 @@ if tables_info:
                     test_pct = st.slider("Test set (%)", 10, 40, 20)
                 
                 models_to_train = st.multiselect(
-                    "Modèles",
+                    "Modèles à entraîner",
                     ['random_forest', 'xgboost', 'gradient_boosting', 'logistic'],
-                    default=['random_forest', 'xgboost']
+                    default=['random_forest', 'xgboost'],
+                    format_func=lambda x: {'random_forest': 'Random Forest', 'xgboost': 'XGBoost', 
+                                          'gradient_boosting': 'Gradient Boosting', 'logistic': 'Logistic Regression'}[x]
                 )
                 
-                if st.button("🚀 LANCER ML", type="primary", use_container_width=True):
+                if st.button("🚀 LANCER L'ENTRAÎNEMENT ML", type="primary", use_container_width=True):
                     
-                    # Charger plus de données pour ML
-                    with st.spinner("Chargement des données..."):
+                    # Charger toutes les données pour ML
+                    with st.spinner("Chargement des données complètes..."):
                         full_data = get_table_data(selected_table, limit=50000)
                         df_ml = pd.DataFrame(full_data)
                     
-                    # Features
-                    with st.spinner("Génération des features..."):
+                    st.info(f"📊 {len(df_ml):,} lignes chargées")
+                    
+                    # Feature Engineering
+                    with st.spinner("Génération des features techniques..."):
                         fe = FeatureEngineer()
                         df_ml = fe.add_all_features(df_ml)
                         df_ml = fe.create_target(df_ml, horizon, threshold)
@@ -455,7 +444,9 @@ if tables_info:
                                'rsi', 'bb_position', 'atr', 'return_1', 'return_5', 'volume_ratio',
                                'ema_cross', 'rsi_oversold', 'rsi_overbought']
                     
-                    # Train
+                    st.success(f"✅ {len(features)} features générées")
+                    
+                    # Entraînement
                     ml = MLModels()
                     X_train, X_test, y_train, y_test, df_test = ml.train(df_ml, features, 'target', test_pct/100)
                     
@@ -465,52 +456,175 @@ if tables_info:
                     results = {}
                     available = ml.get_models()
                     
-                    for key in models_to_train:
+                    progress_bar = st.progress(0)
+                    for i, key in enumerate(models_to_train):
                         name, model = available[key]
-                        with st.spinner(f"Training {name}..."):
+                        with st.spinner(f"Entraînement de {name}..."):
                             results[key] = ml.evaluate(model, X_train, X_test, y_train, y_test)
                             results[key]['name'] = name
+                        progress_bar.progress((i + 1) / len(models_to_train))
                     
                     # Afficher résultats
-                    st.markdown("#### 📊 Résultats ML")
+                    st.markdown("#### 📊 Résultats des modèles")
                     res_df = pd.DataFrame([{
                         'Modèle': r['name'],
                         'Accuracy': f"{r['accuracy']:.2%}",
                         'Precision': f"{r['precision']:.2%}",
                         'Recall': f"{r['recall']:.2%}",
-                        'F1': f"{r['f1']:.2%}"
+                        'F1 Score': f"{r['f1']:.2%}"
                     } for r in results.values()])
                     st.dataframe(res_df, use_container_width=True, hide_index=True)
                     
-                    # Backtest du meilleur modèle
+                    # Graphique comparatif
+                    fig_comp = go.Figure()
+                    metrics = ['accuracy', 'precision', 'recall', 'f1']
+                    for metric in metrics:
+                        fig_comp.add_trace(go.Bar(
+                            name=metric.title(),
+                            x=[results[k]['name'] for k in results],
+                            y=[results[k][metric] for k in results]
+                        ))
+                    fig_comp.update_layout(barmode='group', template='plotly_dark', height=350, 
+                                          title='Comparaison des modèles')
+                    st.plotly_chart(fig_comp, use_container_width=True)
+                    
+                    # Feature Importance du meilleur modèle
                     best_key = max(results, key=lambda k: results[k]['accuracy'])
-                    st.markdown(f"#### 💰 Backtest ({results[best_key]['name']})")
+                    if results[best_key]['feature_importance'] is not None:
+                        st.markdown(f"#### 📈 Feature Importance ({results[best_key]['name']})")
+                        
+                        importance = results[best_key]['feature_importance']
+                        top_n = min(15, len(features))
+                        indices = np.argsort(importance)[-top_n:]
+                        
+                        fig_imp = go.Figure(go.Bar(
+                            x=importance[indices],
+                            y=[features[i] for i in indices],
+                            orientation='h',
+                            marker_color='#FFAA00'
+                        ))
+                        fig_imp.update_layout(template='plotly_dark', height=400,
+                                             title=f'Top {top_n} Features')
+                        st.plotly_chart(fig_imp, use_container_width=True)
                     
-                    col_bt1, col_bt2 = st.columns(2)
+                    # Sauvegarder pour backtest
+                    st.session_state['ml_results'] = results
+                    st.session_state['df_test'] = df_test
+                    st.session_state['best_model'] = best_key
+            
+            # Section Backtest (séparée de l'expander)
+            if 'ml_results' in st.session_state:
+                st.markdown("---")
+                st.markdown("### 💰 BACKTESTING")
+                
+                with st.expander("📈 Configurer et lancer le backtest", expanded=False):
+                    
+                    results = st.session_state['ml_results']
+                    
+                    col_bt1, col_bt2, col_bt3 = st.columns(3)
+                    
                     with col_bt1:
-                        sl = st.slider("Stop Loss %", 1.0, 5.0, 2.0) / 100
+                        backtest_model = st.selectbox(
+                            "Modèle pour backtest",
+                            options=list(results.keys()),
+                            index=list(results.keys()).index(st.session_state['best_model']),
+                            format_func=lambda x: results[x]['name']
+                        )
+                    
                     with col_bt2:
-                        tp = st.slider("Take Profit %", 1.0, 10.0, 4.0) / 100
+                        stop_loss = st.slider("Stop Loss (%)", 0.5, 5.0, 2.0, 0.5) / 100
                     
-                    bt = Backtester()
-                    bt_results = bt.run(df_test, results[best_key]['predictions'], sl, tp)
+                    with col_bt3:
+                        take_profit = st.slider("Take Profit (%)", 1.0, 10.0, 4.0, 0.5) / 100
                     
-                    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-                    col_m1.metric("Rendement", f"{bt_results['total_return']:.2f}%", 
-                                  delta=f"vs B&H: {bt_results['total_return'] - bt_results['bh_return']:.2f}%")
-                    col_m2.metric("Max Drawdown", f"-{bt_results['max_dd']:.2f}%")
-                    col_m3.metric("Trades", bt_results['trades'])
-                    col_m4.metric("Win Rate", f"{bt_results['win_rate']:.1f}%")
-                    
-                    # Equity curve
-                    fig_eq = go.Figure()
-                    fig_eq.add_trace(go.Scatter(y=bt_results['equity'], name='Strategy', line=dict(color='#00ff88')))
-                    fig_eq.add_trace(go.Scatter(y=bt_results['bh_equity'], name='Buy & Hold', line=dict(color='#ff8800', dash='dash')))
-                    fig_eq.update_layout(template='plotly_dark', height=400, title='Equity Curve')
-                    st.plotly_chart(fig_eq, use_container_width=True)
-
+                    if st.button("📈 LANCER LE BACKTEST", type="primary", use_container_width=True):
+                        
+                        with st.spinner("Exécution du backtest..."):
+                            bt = Backtester()
+                            bt_results = bt.run(
+                                st.session_state['df_test'],
+                                results[backtest_model]['predictions'],
+                                stop_loss,
+                                take_profit
+                            )
+                        
+                        # Métriques
+                        st.markdown("#### 📊 Performance")
+                        
+                        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+                        
+                        with col_m1:
+                            delta_color = "normal" if bt_results['total_return'] >= bt_results['bh_return'] else "inverse"
+                            st.metric(
+                                "Rendement Stratégie", 
+                                f"{bt_results['total_return']:.2f}%",
+                                delta=f"vs B&H: {bt_results['total_return'] - bt_results['bh_return']:.2f}%"
+                            )
+                        
+                        with col_m2:
+                            st.metric("Max Drawdown", f"-{bt_results['max_dd']:.2f}%")
+                        
+                        with col_m3:
+                            st.metric("Nombre de Trades", bt_results['trades'])
+                        
+                        with col_m4:
+                            st.metric("Win Rate", f"{bt_results['win_rate']:.1f}%")
+                        
+                        # Equity Curve
+                        st.markdown("#### 📈 Equity Curve")
+                        
+                        fig_eq = go.Figure()
+                        fig_eq.add_trace(go.Scatter(
+                            y=bt_results['equity'],
+                            mode='lines',
+                            name='Strategy',
+                            line=dict(color='#00ff88', width=2)
+                        ))
+                        fig_eq.add_trace(go.Scatter(
+                            y=bt_results['bh_equity'],
+                            mode='lines',
+                            name='Buy & Hold',
+                            line=dict(color='#ff8800', width=2, dash='dash')
+                        ))
+                        fig_eq.update_layout(
+                            template='plotly_dark',
+                            height=400,
+                            title='Strategy vs Buy & Hold',
+                            xaxis_title='Période',
+                            yaxis_title='Capital ($)',
+                            legend=dict(x=0.02, y=0.98)
+                        )
+                        st.plotly_chart(fig_eq, use_container_width=True)
+                        
+                        # Drawdown
+                        equity = bt_results['equity']
+                        peak = np.maximum.accumulate(equity)
+                        dd = (peak - equity) / peak * 100
+                        
+                        fig_dd = go.Figure()
+                        fig_dd.add_trace(go.Scatter(
+                            y=-dd,
+                            fill='tozeroy',
+                            mode='lines',
+                            name='Drawdown',
+                            line=dict(color='#ff4444'),
+                            fillcolor='rgba(255, 68, 68, 0.3)'
+                        ))
+                        fig_dd.update_layout(
+                            template='plotly_dark',
+                            height=250,
+                            title='Drawdown',
+                            xaxis_title='Période',
+                            yaxis_title='Drawdown (%)'
+                        )
+                        st.plotly_chart(fig_dd, use_container_width=True)
+        
+        else:
+            st.info("📭 Aucune donnée dans cette table")
     
-    # Section 3: Actions sur les données
+    st.markdown("---")
+    
+    # Section 3: Gestion des données
     st.markdown("### 🗑️ GESTION DES DONNÉES")
     
     with st.expander("⚠️ Zone Dangereuse - Suppression de données"):
@@ -525,32 +639,10 @@ if tables_info:
         col_del1, col_del2 = st.columns(2)
         
         with col_del1:
-            if delete_table == 'crypto_data':
-                # Options de suppression spécifiques
-                try:
-                    symbols_response = supabase.table('crypto_data').select('symbol').execute()
-                    if symbols_response.data:
-                        available_symbols = list(set([d['symbol'] for d in symbols_response.data]))
-                        symbol_to_delete = st.selectbox("Symbole à supprimer", [''] + available_symbols)
-                        
-                        if symbol_to_delete and st.button("🗑️ SUPPRIMER CE SYMBOLE", type="secondary"):
-                            try:
-                                supabase.table('crypto_data').delete().eq('symbol', symbol_to_delete).execute()
-                                st.success(f"✅ Données de {symbol_to_delete} supprimées!")
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Erreur: {e}")
-                except Exception:
-                    pass
-        
-        with col_del2:
-            st.write("")
-            st.write("")
-            if st.button("🗑️ VIDER TOUTE LA TABLE", type="secondary"):
+            if st.button("🗑️ VIDER LA TABLE", type="secondary"):
                 confirm = st.checkbox(f"Je confirme vouloir supprimer TOUTES les données de {delete_table}")
                 if confirm:
                     try:
-                        # Supprimer toutes les lignes
                         supabase.table(delete_table).delete().neq('id', -99999).execute()
                         st.success(f"✅ Table {delete_table} vidée!")
                         st.rerun()
@@ -574,6 +666,6 @@ else:
 st.markdown("---")
 st.markdown(f"""
 <div style='text-align: center; color: #666; font-size: 9px; font-family: "Courier New", monospace;'>
-    © 2025 CRYPTO DATABASE VIEWER | Connected to Supabase
+    © 2025 CRYPTO DATABASE VIEWER + ML TRADING | Connected to Supabase
 </div>
 """, unsafe_allow_html=True)
