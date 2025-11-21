@@ -2420,7 +2420,7 @@ with tab3:
             with col_bt2:
                 exit_threshold = st.slider(
                     "EXIT THRESHOLD",
-                    min_value=0.0, max_value=float(threshold), value=0.0, step=0.1,
+                    min_value=0.0, max_value=float(short_threshold), value=0.0, step=0.1,
                     help="Exit when signal crosses this level (0 = mean reversion)",
                     key="bt_exit"
                 )
@@ -2471,7 +2471,7 @@ with tab3:
                                 position = 1
                                 entry_date = current_date
                                 
-                            elif signal_val > threshold:  # Short spread
+                            elif signal_val > short_threshold:  # Short spread
                                 entry_price_x = px_x
                                 entry_price_y = px_y
                                 qty_x = position_capital / entry_price_x
@@ -2481,7 +2481,7 @@ with tab3:
                         
                         # Exit logic
                         elif position == 1:  # Long spread: long Y, short X
-                            elif signal_val > short_threshold:  # Short spread
+                            if signal_val >= exit_threshold:
                                 pnl_y = (px_y - entry_price_y) * qty_y
                                 pnl_x = (entry_price_x - px_x) * qty_x
                                 gross_pnl = pnl_y + pnl_x
