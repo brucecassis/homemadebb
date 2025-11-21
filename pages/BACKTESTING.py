@@ -2245,7 +2245,910 @@ with tab3:
 # ===== TAB 4: DATA INTEGRATION =====
 with tab4:
     st.markdown("### 🔗 DATA INTEGRATION & ENRICHMENT")
-    st.info("Cette section reste inchangée - voir le code original")
+    
+    st.markdown("""
+    <div style="background-color: #0a0a0a; border-left: 3px solid #FF00FF; padding: 10px; margin: 10px 0;">
+        <p style="margin: 0; font-size: 10px; color: #FF00FF; font-weight: bold;">
+        🔗 MULTI-SOURCE DATA FUSION
+        </p>
+        <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
+        Fusionne données macro FRED avec prix de marché, données alternatives, et fondamentaux.
+        Alignement automatique des dates avec business days.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Sous-onglets
+    integration_tab1, integration_tab2, integration_tab3, integration_tab4 = st.tabs([
+        "📊 MACRO + MARKET DATA",
+        "🌍 ALTERNATIVE DATA",
+        "🏭 SECTOR MAPPING",
+        "🏢 COMPANY FUNDAMENTALS"
+    ])
+    
+    # ===== INTEGRATION TAB 1: MACRO + MARKET DATA =====
+    with integration_tab1:
+        st.markdown("#### 📊 MACRO-MARKET DATA FUSION")
+        st.caption("Cross-join FRED macro series with market prices (Yahoo Finance)")
+        
+        col_mm1, col_mm2 = st.columns(2)
+        
+        with col_mm1:
+            macro_series_select = st.selectbox(
+                "SELECT MACRO SERIES",
+                options=[
+                    'FEDFUNDS - Fed Funds Rate',
+                    'CPIAUCSL - CPI',
+                    'UNRATE - Unemployment',
+                    'GDP - GDP',
+                    'M2SL - M2 Money Supply',
+                    'DGS10 - 10Y Treasury',
+                    'T10Y2Y - Yield Curve Spread',
+                    'INDPRO - Industrial Production',
+                    'UMCSENT - Consumer Sentiment',
+                    'HOUST - Housing Starts'
+                ],
+                key="macro_series_mm"
+            )
+            
+            market_ticker = st.text_input(
+                "MARKET TICKER (Yahoo Finance)",
+                value="SPY",
+                help="Ex: SPY, QQQ, GLD, TLT, AAPL...",
+                key="market_ticker"
+            ).upper()
+        
+        with col_mm2:
+            fusion_period = st.selectbox(
+                "TIME PERIOD",
+                options=['1Y', '2Y', '5Y', '10Y', '20Y'],
+                index=2,
+                key="fusion_period"
+            )
+            
+            alignment_method = st.selectbox(
+                "DATE ALIGNMENT",
+                options=['Forward Fill', 'Backward Fill', 'Interpolate'],
+                help="Forward Fill = use last available macro value",
+                key="alignment_method"
+            )
+        
+        if st.button("🔗 MERGE DATA", use_container_width=True, key="merge_macro_market"):
+            with st.spinner("Merging macro and market data..."):
+                # Calculer date de début
+                years = int(fusion_period[:-1])
+                start_date = (datetime.now() - timedelta(days=years*365)).strftime('%Y-%m-%d')
+                
+                # Récupérer série macro
+                macro_id = macro_series_select.split(' - ')[0]
+                df_macro = get_fred_series(macro_id, observation_start=start_date)
+                
+                # Récupérer données marché via yfinance
+                try:
+                    ticker_data = yf.Ticker(market_ticker)
+                    df_market = ticker_data.history(start=start_date, interval='1d')
+                    
+                    if not df_market.empty and df_macro is not None:
+                        # Préparer données marché
+                        df_market = df_market.reset_index()
+                        df_market = df_market.rename(columns={'Date': 'date'})
+                        df_market['date'] = pd.to_datetime(df_market['date']).dt.tz_localize(None)
+                        
+                        # Préparer données macro
+                        df_macro = df_macro.rename(columns={'value': 'macro_value'})
+                        
+                        st.success(f"✅ Data retrieved: {len(df_macro)} macro obs, {len(df_market)} market days")
+                        
+                        # Merger les données
+                        if alignment_method == "Forward Fill":
+                            df_merged = pd.merge_asof(
+                                df_market.sort_values('date'),
+                                df_macro[['date', 'macro_value']].sort_values('date'),
+                                on='date',
+                                direction='backward'
+                            )
+                        elif alignment_method == "Backward Fill":
+                            df_merged = pd.merge_asof(
+                                df_market.sort_values('date'),
+                                df_macro[['date', 'macro_value']].sort_values('date'),
+                                on='date',
+                                direction='forward'
+                            )
+                        else:  # Interpolate
+                            df_merged = pd.merge(
+                                df_market,
+                                df_macro[['date', 'macro_value']],
+                                on='date',
+                                how='outer'
+                            ).sort_values('date')
+                            df_merged['macro_value'] = df_merged['macro_value'].interpolate(method='linear')
+                            df_merged = df_merged.dropna(subset=['Close'])
+                        
+                        st.markdown("### 📊 MERGED DATASET")
+                        st.caption(f"Total observations: {len(df_merged)}")
+                        
+                        # Aperçu des données
+                        st.dataframe(
+                            df_merged[['date', 'Close', 'macro_value']].tail(10),
+                            use_container_width=True,
+                            hide_index=True
+                        )
+                        
+                        # Graphique dual-axis
+                        st.markdown("#### 📈 DUAL-AXIS VISUALIZATION")
+                        
+                        fig_dual = make_subplots(specs=[[{"secondary_y": True}]])
+                        
+                        fig_dual.add_trace(
+                            go.Scatter(
+                                x=df_merged['date'],
+                                y=df_merged['Close'],
+                                name=f"{market_ticker} Price",
+                                line=dict(color='#FFAA00', width=2)
+                            ),
+                            secondary_y=False
+                        )
+                        
+                        fig_dual.add_trace(
+                            go.Scatter(
+                                x=df_merged['date'],
+                                y=df_merged['macro_value'],
+                                name=macro_series_select.split(' - ')[1],
+                                line=dict(color='#00FF00', width=2)
+                            ),
+                            secondary_y=True
+                        )
+                        
+                        fig_dual.update_layout(
+                            title=f"{market_ticker} vs {macro_series_select.split(' - ')[1]}",
+                            paper_bgcolor='#000',
+                            plot_bgcolor='#111',
+                            font=dict(color='#FFAA00', size=10),
+                            xaxis=dict(gridcolor='#333'),
+                            height=400,
+                            hovermode='x unified'
+                        )
+                        
+                        fig_dual.update_yaxes(title_text=f"{market_ticker} Price", secondary_y=False, gridcolor='#333')
+                        fig_dual.update_yaxes(title_text="Macro Value", secondary_y=True, gridcolor='#333')
+                        
+                        st.plotly_chart(fig_dual, use_container_width=True)
+                        
+                        # Analyse de corrélation
+                        st.markdown("#### 📊 CORRELATION ANALYSIS")
+                        
+                        df_merged['market_return'] = df_merged['Close'].pct_change()
+                        df_merged['macro_change'] = df_merged['macro_value'].pct_change()
+                        
+                        # Corrélation avec différents lags
+                        st.markdown("**Correlation with Different Lags:**")
+                        
+                        lag_correlations = []
+                        for lag in range(-20, 21, 5):
+                            if lag < 0:
+                                corr = df_merged['market_return'].iloc[-lag:].corr(df_merged['macro_change'].iloc[:lag])
+                            elif lag > 0:
+                                corr = df_merged['market_return'].iloc[:-lag].corr(df_merged['macro_change'].iloc[lag:])
+                            else:
+                                corr = df_merged['market_return'].corr(df_merged['macro_change'])
+                            lag_correlations.append({'Lag': lag, 'Correlation': corr})
+                        
+                        lag_df = pd.DataFrame(lag_correlations)
+                        
+                        fig_lag = go.Figure()
+                        fig_lag.add_trace(go.Bar(
+                            x=lag_df['Lag'],
+                            y=lag_df['Correlation'],
+                            marker=dict(color=['#00FF00' if c > 0 else '#FF0000' for c in lag_df['Correlation']])
+                        ))
+                        
+                        fig_lag.update_layout(
+                            title="Cross-Correlation by Lag (days)",
+                            paper_bgcolor='#000',
+                            plot_bgcolor='#111',
+                            font=dict(color='#FFAA00', size=10),
+                            xaxis=dict(gridcolor='#333', title="Lag (days)"),
+                            yaxis=dict(gridcolor='#333', title="Correlation"),
+                            height=300
+                        )
+                        
+                        st.plotly_chart(fig_lag, use_container_width=True)
+                        
+                        # Rolling correlation
+                        df_merged['rolling_corr'] = df_merged['market_return'].rolling(60).corr(df_merged['macro_change'])
+                        
+                        col_corr1, col_corr2 = st.columns(2)
+                        
+                        corr = df_merged[['market_return', 'macro_change']].corr().iloc[0, 1]
+                        
+                        with col_corr1:
+                            st.metric("OVERALL CORRELATION", f"{corr:.3f}")
+                            
+                            if abs(corr) > 0.5:
+                                st.success("Strong correlation detected")
+                            elif abs(corr) > 0.3:
+                                st.info("Moderate correlation")
+                            else:
+                                st.warning("Weak correlation")
+                        
+                        with col_corr2:
+                            current_roll = df_merged['rolling_corr'].iloc[-1]
+                            st.metric("CURRENT ROLLING CORR (60D)", 
+                                     f"{current_roll:.3f}" if not np.isnan(current_roll) else "N/A")
+                        
+                        # Graphique rolling correlation
+                        fig_corr = go.Figure()
+                        
+                        fig_corr.add_trace(go.Scatter(
+                            x=df_merged['date'],
+                            y=df_merged['rolling_corr'],
+                            mode='lines',
+                            line=dict(color='#00FFFF', width=2),
+                            fill='tozeroy',
+                            fillcolor='rgba(0, 255, 255, 0.1)'
+                        ))
+                        
+                        fig_corr.add_hline(y=0, line_dash="dash", line_color="#FFAA00")
+                        
+                        fig_corr.update_layout(
+                            title="60-Day Rolling Correlation",
+                            paper_bgcolor='#000',
+                            plot_bgcolor='#111',
+                            font=dict(color='#FFAA00', size=10),
+                            xaxis=dict(gridcolor='#333', title="Date"),
+                            yaxis=dict(gridcolor='#333', title="Correlation"),
+                            height=300
+                        )
+                        
+                        st.plotly_chart(fig_corr, use_container_width=True)
+                        
+                        # Régime Analysis
+                        st.markdown("#### 📊 REGIME ANALYSIS")
+                        
+                        # Diviser en quartiles de la variable macro
+                        df_merged['macro_quartile'] = pd.qcut(df_merged['macro_value'], q=4, labels=['Q1 (Low)', 'Q2', 'Q3', 'Q4 (High)'])
+                        
+                        regime_stats = df_merged.groupby('macro_quartile')['market_return'].agg(['mean', 'std', 'count']).reset_index()
+                        regime_stats['mean'] = regime_stats['mean'] * 252 * 100  # Annualized
+                        regime_stats['std'] = regime_stats['std'] * np.sqrt(252) * 100  # Annualized
+                        regime_stats['sharpe'] = regime_stats['mean'] / regime_stats['std']
+                        
+                        regime_stats.columns = ['Macro Regime', 'Avg Return (%)', 'Volatility (%)', 'Days', 'Sharpe']
+                        
+                        st.dataframe(regime_stats.round(2), use_container_width=True, hide_index=True)
+                        
+                        # Download merged data
+                        st.markdown("#### 💾 EXPORT MERGED DATA")
+                        
+                        csv_data = df_merged[['date', 'Close', 'macro_value', 'market_return', 'macro_change']].to_csv(index=False)
+                        
+                        st.download_button(
+                            label="📥 DOWNLOAD CSV",
+                            data=csv_data,
+                            file_name=f"{market_ticker}_{macro_id}_merged_{datetime.now().strftime('%Y%m%d')}.csv",
+                            mime="text/csv",
+                            use_container_width=True
+                        )
+                    
+                    else:
+                        st.error(f"❌ Could not retrieve data for {market_ticker}")
+                
+                except Exception as e:
+                    st.error(f"❌ Error: {e}")
+    
+    # ===== INTEGRATION TAB 2: ALTERNATIVE DATA =====
+    with integration_tab2:
+        st.markdown("#### 🌍 ALTERNATIVE DATA INTEGRATION")
+        st.caption("Enhance analysis with high-frequency alternative data")
+        
+        st.markdown("""
+        <div style="background-color: #111; border: 1px solid #333; padding: 15px; margin: 10px 0;">
+            <p style="margin: 0; font-size: 11px; color: #FFAA00; font-weight: bold;">
+            📊 AVAILABLE ALTERNATIVE DATA SOURCES (FRED)
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        alt_data_type = st.selectbox(
+            "SELECT ALTERNATIVE DATA TYPE",
+            options=[
+                "Weekly Economic Index (WEI)",
+                "Financial Stress Index",
+                "Credit Spreads",
+                "Volatility Index (VIX proxy)",
+                "Custom FRED Series"
+            ],
+            key="alt_data_type"
+        )
+        
+        # Mapping des séries
+        alt_series_map = {
+            "Weekly Economic Index (WEI)": "WEI",
+            "Financial Stress Index": "STLFSI4",
+            "Credit Spreads": "BAA10Y",
+            "Volatility Index (VIX proxy)": "VIXCLS",
+            "Custom FRED Series": None
+        }
+        
+        if alt_data_type == "Custom FRED Series":
+            custom_series = st.text_input(
+                "ENTER FRED SERIES ID",
+                value="",
+                help="Find series IDs at https://fred.stlouisfed.org",
+                key="custom_fred"
+            ).upper()
+            series_id = custom_series
+        else:
+            series_id = alt_series_map[alt_data_type]
+        
+        compare_ticker = st.text_input(
+            "COMPARE WITH TICKER (optional)",
+            value="SPY",
+            key="alt_compare_ticker"
+        ).upper()
+        
+        if st.button("📊 LOAD ALTERNATIVE DATA", use_container_width=True, key="load_alt"):
+            if series_id:
+                with st.spinner(f"Loading {series_id}..."):
+                    df_alt = get_fred_series(series_id)
+                    
+                    if df_alt is not None:
+                        st.success(f"✅ Loaded {len(df_alt)} observations for {series_id}")
+                        
+                        # Stats de base
+                        col_alt1, col_alt2, col_alt3, col_alt4 = st.columns(4)
+                        
+                        with col_alt1:
+                            st.metric("CURRENT VALUE", f"{df_alt['value'].iloc[-1]:.2f}")
+                        
+                        with col_alt2:
+                            st.metric("52W HIGH", f"{df_alt['value'].tail(252).max():.2f}")
+                        
+                        with col_alt3:
+                            st.metric("52W LOW", f"{df_alt['value'].tail(252).min():.2f}")
+                        
+                        with col_alt4:
+                            percentile = (df_alt['value'].iloc[-1] - df_alt['value'].min()) / (df_alt['value'].max() - df_alt['value'].min()) * 100
+                            st.metric("PERCENTILE", f"{percentile:.1f}%")
+                        
+                        # Graphique
+                        fig_alt = go.Figure()
+                        
+                        fig_alt.add_trace(go.Scatter(
+                            x=df_alt['date'],
+                            y=df_alt['value'],
+                            mode='lines',
+                            line=dict(color='#FF00FF', width=2),
+                            fill='tozeroy',
+                            fillcolor='rgba(255, 0, 255, 0.1)'
+                        ))
+                        
+                        fig_alt.update_layout(
+                            title=f"{alt_data_type} ({series_id})",
+                            paper_bgcolor='#000',
+                            plot_bgcolor='#111',
+                            font=dict(color='#FFAA00', size=10),
+                            xaxis=dict(gridcolor='#333', title="Date"),
+                            yaxis=dict(gridcolor='#333', title="Value"),
+                            height=400
+                        )
+                        
+                        st.plotly_chart(fig_alt, use_container_width=True)
+                        
+                        # Comparaison avec ticker si fourni
+                        if compare_ticker:
+                            try:
+                                df_ticker = yf.download(compare_ticker, period="5y", interval="1d", progress=False)
+                                
+                                if not df_ticker.empty:
+                                    if isinstance(df_ticker.columns, pd.MultiIndex):
+                                        df_ticker.columns = df_ticker.columns.get_level_values(0)
+                                    
+                                    df_ticker = df_ticker.reset_index()
+                                    df_ticker['date'] = pd.to_datetime(df_ticker['Date']).dt.tz_localize(None)
+                                    
+                                    # Merge
+                                    df_compare = pd.merge_asof(
+                                        df_ticker[['date', 'Close']].sort_values('date'),
+                                        df_alt[['date', 'value']].sort_values('date'),
+                                        on='date',
+                                        direction='backward'
+                                    )
+                                    
+                                    # Normaliser
+                                    df_compare['Close_norm'] = df_compare['Close'] / df_compare['Close'].iloc[0] * 100
+                                    df_compare['value_norm'] = df_compare['value'] / df_compare['value'].iloc[0] * 100
+                                    
+                                    st.markdown(f"#### 📈 {compare_ticker} vs {series_id}")
+                                    
+                                    fig_compare = make_subplots(specs=[[{"secondary_y": True}]])
+                                    
+                                    fig_compare.add_trace(
+                                        go.Scatter(x=df_compare['date'], y=df_compare['Close'],
+                                                  name=compare_ticker, line=dict(color='#FFAA00', width=2)),
+                                        secondary_y=False
+                                    )
+                                    
+                                    fig_compare.add_trace(
+                                        go.Scatter(x=df_compare['date'], y=df_compare['value'],
+                                                  name=series_id, line=dict(color='#FF00FF', width=2)),
+                                        secondary_y=True
+                                    )
+                                    
+                                    fig_compare.update_layout(
+                                        paper_bgcolor='#000',
+                                        plot_bgcolor='#111',
+                                        font=dict(color='#FFAA00', size=10),
+                                        height=350,
+                                        hovermode='x unified'
+                                    )
+                                    
+                                    fig_compare.update_xaxes(gridcolor='#333')
+                                    fig_compare.update_yaxes(gridcolor='#333')
+                                    
+                                    st.plotly_chart(fig_compare, use_container_width=True)
+                                    
+                                    # Corrélation
+                                    df_compare['ticker_ret'] = df_compare['Close'].pct_change()
+                                    df_compare['alt_change'] = df_compare['value'].pct_change()
+                                    
+                                    corr = df_compare['ticker_ret'].corr(df_compare['alt_change'])
+                                    st.metric(f"Correlation {compare_ticker} vs {series_id}", f"{corr:.3f}")
+                            
+                            except Exception as e:
+                                st.warning(f"Could not load {compare_ticker}: {e}")
+                        
+                        # Export
+                        csv_alt = df_alt.to_csv(index=False)
+                        st.download_button(
+                            label="📥 DOWNLOAD DATA",
+                            data=csv_alt,
+                            file_name=f"{series_id}_{datetime.now().strftime('%Y%m%d')}.csv",
+                            mime="text/csv"
+                        )
+                    else:
+                        st.error(f"❌ Could not load series {series_id}")
+            else:
+                st.warning("⚠️ Please enter a FRED series ID")
+    
+    # ===== INTEGRATION TAB 3: SECTOR MAPPING =====
+    with integration_tab3:
+        st.markdown("#### 🏭 MACRO-TO-SECTOR MAPPING")
+        st.caption("Map macro conditions to sector exposures for portfolio tilting")
+        
+        # Matrice de sensibilité prédéfinie
+        sector_sensitivity = {
+            'Technology (XLK)': {'GDP': 1.5, 'Inflation': -0.8, 'Rates': -1.2, 'Type': 'Cyclical', 'ETF': 'XLK'},
+            'Consumer Disc. (XLY)': {'GDP': 1.3, 'Inflation': -1.0, 'Rates': -0.9, 'Type': 'Cyclical', 'ETF': 'XLY'},
+            'Financials (XLF)': {'GDP': 1.1, 'Inflation': -0.5, 'Rates': 0.8, 'Type': 'Cyclical', 'ETF': 'XLF'},
+            'Industrials (XLI)': {'GDP': 1.4, 'Inflation': -0.7, 'Rates': -0.6, 'Type': 'Cyclical', 'ETF': 'XLI'},
+            'Materials (XLB)': {'GDP': 1.6, 'Inflation': 0.3, 'Rates': -0.5, 'Type': 'Cyclical', 'ETF': 'XLB'},
+            'Energy (XLE)': {'GDP': 0.9, 'Inflation': 0.9, 'Rates': -0.3, 'Type': 'Cyclical', 'ETF': 'XLE'},
+            'Consumer Staples (XLP)': {'GDP': 0.3, 'Inflation': -0.4, 'Rates': -0.2, 'Type': 'Defensive', 'ETF': 'XLP'},
+            'Healthcare (XLV)': {'GDP': 0.4, 'Inflation': -0.3, 'Rates': -0.4, 'Type': 'Defensive', 'ETF': 'XLV'},
+            'Utilities (XLU)': {'GDP': 0.2, 'Inflation': -0.2, 'Rates': -0.7, 'Type': 'Defensive', 'ETF': 'XLU'},
+            'Real Estate (XLRE)': {'GDP': 0.8, 'Inflation': -0.5, 'Rates': -1.5, 'Type': 'Sensitive', 'ETF': 'XLRE'},
+            'Communication (XLC)': {'GDP': 0.7, 'Inflation': -0.6, 'Rates': -0.8, 'Type': 'Mixed', 'ETF': 'XLC'}
+        }
+        
+        # Afficher la matrice
+        st.markdown("#### 📊 SECTOR SENSITIVITY MATRIX")
+        
+        sens_df = pd.DataFrame(sector_sensitivity).T
+        sens_df = sens_df.reset_index().rename(columns={'index': 'Sector'})
+        
+        st.dataframe(sens_df[['Sector', 'GDP', 'Inflation', 'Rates', 'Type']], use_container_width=True, hide_index=True)
+        
+        st.caption("""
+        **Interpretation:**
+        - **GDP**: Sensitivity to GDP growth (>1 = high beta)
+        - **Inflation**: Sensitivity to CPI (+ve = benefits, -ve = hurt)
+        - **Rates**: Sensitivity to interest rates (-ve = hurt by rate hikes)
+        """)
+        
+        # Calculer recommandations actuelles
+        st.markdown("#### 🎯 CURRENT SECTOR RECOMMENDATIONS")
+        
+        if st.button("📊 GENERATE RECOMMENDATIONS", use_container_width=True, key="sector_reco"):
+            with st.spinner("Analyzing macro conditions..."):
+                # Récupérer conditions actuelles
+                df_gdp = get_fred_series('GDP')
+                df_cpi = get_fred_series('CPIAUCSL')
+                df_rates = get_fred_series('DGS10')
+                
+                if all(df is not None for df in [df_gdp, df_cpi, df_rates]):
+                    # Calculs
+                    gdp_growth = (df_gdp['value'].iloc[-1] / df_gdp['value'].iloc[-2] - 1) * 400
+                    inflation = (df_cpi['value'].iloc[-1] / df_cpi['value'].iloc[-13] - 1) * 100
+                    rate_change = df_rates['value'].iloc[-1] - df_rates['value'].iloc[-120] if len(df_rates) > 120 else 0
+                    
+                    # Normaliser
+                    gdp_signal = np.clip((gdp_growth - 2) / 2, -1, 1)
+                    inflation_signal = np.clip((inflation - 2) / 2, -1, 1)
+                    rate_signal = np.clip(rate_change / 2, -1, 1)
+                    
+                    st.markdown("**📊 Current Macro Conditions:**")
+                    
+                    col_macro1, col_macro2, col_macro3 = st.columns(3)
+                    
+                    with col_macro1:
+                        st.metric("GDP GROWTH (QoQ Ann.)", f"{gdp_growth:.2f}%")
+                    
+                    with col_macro2:
+                        st.metric("INFLATION (YoY)", f"{inflation:.2f}%")
+                    
+                    with col_macro3:
+                        st.metric("RATE CHANGE (6M)", f"{rate_change:+.2f}%")
+                    
+                    # Calculer scores par secteur
+                    sector_scores = {}
+                    
+                    for sector, sensitivities in sector_sensitivity.items():
+                        score = (
+                            sensitivities['GDP'] * gdp_signal +
+                            sensitivities['Inflation'] * inflation_signal +
+                            sensitivities['Rates'] * rate_signal
+                        )
+                        sector_scores[sector] = {
+                            'score': score,
+                            'type': sensitivities['Type'],
+                            'etf': sensitivities['ETF']
+                        }
+                    
+                    # Trier par score
+                    sorted_sectors = sorted(sector_scores.items(), key=lambda x: x[1]['score'], reverse=True)
+                    
+                    st.markdown("#### 🎯 SECTOR RANKINGS")
+                    
+                    rankings_data = []
+                    for i, (sector, data) in enumerate(sorted_sectors):
+                        if i < 3:
+                            label = "🟢 OVERWEIGHT"
+                        elif i < 8:
+                            label = "🟡 NEUTRAL"
+                        else:
+                            label = "🔴 UNDERWEIGHT"
+                        
+                        rankings_data.append({
+                            'Rank': i + 1,
+                            'Sector': sector,
+                            'ETF': data['etf'],
+                            'Score': f"{data['score']:.2f}",
+                            'Type': data['type'],
+                            'Recommendation': label
+                        })
+                    
+                    rankings_df = pd.DataFrame(rankings_data)
+                    st.dataframe(rankings_df, use_container_width=True, hide_index=True)
+                    
+                    # Graphique radar
+                    st.markdown("#### 📊 TOP 5 vs BOTTOM 5 SECTORS")
+                    
+                    top5 = [s[0] for s in sorted_sectors[:5]]
+                    bottom5 = [s[0] for s in sorted_sectors[-5:]]
+                    
+                    col_tb1, col_tb2 = st.columns(2)
+                    
+                    with col_tb1:
+                        st.markdown("**🟢 TOP 5 (Overweight):**")
+                        for s in top5:
+                            etf = sector_sensitivity[s]['ETF']
+                            st.markdown(f"• {s}")
+                    
+                    with col_tb2:
+                        st.markdown("**🔴 BOTTOM 5 (Underweight):**")
+                        for s in bottom5:
+                            etf = sector_sensitivity[s]['ETF']
+                            st.markdown(f"• {s}")
+                    
+                    # Performance historique des recommandations
+                    st.markdown("---")
+                    st.markdown("#### 📈 SECTOR ETF PERFORMANCE (YTD)")
+                    
+                    ytd_perf = []
+                    for sector, data in sector_sensitivity.items():
+                        try:
+                            etf = data['ETF']
+                            df_etf = yf.download(etf, period="1y", interval="1d", progress=False)
+                            if not df_etf.empty:
+                                if isinstance(df_etf.columns, pd.MultiIndex):
+                                    df_etf.columns = df_etf.columns.get_level_values(0)
+                                ytd_return = (df_etf['Close'].iloc[-1] / df_etf['Close'].iloc[0] - 1) * 100
+                                ytd_perf.append({'Sector': sector, 'ETF': etf, 'YTD Return': f"{ytd_return:.2f}%"})
+                        except:
+                            pass
+                    
+                    if ytd_perf:
+                        perf_df = pd.DataFrame(ytd_perf)
+                        st.dataframe(perf_df, use_container_width=True, hide_index=True)
+    
+    # ===== INTEGRATION TAB 4: COMPANY FUNDAMENTALS =====
+    with integration_tab4:
+        st.markdown("#### 🏢 MACRO-ADJUSTED COMPANY ANALYSIS")
+        st.caption("Adjust company valuations based on macro conditions")
+        
+        col_comp1, col_comp2 = st.columns(2)
+        
+        with col_comp1:
+            company_ticker = st.text_input(
+                "COMPANY TICKER",
+                value="AAPL",
+                help="Yahoo Finance ticker",
+                key="company_ticker"
+            ).upper()
+        
+        with col_comp2:
+            analysis_type = st.selectbox(
+                "ANALYSIS TYPE",
+                options=[
+                    "Macro Sensitivity Analysis",
+                    "Revenue Forecast Adjustment",
+                    "Valuation Impact"
+                ],
+                key="analysis_type"
+            )
+        
+        if st.button("📊 RUN COMPANY ANALYSIS", use_container_width=True, key="run_company"):
+            if company_ticker:
+                with st.spinner(f"Analyzing {company_ticker}..."):
+                    try:
+                        ticker = yf.Ticker(company_ticker)
+                        info = ticker.info
+                        hist = ticker.history(period="2y", interval="1d")
+                        
+                        if not hist.empty:
+                            st.markdown(f"### 📊 {company_ticker} - {info.get('longName', 'N/A')}")
+                            
+                            # Info de base
+                            col_info1, col_info2, col_info3, col_info4 = st.columns(4)
+                            
+                            with col_info1:
+                                st.metric("SECTOR", info.get('sector', 'N/A'))
+                            
+                            with col_info2:
+                                mkt_cap = info.get('marketCap', 0)
+                                st.metric("MARKET CAP", f"${mkt_cap/1e9:.1f}B" if mkt_cap else "N/A")
+                            
+                            with col_info3:
+                                pe = info.get('trailingPE', 0)
+                                st.metric("P/E RATIO", f"{pe:.1f}" if pe else "N/A")
+                            
+                            with col_info4:
+                                beta = info.get('beta', 0)
+                                st.metric("BETA", f"{beta:.2f}" if beta else "N/A")
+                            
+                            if analysis_type == "Macro Sensitivity Analysis":
+                                st.markdown("#### 📈 MACRO SENSITIVITY ANALYSIS")
+                                
+                                # Récupérer données macro
+                                df_rates = get_fred_series('DGS10')
+                                df_cpi = get_fred_series('CPIAUCSL')
+                                
+                                if df_rates is not None:
+                                    # Préparer données
+                                    hist = hist.reset_index()
+                                    hist['date'] = pd.to_datetime(hist['Date']).dt.tz_localize(None)
+                                    
+                                    # Merge avec rates
+                                    df_analysis = pd.merge_asof(
+                                        hist[['date', 'Close']].sort_values('date'),
+                                        df_rates[['date', 'value']].rename(columns={'value': 'rates'}).sort_values('date'),
+                                        on='date',
+                                        direction='backward'
+                                    )
+                                    
+                                    df_analysis['stock_return'] = df_analysis['Close'].pct_change()
+                                    df_analysis['rate_change'] = df_analysis['rates'].diff()
+                                    
+                                    # Régression
+                                    df_reg = df_analysis.dropna()
+                                    X = sm.add_constant(df_reg['rate_change'])
+                                    model = sm.OLS(df_reg['stock_return'], X).fit()
+                                    
+                                    col_sens1, col_sens2 = st.columns(2)
+                                    
+                                    with col_sens1:
+                                        rate_sens = model.params['rate_change']
+                                        st.metric(
+                                            "RATE SENSITIVITY",
+                                            f"{rate_sens:.4f}",
+                                            help="Stock return per 1% rate change"
+                                        )
+                                        
+                                        if rate_sens < -0.01:
+                                            st.error("⚠️ Highly rate-sensitive (negative)")
+                                        elif rate_sens > 0.01:
+                                            st.success("✅ Benefits from rate increases")
+                                        else:
+                                            st.info("➡️ Low rate sensitivity")
+                                    
+                                    with col_sens2:
+                                        r2 = model.rsquared
+                                        st.metric("R-SQUARED", f"{r2:.4f}")
+                                    
+                                    # Scatter plot
+                                    fig_sens = go.Figure()
+                                    
+                                    fig_sens.add_trace(go.Scatter(
+                                        x=df_reg['rate_change'],
+                                        y=df_reg['stock_return'],
+                                        mode='markers',
+                                        marker=dict(color='#FFAA00', size=5, opacity=0.5),
+                                        name='Observations'
+                                    ))
+                                    
+                                    # Ligne de régression
+                                    x_line = np.linspace(df_reg['rate_change'].min(), df_reg['rate_change'].max(), 100)
+                                    y_line = model.params['const'] + model.params['rate_change'] * x_line
+                                    
+                                    fig_sens.add_trace(go.Scatter(
+                                        x=x_line,
+                                        y=y_line,
+                                        mode='lines',
+                                        line=dict(color='#FF0000', width=2),
+                                        name='Regression Line'
+                                    ))
+                                    
+                                    fig_sens.update_layout(
+                                        title=f"{company_ticker} Returns vs Rate Changes",
+                                        paper_bgcolor='#000',
+                                        plot_bgcolor='#111',
+                                        font=dict(color='#FFAA00', size=10),
+                                        xaxis=dict(gridcolor='#333', title="Rate Change (%)"),
+                                        yaxis=dict(gridcolor='#333', title="Stock Return (%)"),
+                                        height=400
+                                    )
+                                    
+                                    st.plotly_chart(fig_sens, use_container_width=True)
+                            
+                            elif analysis_type == "Revenue Forecast Adjustment":
+                                st.markdown("#### 📈 MACRO-ADJUSTED REVENUE FORECAST")
+                                
+                                # Inputs
+                                col_rev1, col_rev2 = st.columns(2)
+                                
+                                with col_rev1:
+                                    base_revenue = st.number_input(
+                                        "BASE REVENUE (Last FY, $B)",
+                                        min_value=0.0,
+                                        value=float(info.get('totalRevenue', 100e9) / 1e9),
+                                        step=1.0,
+                                        key="base_rev"
+                                    )
+                                    
+                                    consensus_growth = st.number_input(
+                                        "CONSENSUS GROWTH (%)",
+                                        min_value=-50.0,
+                                        max_value=100.0,
+                                        value=5.0,
+                                        step=0.5,
+                                        key="cons_growth"
+                                    )
+                                
+                                with col_rev2:
+                                    gdp_assumption = st.number_input(
+                                        "GDP GROWTH ASSUMPTION (%)",
+                                        min_value=-10.0,
+                                        max_value=10.0,
+                                        value=2.0,
+                                        step=0.5,
+                                        key="gdp_assump"
+                                    )
+                                    
+                                    sector = info.get('sector', 'Technology')
+                                    gdp_sensitivity = st.number_input(
+                                        "GDP SENSITIVITY (β)",
+                                        min_value=0.0,
+                                        max_value=3.0,
+                                        value=1.5 if 'Tech' in sector else 1.0,
+                                        step=0.1,
+                                        key="gdp_sens"
+                                    )
+                                
+                                # Calcul des scénarios
+                                scenarios = {
+                                    'Bear Case': gdp_assumption - 2,
+                                    'Base Case': gdp_assumption,
+                                    'Bull Case': gdp_assumption + 2
+                                }
+                                
+                                results = []
+                                for scenario, gdp in scenarios.items():
+                                    adj_growth = consensus_growth + gdp_sensitivity * (gdp - 2)
+                                    adj_revenue = base_revenue * (1 + adj_growth / 100)
+                                    
+                                    results.append({
+                                        'Scenario': scenario,
+                                        'GDP Growth': f"{gdp:.1f}%",
+                                        'Adj. Revenue Growth': f"{adj_growth:.1f}%",
+                                        'Projected Revenue': f"${adj_revenue:.1f}B",
+                                        'vs Consensus': f"{adj_growth - consensus_growth:+.1f}%"
+                                    })
+                                
+                                results_df = pd.DataFrame(results)
+                                st.dataframe(results_df, use_container_width=True, hide_index=True)
+                                
+                                # Graphique
+                                fig_rev = go.Figure()
+                                
+                                colors = {'Bear Case': '#FF0000', 'Base Case': '#FFAA00', 'Bull Case': '#00FF00'}
+                                
+                                for r in results:
+                                    rev = float(r['Projected Revenue'].replace('$', '').replace('B', ''))
+                                    fig_rev.add_trace(go.Bar(
+                                        x=[r['Scenario']],
+                                        y=[rev],
+                                        name=r['Scenario'],
+                                        marker_color=colors[r['Scenario']],
+                                        text=r['Projected Revenue'],
+                                        textposition='auto'
+                                    ))
+                                
+                                fig_rev.add_hline(y=base_revenue, line_dash="dash", line_color="#FFFFFF",
+                                                 annotation_text=f"Current: ${base_revenue:.1f}B")
+                                
+                                fig_rev.update_layout(
+                                    title=f"{company_ticker} Revenue Scenarios",
+                                    paper_bgcolor='#000',
+                                    plot_bgcolor='#111',
+                                    font=dict(color='#FFAA00', size=10),
+                                    xaxis=dict(gridcolor='#333'),
+                                    yaxis=dict(gridcolor='#333', title="Revenue ($B)"),
+                                    height=400,
+                                    showlegend=False
+                                )
+                                
+                                st.plotly_chart(fig_rev, use_container_width=True)
+                            
+                            else:  # Valuation Impact
+                                st.markdown("#### 💰 MACRO VALUATION IMPACT")
+                                
+                                col_val1, col_val2 = st.columns(2)
+                                
+                                with col_val1:
+                                    current_pe = info.get('trailingPE', 20)
+                                    st.metric("CURRENT P/E", f"{current_pe:.1f}" if current_pe else "N/A")
+                                    
+                                    eps = info.get('trailingEps', 5)
+                                    st.metric("TRAILING EPS", f"${eps:.2f}" if eps else "N/A")
+                                
+                                with col_val2:
+                                    fwd_pe = info.get('forwardPE', 18)
+                                    st.metric("FORWARD P/E", f"{fwd_pe:.1f}" if fwd_pe else "N/A")
+                                    
+                                    price = info.get('currentPrice', hist['Close'].iloc[-1])
+                                    st.metric("CURRENT PRICE", f"${price:.2f}")
+                                
+                                # Impact des taux sur le P/E
+                                st.markdown("**Rate Sensitivity on P/E:**")
+                                
+                                rate_scenarios = [-1, -0.5, 0, 0.5, 1, 1.5]
+                                pe_impacts = []
+                                
+                                for rate_change in rate_scenarios:
+                                    # Règle empirique: P/E baisse de ~1.5x par 1% de hausse des taux
+                                    pe_impact = -1.5 * rate_change
+                                    new_pe = current_pe * (1 + pe_impact / 100) if current_pe else 20
+                                    implied_price = new_pe * eps if eps else price
+                                    
+                                    pe_impacts.append({
+                                        'Rate Change': f"{rate_change:+.1f}%",
+                                        'P/E Impact': f"{pe_impact:+.1f}%",
+                                        'New P/E': f"{new_pe:.1f}",
+                                        'Implied Price': f"${implied_price:.2f}",
+                                        'vs Current': f"{(implied_price/price - 1)*100:+.1f}%" if price else "N/A"
+                                    })
+                                
+                                pe_df = pd.DataFrame(pe_impacts)
+                                st.dataframe(pe_df, use_container_width=True, hide_index=True)
+                        
+                        else:
+                            st.error(f"❌ No data found for {company_ticker}")
+                    
+                    except Exception as e:
+                        st.error(f"❌ Error analyzing {company_ticker}: {e}")
+            else:
+                st.warning("⚠️ Please enter a ticker")
 
 # Footer
 st.markdown('<div style="border-top: 1px solid #333; margin: 10px 0;"></div>', unsafe_allow_html=True)
