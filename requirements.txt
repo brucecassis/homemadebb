@@ -19,3 +19,4 @@ supabase==2.10.0
 PyPDF2
 python-docx
 openpyxl
+streamlit-autorefresh
