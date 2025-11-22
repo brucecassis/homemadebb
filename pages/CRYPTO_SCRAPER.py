@@ -608,6 +608,15 @@ class AdvancedBacktester:
         """Exécute le backtest avec configuration avancée"""
         df = df.iloc[-len(predictions):].copy()
         
+        # Extraire les dates si disponibles
+        if 'open_time' in df.columns:
+            dates = pd.to_datetime(df['open_time']).values
+        else:
+            dates = np.arange(len(df))
+        
+        # Extraire les prix pour le Buy & Hold
+        prices = df['close'].astype(float).values
+        
         capital = self.initial_capital
         position = 0
         entry_price = 0
@@ -715,11 +724,12 @@ class AdvancedBacktester:
                 daily_returns.append((equity[-1] / equity[-2]) - 1)
         
         equity = np.array(equity[1:])
-        bh_equity = self.initial_capital * (1 + df['close'].astype(float).pct_change().fillna(0)).cumprod().values
+        # Buy & Hold: si on avait acheté au prix initial et gardé
+        bh_equity = self.initial_capital * (prices / prices[0])
         
-        return self._calculate_metrics(equity, bh_equity, trades, daily_returns)
+        return self._calculate_metrics(equity, bh_equity, trades, daily_returns, dates, prices)
     
-    def _calculate_metrics(self, equity, bh_equity, trades, daily_returns):
+    def _calculate_metrics(self, equity, bh_equity, trades, daily_returns, dates, prices):
         """Calcule toutes les métriques de performance"""
         daily_returns = np.array(daily_returns) if daily_returns else np.array([0])
         
@@ -760,6 +770,8 @@ class AdvancedBacktester:
         return {
             'equity': equity,
             'bh_equity': bh_equity,
+            'dates': dates,
+            'prices': prices,
             'total_return': total_return,
             'bh_return': bh_return,
             'max_dd': max_dd,
@@ -1379,19 +1391,37 @@ elif page == "📈 Backtesting":
             
             equity = bt_results['equity']
             bh_equity = bt_results['bh_equity']
+            dates = bt_results.get('dates')
+            prices = bt_results.get('prices')
+            
+            # Utiliser les dates si disponibles
+            if dates is not None and len(dates) == len(equity):
+                x_axis = dates
+            else:
+                x_axis = np.arange(len(equity))
             
             fig_eq = go.Figure()
-            fig_eq.add_trace(go.Scatter(y=equity, mode='lines', name='Strategy', line=dict(color='#00ff88', width=2)))
-            fig_eq.add_trace(go.Scatter(y=bh_equity, mode='lines', name='Buy & Hold', line=dict(color='#ff8800', width=2, dash='dash')))
-            fig_eq.update_layout(template='plotly_dark', height=400, title='Strategy vs Buy & Hold', legend=dict(x=0.02, y=0.98))
+            fig_eq.add_trace(go.Scatter(x=x_axis, y=equity, mode='lines', name='Strategy', line=dict(color='#00ff88', width=2)))
+            fig_eq.add_trace(go.Scatter(x=x_axis, y=bh_equity, mode='lines', name='Buy & Hold', line=dict(color='#ff8800', width=2, dash='dash')))
+            fig_eq.update_layout(template='plotly_dark', height=400, title='Strategy vs Buy & Hold ($)',
+                               xaxis_title='Date', yaxis_title='Capital ($)', legend=dict(x=0.02, y=0.98))
             st.plotly_chart(fig_eq, use_container_width=True)
+            
+            # Graphique des prix BTC pour comparaison
+            if prices is not None:
+                with st.expander("📊 Prix de l'actif (référence)"):
+                    fig_price = go.Figure()
+                    fig_price.add_trace(go.Scatter(x=x_axis, y=prices, mode='lines', name='Prix', line=dict(color='#FFAA00', width=1)))
+                    fig_price.update_layout(template='plotly_dark', height=300, title='Prix de l\'actif',
+                                          xaxis_title='Date', yaxis_title='Prix ($)')
+                    st.plotly_chart(fig_price, use_container_width=True)
             
             peak = np.maximum.accumulate(equity)
             dd = (peak - equity) / peak * 100
             fig_dd = go.Figure()
-            fig_dd.add_trace(go.Scatter(y=-dd, fill='tozeroy', mode='lines', name='Drawdown',
+            fig_dd.add_trace(go.Scatter(x=x_axis, y=-dd, fill='tozeroy', mode='lines', name='Drawdown',
                                        line=dict(color='#ff4444'), fillcolor='rgba(255, 68, 68, 0.3)'))
-            fig_dd.update_layout(template='plotly_dark', height=250, title='Drawdown')
+            fig_dd.update_layout(template='plotly_dark', height=250, title='Drawdown', xaxis_title='Date', yaxis_title='Drawdown (%)')
             st.plotly_chart(fig_dd, use_container_width=True)
             
             col_v1, col_v2 = st.columns(2)
