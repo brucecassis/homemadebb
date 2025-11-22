@@ -1027,7 +1027,8 @@ st.sidebar.markdown("### 🧭 NAVIGATION")
 page = st.sidebar.radio(
     "Menu",
     ["📂 Database", "🤖 ML Training", "📈 Backtesting", "📊 Analytics", "🗺️ Roadmap"],
-    index=0
+    index=0,
+    label_visibility="collapsed"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
