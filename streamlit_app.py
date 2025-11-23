@@ -614,7 +614,170 @@ if selected_tickers:
         - 🔴 **Rouge (proche de -1.0)** : Les actions évoluent en sens inverse (corrélation négative)
         """)
 
+
+# ===== SIMULATEUR DE PORTEFEUILLE =====
+st.markdown('<div style="border-top: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+st.markdown("#### 💼 PORTFOLIO SIMULATOR")
+
+# Interface de configuration du portefeuille
+st.markdown("**Configurez les poids de chaque actif dans votre portefeuille :**")
+
+# Créer une ligne de sliders pour chaque ticker sélectionné
+weight_cols = st.columns(min(len(selected_tickers), 5))
+weights = {}
+
+for idx, ticker in enumerate(selected_tickers[:10]):
+    with weight_cols[idx % 5]:
+        weights[ticker] = st.slider(
+            f"{ticker}",
+            min_value=0.0,
+            max_value=100.0,
+            value=100.0 / len(selected_tickers),  # Répartition équitable par défaut
+            step=1.0,
+            key=f"weight_{ticker}"
+        )
+
+# Vérifier que la somme fait 100%
+total_weight = sum(weights.values())
+if abs(total_weight - 100.0) > 0.1:
+    st.warning(f"⚠️ La somme des poids est de {total_weight:.1f}% (devrait être 100%)")
+else:
+    st.success(f"✅ Portefeuille équilibré : {total_weight:.1f}%")
+
+# Calculer la performance du portefeuille
+if total_weight > 0:
+    portfolio_performance = pd.Series(dtype=float)
+    portfolio_data = pd.DataFrame()
+    
+    # Normaliser les poids pour qu'ils totalisent 100%
+    normalized_weights = {k: v/total_weight for k, v in weights.items()}
+    
+    for ticker, weight in normalized_weights.items():
+        hist = get_historical_data(ticker, timeframe)
+        if hist is not None and len(hist) > 0:
+            normalized = normalize_to_percentage(hist['Close'])
+            if portfolio_performance.empty:
+                portfolio_performance = normalized * (weight)
+            else:
+                portfolio_performance = portfolio_performance.add(
+                    normalized * (weight), 
+                    fill_value=0
+                )
+            portfolio_data[ticker] = hist['Close']
+    
+    # Créer le graphique du portefeuille
+    if not portfolio_performance.empty:
+        fig_portfolio = go.Figure()
+        
+        # Ajouter les performances individuelles en transparence
+        for idx, ticker in enumerate(selected_tickers[:10]):
+            hist = get_historical_data(ticker, timeframe)
+            if hist is not None and len(hist) > 0:
+                normalized = normalize_to_percentage(hist['Close'])
+                fig_portfolio.add_trace(go.Scatter(
+                    x=hist.index,
+                    y=normalized,
+                    mode='lines',
+                    name=f"{ticker} ({weights[ticker]:.1f}%)",
+                    line=dict(color=colors[idx % len(colors)], width=1, dash='dot'),
+                    opacity=0.3,
+                    showlegend=True
+                ))
+        
+        # Ajouter la performance du portefeuille
+        fig_portfolio.add_trace(go.Scatter(
+            x=portfolio_performance.index,
+            y=portfolio_performance.values,
+            mode='lines',
+            name='PORTFOLIO',
+            line=dict(color='#FFAA00', width=4),
+            hovertemplate='<b>PORTFOLIO</b><br>%{y:.2f}%<br>%{x}<extra></extra>'
+        ))
+        
+        fig_portfolio.update_layout(
+            title=f"Portfolio Performance vs Individual Assets - {timeframe.upper()}",
+            paper_bgcolor='#000',
+            plot_bgcolor='#111',
+            font=dict(color='#FFAA00', size=10),
+            xaxis=dict(
+                gridcolor='#333',
+                showgrid=True,
+                title="Date"
+            ),
+            yaxis=dict(
+                gridcolor='#333',
+                showgrid=True,
+                title="Performance (%)"
+            ),
+            hovermode='x unified',
+            legend=dict(
+                orientation="v",
+                yanchor="top",
+                y=0.99,
+                xanchor="left",
+                x=0.01,
+                bgcolor='rgba(17,17,17,0.8)'
+            ),
+            height=500
+        )
+        
+        # Ligne horizontale à 100%
+        fig_portfolio.add_shape(
+            type="line",
+            x0=0, x1=1, xref="paper",
+            y0=100, y1=100,
+            line=dict(color="#666", width=1, dash="dash")
+        )
+        
+        st.plotly_chart(fig_portfolio, use_container_width=True)
+        
+        # Statistiques du portefeuille
+        st.markdown("#### 📊 PORTFOLIO STATISTICS")
+        
+        start_value = portfolio_performance.iloc[0]
+        end_value = portfolio_performance.iloc[-1]
+        total_return = end_value - start_value
+        
+        # Volatilité (écart-type des rendements quotidiens)
+        daily_returns = portfolio_performance.pct_change().dropna()
+        volatility = daily_returns.std() * (252 ** 0.5) * 100  # Annualisée
+        
+        # Sharpe Ratio (simplifié, sans taux sans risque)
+        sharpe = (daily_returns.mean() / daily_returns.std()) * (252 ** 0.5) if daily_returns.std() > 0 else 0
+        
+        # Max Drawdown
+        cumulative = (1 + daily_returns).cumprod()
+        running_max = cumulative.expanding().max()
+        drawdown = (cumulative - running_max) / running_max
+        max_drawdown = drawdown.min() * 100
+        
+        stat_cols = st.columns(5)
+        
+        with stat_cols[0]:
+            st.metric("Total Return", f"{total_return:+.2f}%")
+        
+        with stat_cols[1]:
+            st.metric("Volatility (ann.)", f"{volatility:.2f}%")
+        
+        with stat_cols[2]:
+            st.metric("Sharpe Ratio", f"{sharpe:.2f}")
+        
+        with stat_cols[3]:
+            st.metric("Max Drawdown", f"{max_drawdown:.2f}%")
+        
+        with stat_cols[4]:
+            end_date = portfolio_performance.index[-1].strftime('%Y-%m-%d')
+            st.metric("End Date", end_date)
+        
+        # Composition du portefeuille
+        st.markdown("**📋 Portfolio Composition:**")
+        comp_text = " | ".join([f"{ticker}: {weight:.1f}%" for ticker, weight in weights.items() if weight > 0])
+        st.text(comp_text)
+
+
 st.markdown('<hr>', unsafe_allow_html=True)
+
+
 
 # =============================================
 # INFO SYSTÈME
