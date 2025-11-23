@@ -29,7 +29,6 @@ st.set_page_config(
 
 # =============================================
 # STYLE BLOOMBERG TERMINAL
-# (La section style reste inchangée, je la laisse vide pour la concision)
 # =============================================
 st.markdown("""
 <style>
@@ -111,7 +110,7 @@ st.markdown("""
         color: #FFAA00;
     }
     
-    .news-card, .event-card {
+    .news-card {
         background: #111;
         border: 1px solid #333;
         border-left: 4px solid #FFAA00;
@@ -120,7 +119,7 @@ st.markdown("""
         transition: all 0.3s;
     }
     
-    .news-card:hover, .event-card:hover {
+    .news-card:hover {
         border-left-color: #00FF00;
         background: #1a1a1a;
     }
@@ -198,31 +197,6 @@ st.markdown("""
     }
     
     hr { border-color: #333; margin: 10px 0; }
-    
-    /* Styles spécifiques Calendrier */
-    .event-card {
-        border-left: 4px solid #00FFFF !important; /* Changement de couleur pour différencier */
-    }
-    
-    .event-title {
-        color: #00FF00; /* Vert pour le titre de l'événement */
-        font-size: 13px;
-        font-weight: bold;
-        margin-bottom: 5px;
-    }
-    
-    .event-meta {
-        font-size: 11px;
-        margin-bottom: 5px;
-    }
-    
-    .event-meta span {
-        font-weight: bold;
-    }
-    
-    .event-impact-high { color: #FF0000; font-weight: bold; }
-    .event-impact-medium { color: #FFAA00; }
-    .event-impact-low { color: #00FF00; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -259,24 +233,6 @@ def get_company_news(ticker, days_back=7):
         st.error(f"Erreur Finnhub: {e}")
         return []
 
-@st.cache_data(ttl=600) # Calendrier rafraîchi moins souvent
-def get_economic_calendar(days_ahead=30):
-    """Récupère le calendrier économique via Finnhub pour les 30 prochains jours"""
-    try:
-        today = datetime.now()
-        from_date = today.strftime("%Y-%m-%d")
-        to_date = (today + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
-        
-        # Finnhub Economic Calendar
-        url = f"https://finnhub.io/api/v1/calendar/economic?from={from_date}&to={to_date}&token={FINNHUB_API_KEY}"
-        response = requests.get(url)
-        if response.status_code == 200:
-            return response.json().get('economicCalendar', [])
-        return []
-    except Exception as e:
-        st.error(f"Erreur Finnhub: {e}")
-        return []
-
 def format_timestamp(timestamp):
     """Convertit un timestamp en date lisible"""
     try:
@@ -284,16 +240,6 @@ def format_timestamp(timestamp):
         return dt.strftime("%d/%m/%Y %H:%M")
     except:
         return "Date inconnue"
-
-def format_economic_date(date_time_str):
-    """Convertit la date/heure de l'API Finnhub en format lisible"""
-    try:
-        # Format attendu: 2025-01-20 16:30:00
-        dt = datetime.strptime(date_time_str, "%Y-%m-%d %H:%M:%S")
-        return dt.strftime("%d/%m/%Y %H:%M")
-    except:
-        return date_time_str # Retourne la chaîne originale si le formatage échoue
-
 
 def display_news_card(news_item, ticker="", show_summary=True):
     """Affiche une carte de news style Bloomberg"""
@@ -335,47 +281,6 @@ def display_news_card(news_item, ticker="", show_summary=True):
     </div>
     """, unsafe_allow_html=True)
 
-
-def display_event_card(event):
-    """Affiche une carte d'événement économique style Bloomberg"""
-    event_time = event.get('datetime', 'Date inconnue')
-    country = event.get('country', 'N/A')
-    event_title = event.get('event', 'Événement inconnu')
-    impact = event.get('impact', 'low')
-    actual = event.get('actual', 'N/A')
-    consensus = event.get('consensus', 'N/A')
-    prev = event.get('prev', 'N/A')
-    
-    # Déterminer la classe d'impact
-    impact_class = ""
-    if impact == 'high':
-        impact_class = "event-impact-high"
-    elif impact == 'medium':
-        impact_class = "event-impact-medium"
-    else:
-        impact_class = "event-impact-low"
-
-    # Symbole pour le drapeau (rudimentaire)
-    flag_map = {'US': '🇺🇸', 'EZ': '🇪🇺', 'CA': '🇨🇦', 'JP': '🇯🇵', 'GB': '🇬🇧', 'AU': '🇦🇺', 'DE': '🇩🇪'}
-    flag = flag_map.get(country, '🌐')
-
-    st.markdown(f"""
-    <div class="event-card">
-        <div class="event-title">{flag} {event_title}</div>
-        <div class="news-meta">
-            <span style="color:#FFF;">Date:</span> {format_economic_date(event_time)} • 
-            <span style="color:#FFF;">Pays:</span> <span class="news-ticker">{country}</span> • 
-            <span style="color:#FFF;">Impact:</span> <span class="{impact_class}">{impact.upper()}</span>
-        </div>
-        <div class="event-meta">
-            <span style="color:#00FFFF;">ACTUEL:</span> {actual} | 
-            <span style="color:#FFAA00;">CONSENSUS:</span> {consensus} | 
-            <span style="color:#333;">PRÉCÉDENT:</span> {prev}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-
 # =============================================
 # HEADER BLOOMBERG
 # =============================================
@@ -393,10 +298,10 @@ st.markdown(f"""
 # =============================================
 # ONGLETS PRINCIPAUX
 # =============================================
-tab_global, tab_search, tab_calendar = st.tabs(["📰 GLOBAL FEED", "🔍 SEARCH TICKER", "🗓️ ECONOMIC CALENDAR"])
+tab_global, tab_search = st.tabs(["📰 GLOBAL FEED", "🔍 SEARCH TICKER"])
 
 # =============================================
-# ONGLET 1 : GLOBAL FEED (inchangé)
+# ONGLET 1 : GLOBAL FEED
 # =============================================
 with tab_global:
     st.markdown("### 🌍 GLOBAL MARKET NEWS - FINNHUB")
@@ -447,10 +352,10 @@ with tab_global:
         for news in market_news[:50]:
             display_news_card(news, show_summary=True)
     else:
-        st.warning("⚠️ Aucune news disponible pour le moment")
+        st.warning(⚠️ Aucune news disponible pour le moment")
 
 # =============================================
-# ONGLET 2 : SEARCH TICKER (inchangé)
+# ONGLET 2 : SEARCH TICKER
 # =============================================
 with tab_search:
     st.markdown("### 🔍 SEARCH NEWS BY TICKER")
@@ -526,51 +431,6 @@ with tab_search:
             <div style="font-size:11px;margin-top:10px;color:#444;">Note: Finnhub supporte principalement les tickers US</div>
         </div>
         """, unsafe_allow_html=True)
-
-# =============================================
-# ONGLET 3 : ECONOMIC CALENDAR (NOUVEL AJOUT)
-# =============================================
-with tab_calendar:
-    st.markdown("### 🗓️ GLOBAL ECONOMIC CALENDAR - FINNHUB")
-    
-    st.markdown("""
-    <div style="color:#666;font-size:10px;padding:10px 0;">
-        Indicateurs économiques majeurs à venir (IPC, taux, emploi, etc.) pour les principales économies mondiales.
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Récupérer les événements
-    days_to_display = st.slider("Jours à afficher (depuis aujourd'hui)", 7, 90, 30)
-    
-    st.markdown('<hr>', unsafe_allow_html=True)
-
-    with st.spinner("📡 Chargement du calendrier économique..."):
-        economic_calendar = get_economic_calendar(days_to_display)
-
-    if economic_calendar:
-        # Trier par date pour l'affichage (Finnhub renvoie déjà souvent trié, mais c'est une sécurité)
-        economic_calendar.sort(key=lambda x: x.get('datetime', ''))
-        
-        # Stats
-        col_c1, col_c2, col_c3 = st.columns(3)
-        with col_c1:
-            st.metric("ÉVÉNEMENTS", len(economic_calendar))
-        with col_c2:
-            st.metric("PÉRIODE", f"Prochains {days_to_display} jours")
-        with col_c3:
-            st.metric("MAJ", datetime.now().strftime("%H:%M:%S"))
-        
-        st.markdown('<hr>', unsafe_allow_html=True)
-
-        # Afficher les événements
-        st.markdown(f'<div class="category-header">📊 ÉVÉNEMENTS ÉCONOMIQUES À VENIR - {len(economic_calendar)} ITEMS</div>', unsafe_allow_html=True)
-        
-        for event in economic_calendar:
-            display_event_card(event)
-
-    else:
-        st.warning("⚠️ Aucun événement économique disponible pour le moment ou erreur de l'API Finnhub.")
-
 
 # =============================================
 # FOOTER
