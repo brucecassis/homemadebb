@@ -1,5 +1,5 @@
 # pages/NEWS.py
-# Bloomberg Terminal - News Feed avec Finnhub API + Calendrier Économique
+# Bloomberg Terminal - News Feed avec Finnhub API + Calendrier Économique (Polygon.io)
 
 import streamlit as st
 import requests
@@ -9,9 +9,10 @@ from streamlit_autorefresh import st_autorefresh
 import pandas as pd
 
 # =============================================
-# CONFIGURATION FINNHUB
+# CONFIGURATION APIs
 # =============================================
 FINNHUB_API_KEY = "d14re49r01qop9mf2algd14re49r01qop9mf2am0"
+POLYGON_API_KEY = "F95xsJcPxjI5WHlyVfcWWTFy1mK9cfEi"
 
 # =============================================
 # AUTO-REFRESH TOUTES LES 60 SECONDES
@@ -73,14 +74,13 @@ st.markdown("""
         color: #000 !important;
     }
     
-    .stTextInput > div > div > input {
+    .stTextInput > div > div > input, .stDateInput > div > div > input {
         background-color: #111 !important;
         color: #FFAA00 !important;
         border: 2px solid #FFAA00 !important;
         border-radius: 0 !important;
         font-family: 'Courier New', monospace !important;
-        font-size: 14px !important;
-        text-transform: uppercase !important;
+        font-size: 12px !important;
     }
     
     .stTabs [data-baseweb="tab-list"] {
@@ -203,9 +203,6 @@ st.markdown("""
         border-left: 4px solid #00FFFF;
         padding: 12px 15px;
         margin: 8px 0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
         transition: all 0.3s;
     }
     
@@ -221,49 +218,21 @@ st.markdown("""
         font-weight: bold;
         font-size: 10px;
         margin-right: 15px;
-        min-width: 90px;
+        display: inline-block;
+        min-width: 100px;
         text-align: center;
-    }
-    
-    .event-info {
-        flex: 1;
     }
     
     .event-title {
         color: #FFAA00;
         font-size: 12px;
         font-weight: bold;
-        margin-bottom: 4px;
+        margin: 8px 0 4px 0;
     }
     
     .event-details {
         color: #888;
         font-size: 10px;
-    }
-    
-    .event-impact {
-        padding: 3px 8px;
-        font-size: 9px;
-        font-weight: bold;
-        border: 1px solid;
-    }
-    
-    .impact-high {
-        background: #FF0000;
-        color: #FFF;
-        border-color: #FF0000;
-    }
-    
-    .impact-medium {
-        background: #FFAA00;
-        color: #000;
-        border-color: #FFAA00;
-    }
-    
-    .impact-low {
-        background: #00FF00;
-        color: #000;
-        border-color: #00FF00;
     }
     
     .ipo-card {
@@ -287,6 +256,7 @@ st.markdown("""
         font-size: 11px;
         font-weight: bold;
         margin-right: 10px;
+        display: inline-block;
     }
     
     .ipo-name {
@@ -319,6 +289,11 @@ st.markdown("""
         background: #151515;
     }
     
+    .earnings-card.past {
+        border-left-color: #666;
+        opacity: 0.8;
+    }
+    
     .earnings-ticker {
         background: #00FF00;
         color: #000;
@@ -328,6 +303,11 @@ st.markdown("""
         margin-right: 15px;
         min-width: 70px;
         text-align: center;
+    }
+    
+    .earnings-ticker.past {
+        background: #666;
+        color: #FFF;
     }
     
     .earnings-info {
@@ -351,7 +331,15 @@ st.markdown("""
         font-size: 10px;
         font-weight: bold;
         text-align: right;
-        min-width: 100px;
+        min-width: 200px;
+    }
+    
+    .earnings-beat {
+        color: #00FF00 !important;
+    }
+    
+    .earnings-miss {
+        color: #FF0000 !important;
     }
     
     .dividend-card {
@@ -399,34 +387,6 @@ st.markdown("""
     }
     
     hr { border-color: #333; margin: 10px 0; }
-    
-    /* DataFrame styling */
-    .dataframe {
-        background: #111 !important;
-        color: #FFAA00 !important;
-        border: 1px solid #333 !important;
-        font-family: 'Courier New', monospace !important;
-        font-size: 10px !important;
-    }
-    
-    .dataframe th {
-        background: #FFAA00 !important;
-        color: #000 !important;
-        font-weight: bold !important;
-        padding: 8px !important;
-        text-align: left !important;
-    }
-    
-    .dataframe td {
-        background: #111 !important;
-        color: #FFAA00 !important;
-        padding: 6px !important;
-        border-bottom: 1px solid #222 !important;
-    }
-    
-    .dataframe tr:hover td {
-        background: #1a1a1a !important;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -464,37 +424,11 @@ def get_company_news(ticker, days_back=7):
         return []
 
 # =============================================
-# FONCTIONS FINNHUB - CALENDRIER
+# FONCTIONS FINNHUB - EARNINGS
 # =============================================
-@st.cache_data(ttl=3600)
-def get_economic_calendar():
-    """Calendrier économique"""
-    try:
-        url = f"https://finnhub.io/api/v1/calendar/economic?token={FINNHUB_API_KEY}"
-        response = requests.get(url)
-        if response.status_code == 200:
-            return response.json()
-        return {"economicCalendar": []}
-    except Exception as e:
-        st.error(f"Erreur calendrier économique: {e}")
-        return {"economicCalendar": []}
-
-@st.cache_data(ttl=3600)
-def get_ipo_calendar(from_date, to_date):
-    """Calendrier IPO"""
-    try:
-        url = f"https://finnhub.io/api/v1/calendar/ipo?from={from_date}&to={to_date}&token={FINNHUB_API_KEY}"
-        response = requests.get(url)
-        if response.status_code == 200:
-            return response.json()
-        return {"ipoCalendar": []}
-    except Exception as e:
-        st.error(f"Erreur calendrier IPO: {e}")
-        return {"ipoCalendar": []}
-
-@st.cache_data(ttl=3600)
-def get_earnings_calendar(from_date, to_date):
-    """Calendrier résultats trimestriels"""
+@st.cache_data(ttl=1800)
+def get_earnings_calendar_finnhub(from_date, to_date):
+    """Calendrier résultats trimestriels via Finnhub"""
     try:
         url = f"https://finnhub.io/api/v1/calendar/earnings?from={from_date}&to={to_date}&token={FINNHUB_API_KEY}"
         response = requests.get(url)
@@ -505,18 +439,77 @@ def get_earnings_calendar(from_date, to_date):
         st.error(f"Erreur calendrier earnings: {e}")
         return {"earningsCalendar": []}
 
+# =============================================
+# FONCTIONS POLYGON.IO
+# =============================================
 @st.cache_data(ttl=3600)
-def get_dividends(ticker, from_date, to_date):
-    """Dividendes pour un ticker"""
+def get_economic_events_polygon():
+    """Calendrier économique via Polygon.io"""
     try:
-        url = f"https://finnhub.io/api/v1/stock/dividend?symbol={ticker}&from={from_date}&to={to_date}&token={FINNHUB_API_KEY}"
+        # Note: Polygon n'a pas d'endpoint direct pour les événements économiques
+        # On peut utiliser les market holidays et status
+        url = f"https://api.polygon.io/v1/marketstatus/now?apiKey={POLYGON_API_KEY}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.json()
+        return {}
+    except Exception as e:
+        st.error(f"Erreur Polygon economic: {e}")
+        return {}
+
+@st.cache_data(ttl=3600)
+def get_market_holidays_polygon():
+    """Jours fériés du marché via Polygon.io"""
+    try:
+        url = f"https://api.polygon.io/v1/marketstatus/upcoming?apiKey={POLYGON_API_KEY}"
         response = requests.get(url)
         if response.status_code == 200:
             return response.json()
         return []
     except Exception as e:
-        st.error(f"Erreur dividendes: {e}")
+        st.error(f"Erreur Polygon holidays: {e}")
         return []
+
+@st.cache_data(ttl=3600)
+def get_dividends_polygon(ticker):
+    """Dividendes via Polygon.io"""
+    try:
+        url = f"https://api.polygon.io/v3/reference/dividends?ticker={ticker}&limit=100&apiKey={POLYGON_API_KEY}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get('results', [])
+        return []
+    except Exception as e:
+        st.error(f"Erreur Polygon dividends: {e}")
+        return []
+
+@st.cache_data(ttl=3600)
+def get_stock_splits_polygon(ticker):
+    """Stock splits via Polygon.io"""
+    try:
+        url = f"https://api.polygon.io/v3/reference/splits?ticker={ticker}&limit=50&apiKey={POLYGON_API_KEY}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get('results', [])
+        return []
+    except Exception as e:
+        st.error(f"Erreur Polygon splits: {e}")
+        return []
+
+@st.cache_data(ttl=3600)
+def get_ticker_details_polygon(ticker):
+    """Détails d'un ticker via Polygon.io"""
+    try:
+        url = f"https://api.polygon.io/v3/reference/tickers/{ticker}?apiKey={POLYGON_API_KEY}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get('results', {})
+        return {}
+    except Exception as e:
+        return {}
 
 # =============================================
 # FONCTIONS UTILITAIRES
@@ -587,7 +580,7 @@ st.markdown(f"""
         <div>⬛ BLOOMBERG ENS® | NEWS TERMINAL</div>
         <a href="accueil.html" style="background:#333;color:#FFAA00;border:1px solid #000;padding:4px 12px;font-size:11px;text-decoration:none;">ACCUEIL</a>
     </div>
-    <div>{current_time} UTC • FINNHUB API • AUTO-REFRESH: 60s</div>
+    <div>{current_time} UTC • FINNHUB + POLYGON.IO • AUTO-REFRESH: 60s</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -736,231 +729,390 @@ with tab_calendar:
     
     # Sous-onglets du calendrier
     sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs([
-        "📊 ECONOMIC EVENTS",
-        "🚀 IPO CALENDAR",
+        "📊 MARKET STATUS",
+        "🚀 TICKER INFO",
         "💰 EARNINGS CALENDAR",
-        "💵 DIVIDENDS"
+        "💵 DIVIDENDS & SPLITS"
     ])
     
-    # ========== SOUS-ONGLET 1: CALENDRIER ÉCONOMIQUE ==========
+    # ========== SOUS-ONGLET 1: MARKET STATUS (Polygon) ==========
     with sub_tab1:
-        st.markdown("#### 📊 ECONOMIC EVENTS & INDICATORS")
+        st.markdown("#### 📊 MARKET STATUS & HOLIDAYS")
         
         st.markdown("""
         <div style="color:#666;font-size:10px;margin:10px 0;">
-            Événements économiques majeurs, indicateurs macro-économiques et annonces des banques centrales
+            Statut du marché en temps réel et jours fériés à venir (Polygon.io)
         </div>
         """, unsafe_allow_html=True)
         
         st.markdown('<hr>', unsafe_allow_html=True)
         
-        with st.spinner("📡 Chargement du calendrier économique..."):
-            eco_data = get_economic_calendar()
+        col_m1, col_m2 = st.columns(2)
         
-        eco_events = eco_data.get("economicCalendar", [])
-        
-        if eco_events:
-            col_e1, col_e2 = st.columns(2)
-            with col_e1:
-                st.metric("ÉVÉNEMENTS", len(eco_events))
-            with col_e2:
-                st.metric("MAJ", datetime.now().strftime("%H:%M:%S"))
+        with col_m1:
+            st.markdown('<div class="category-header">🔴 MARKET STATUS NOW</div>', unsafe_allow_html=True)
             
-            st.markdown('<hr>', unsafe_allow_html=True)
-            st.markdown('<div class="category-header">📅 UPCOMING ECONOMIC EVENTS</div>', unsafe_allow_html=True)
+            with st.spinner("📡 Chargement du statut du marché..."):
+                market_status = get_economic_events_polygon()
             
-            for event in eco_events[:30]:
-                event_time = event.get("time", "N/A")
-                country = event.get("country", "N/A")
-                event_name = event.get("event", "Événement non spécifié")
-                impact = event.get("impact", "").lower()
-                actual = event.get("actual", "N/A")
-                estimate = event.get("estimate", "N/A")
-                previous = event.get("previous", "N/A")
+            if market_status:
+                market_open = market_status.get('market', 'unknown')
+                server_time = market_status.get('serverTime', 'N/A')
+                exchanges = market_status.get('exchanges', {})
                 
-                # Déterminer la classe d'impact
-                impact_class = "impact-low"
-                if impact == "high":
-                    impact_class = "impact-high"
-                elif impact == "medium":
-                    impact_class = "impact-medium"
+                status_color = "#00FF00" if market_open == "open" else "#FF0000"
+                status_text = "OPEN" if market_open == "open" else "CLOSED"
                 
                 st.markdown(f"""
                 <div class="event-card">
-                    <div class="event-date">{event_time}</div>
-                    <div class="event-info">
-                        <div class="event-title">{country} - {event_name}</div>
-                        <div class="event-details">
-                            ACTUAL: {actual} • FORECAST: {estimate} • PREVIOUS: {previous}
+                    <div style="text-align:center;">
+                        <div style="font-size:40px;margin:20px 0;">
+                            <span style="color:{status_color};">●</span>
+                        </div>
+                        <div style="color:#FFAA00;font-size:18px;font-weight:bold;margin-bottom:10px;">
+                            MARKET IS {status_text}
+                        </div>
+                        <div style="color:#888;font-size:10px;">
+                            Server Time: {server_time}
                         </div>
                     </div>
-                    <div class="event-impact {impact_class}">{impact.upper() if impact else "N/A"}</div>
                 </div>
                 """, unsafe_allow_html=True)
-        else:
-            st.info("ℹ️ Aucun événement économique disponible actuellement")
-    
-    # ========== SOUS-ONGLET 2: CALENDRIER IPO ==========
-    with sub_tab2:
-        st.markdown("#### 🚀 IPO CALENDAR - UPCOMING LISTINGS")
+                
+                if exchanges:
+                    st.markdown('<div style="color:#FFAA00;font-size:11px;margin-top:20px;font-weight:bold;">EXCHANGES STATUS:</div>', unsafe_allow_html=True)
+                    for exchange, status in exchanges.items():
+                        ex_status = "OPEN ✅" if status == "open" else "CLOSED ❌"
+                        st.markdown(f"""
+                        <div style="background:#111;padding:8px;margin:5px 0;border-left:3px solid #00FFFF;">
+                            <span style="color:#00FFFF;font-weight:bold;">{exchange.upper()}</span>: {ex_status}
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.info("ℹ️ Impossible de récupérer le statut du marché")
         
-        # Sélection de période
-        col_p1, col_p2 = st.columns(2)
-        with col_p1:
-            ipo_days_ahead = st.selectbox(
-                "Période à afficher",
-                options=[7, 14, 30, 60, 90],
-                format_func=lambda x: f"Prochains {x} jours",
-                key="ipo_period"
+        with col_m2:
+            st.markdown('<div class="category-header">📅 UPCOMING MARKET HOLIDAYS</div>', unsafe_allow_html=True)
+            
+            with st.spinner("📡 Chargement des jours fériés..."):
+                holidays = get_market_holidays_polygon()
+            
+            if holidays and isinstance(holidays, list):
+                for holiday in holidays[:10]:
+                    h_date = holiday.get('date', 'N/A')
+                    h_name = holiday.get('name', 'Holiday')
+                    h_status = holiday.get('status', 'closed')
+                    
+                    st.markdown(f"""
+                    <div class="event-card">
+                        <span class="event-date">{format_date(h_date) if h_date != 'N/A' else h_date}</span>
+                        <div class="event-title">{h_name}</div>
+                        <div class="event-details">Market Status: {h_status.upper()}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                <div style="text-align:center;padding:30px;color:#666;">
+                    <div style="font-size:30px;margin-bottom:15px;">📅</div>
+                    <div style="font-size:12px;">Aucun jour férié à afficher</div>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    # ========== SOUS-ONGLET 2: TICKER INFO (Polygon) ==========
+    with sub_tab2:
+        st.markdown("#### 🚀 TICKER DETAILS & INFORMATION")
+        
+        st.markdown("""
+        <div class="search-box">
+            <div style="color:#FFAA00;font-size:12px;margin-bottom:10px;">
+                Recherchez des informations détaillées sur un ticker US (Polygon.io)
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col_t1, col_t2 = st.columns([4, 1])
+        
+        with col_t1:
+            ticker_info_search = st.text_input(
+                "Ticker",
+                placeholder="Ex: AAPL, MSFT, TSLA...",
+                label_visibility="collapsed",
+                key="ticker_info"
             )
         
-        from_date_ipo = datetime.now().strftime("%Y-%m-%d")
-        to_date_ipo = (datetime.now() + timedelta(days=ipo_days_ahead)).strftime("%Y-%m-%d")
+        with col_t2:
+            ticker_search_btn = st.button("🔍 SEARCH", use_container_width=True, key="ticker_search")
         
         st.markdown('<hr>', unsafe_allow_html=True)
         
-        with st.spinner("📡 Chargement des IPOs à venir..."):
-            ipo_data = get_ipo_calendar(from_date_ipo, to_date_ipo)
-        
-        ipo_events = ipo_data.get("ipoCalendar", [])
-        
-        if ipo_events:
-            col_i1, col_i2, col_i3 = st.columns(3)
-            with col_i1:
-                st.metric("IPOs", len(ipo_events))
-            with col_i2:
-                st.metric("PÉRIODE", f"{ipo_days_ahead} jours")
-            with col_i3:
-                st.metric("MAJ", datetime.now().strftime("%H:%M:%S"))
+        if ticker_info_search:
+            ticker_clean = ticker_info_search.upper().strip()
             
-            st.markdown('<hr>', unsafe_allow_html=True)
-            st.markdown('<div class="category-header">🚀 UPCOMING IPOs</div>', unsafe_allow_html=True)
+            with st.spinner(f"📡 Recherche d'informations pour {ticker_clean}..."):
+                ticker_details = get_ticker_details_polygon(ticker_clean)
             
-            for ipo in ipo_events[:30]:
-                ipo_date = ipo.get("date", "N/A")
-                exchange = ipo.get("exchange", "N/A")
-                name = ipo.get("name", "N/A")
-                price_low = ipo.get("priceLow", "N/A")
-                price_high = ipo.get("priceHigh", "N/A")
-                shares = ipo.get("numberOfShares", "N/A")
-                total_shares = ipo.get("totalSharesValue", "N/A")
-                status = ipo.get("status", "N/A")
-                symbol = ipo.get("symbol", "N/A")
+            if ticker_details:
+                name = ticker_details.get('name', 'N/A')
+                market = ticker_details.get('market', 'N/A')
+                locale = ticker_details.get('locale', 'N/A')
+                primary_exchange = ticker_details.get('primary_exchange', 'N/A')
+                ticker_type = ticker_details.get('type', 'N/A')
+                active = ticker_details.get('active', False)
+                currency = ticker_details.get('currency_name', 'N/A')
+                cik = ticker_details.get('cik', 'N/A')
+                composite_figi = ticker_details.get('composite_figi', 'N/A')
+                share_class_figi = ticker_details.get('share_class_figi', 'N/A')
+                market_cap = ticker_details.get('market_cap', 'N/A')
+                phone = ticker_details.get('phone_number', 'N/A')
+                address = ticker_details.get('address', {})
+                description = ticker_details.get('description', 'N/A')
+                homepage = ticker_details.get('homepage_url', 'N/A')
+                total_employees = ticker_details.get('total_employees', 'N/A')
+                list_date = ticker_details.get('list_date', 'N/A')
                 
-                price_range = f"${price_low} - ${price_high}" if price_low != "N/A" and price_high != "N/A" else "N/A"
-                
+                # Affichage
                 st.markdown(f"""
                 <div class="ipo-card">
-                    <div style="display:flex;align-items:center;margin-bottom:8px;">
-                        <span class="ipo-ticker">{symbol}</span>
+                    <div style="display:flex;align-items:center;margin-bottom:12px;">
+                        <span class="ipo-ticker">{ticker_clean}</span>
                         <span class="ipo-name">{name}</span>
                     </div>
                     <div class="ipo-details">
-                        📅 {format_date(ipo_date)} • 🏦 {exchange} • 💰 {price_range} • 📊 {shares} shares • STATUS: {status}
+                        <b>Type:</b> {ticker_type} • <b>Market:</b> {market} • <b>Exchange:</b> {primary_exchange}<br>
+                        <b>Currency:</b> {currency} • <b>Active:</b> {'✅ Yes' if active else '❌ No'}<br>
+                        <b>Listed Since:</b> {format_date(list_date) if list_date != 'N/A' else 'N/A'}<br>
+                        <b>Market Cap:</b> ${market_cap:,} • <b>Employees:</b> {total_employees:,}<br>
+                        <b>CIK:</b> {cik} • <b>Phone:</b> {phone}<br>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+                
+                if description and description != 'N/A':
+                    st.markdown(f"""
+                    <div style="background:#111;border:1px solid #333;padding:15px;margin:15px 0;">
+                        <div style="color:#FFAA00;font-weight:bold;margin-bottom:8px;">DESCRIPTION:</div>
+                        <div style="color:#AAA;font-size:11px;line-height:1.6;">{description}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                if homepage and homepage != 'N/A':
+                    st.markdown(f"""
+                    <div style="margin:10px 0;">
+                        <a href="{homepage}" target="_blank" style="color:#00FFFF;text-decoration:none;">
+                            🌐 Visit Company Website →
+                        </a>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                # Adresse
+                if address:
+                    addr1 = address.get('address1', '')
+                    city = address.get('city', '')
+                    state = address.get('state', '')
+                    postal = address.get('postal_code', '')
+                    
+                    if any([addr1, city, state]):
+                        st.markdown(f"""
+                        <div style="background:#0a0a0a;border:1px solid #333;padding:10px;margin:10px 0;">
+                            <div style="color:#FFAA00;font-size:10px;font-weight:bold;">ADDRESS:</div>
+                            <div style="color:#888;font-size:10px;">{addr1}, {city}, {state} {postal}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.warning(f"⚠️ Aucune information trouvée pour {ticker_clean}")
         else:
-            st.info("ℹ️ Aucune IPO prévue dans la période sélectionnée")
+            st.markdown("""
+            <div style="text-align:center;padding:50px;color:#666;">
+                <div style="font-size:40px;margin-bottom:20px;">🔍</div>
+                <div style="font-size:14px;">Entrez un ticker pour voir ses informations détaillées</div>
+            </div>
+            """, unsafe_allow_html=True)
     
-    # ========== SOUS-ONGLET 3: CALENDRIER EARNINGS ==========
+    # ========== SOUS-ONGLET 3: EARNINGS CALENDAR (Finnhub amélioré) ==========
     with sub_tab3:
         st.markdown("#### 💰 EARNINGS CALENDAR - QUARTERLY RESULTS")
         
-        # Sélection de période
-        col_e1, col_e2 = st.columns(2)
+        st.markdown("""
+        <div style="color:#666;font-size:10px;margin:10px 0;">
+            Calendrier des résultats trimestriels avec estimations et résultats réels (Finnhub)
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Sélection de période personnalisée
+        col_e1, col_e2, col_e3 = st.columns(3)
+        
         with col_e1:
-            earn_days_ahead = st.selectbox(
-                "Période à afficher",
-                options=[7, 14, 30, 60],
-                format_func=lambda x: f"Prochains {x} jours",
-                key="earn_period"
+            from_date_earn = st.date_input(
+                "Date de début",
+                value=datetime.now() - timedelta(days=30),
+                key="earn_from"
             )
         
-        from_date_earn = datetime.now().strftime("%Y-%m-%d")
-        to_date_earn = (datetime.now() + timedelta(days=earn_days_ahead)).strftime("%Y-%m-%d")
+        with col_e2:
+            to_date_earn = st.date_input(
+                "Date de fin",
+                value=datetime.now() + timedelta(days=30),
+                key="earn_to"
+            )
+        
+        with col_e3:
+            earn_refresh = st.button("🔄 REFRESH", use_container_width=True, key="earn_refresh")
         
         st.markdown('<hr>', unsafe_allow_html=True)
         
+        from_str = from_date_earn.strftime("%Y-%m-%d")
+        to_str = to_date_earn.strftime("%Y-%m-%d")
+        
         with st.spinner("📡 Chargement du calendrier des résultats..."):
-            earn_data = get_earnings_calendar(from_date_earn, to_date_earn)
+            earn_data = get_earnings_calendar_finnhub(from_str, to_str)
         
         earnings_events = earn_data.get("earningsCalendar", [])
         
         if earnings_events:
-            col_ea1, col_ea2, col_ea3 = st.columns(3)
+            # Séparer passés et futurs
+            today = datetime.now().date()
+            past_earnings = []
+            future_earnings = []
+            
+            for e in earnings_events:
+                e_date_str = e.get('date', '')
+                try:
+                    e_date = datetime.strptime(e_date_str, "%Y-%m-%d").date()
+                    if e_date < today:
+                        past_earnings.append(e)
+                    else:
+                        future_earnings.append(e)
+                except:
+                    future_earnings.append(e)
+            
+            # Stats
+            col_ea1, col_ea2, col_ea3, col_ea4 = st.columns(4)
             with col_ea1:
-                st.metric("ENTREPRISES", len(earnings_events))
+                st.metric("TOTAL", len(earnings_events))
             with col_ea2:
-                st.metric("PÉRIODE", f"{earn_days_ahead} jours")
+                st.metric("PASSÉS", len(past_earnings))
             with col_ea3:
-                st.metric("MAJ", datetime.now().strftime("%H:%M:%S"))
+                st.metric("À VENIR", len(future_earnings))
+            with col_ea4:
+                st.metric("MAJ", datetime.now().strftime("%H:%M"))
             
             st.markdown('<hr>', unsafe_allow_html=True)
-            st.markdown('<div class="category-header">📈 UPCOMING EARNINGS RELEASES</div>', unsafe_allow_html=True)
             
-            for earning in earnings_events[:50]:
+            # Filtre d'affichage
+            display_filter = st.radio(
+                "Afficher",
+                options=["Tous", "À venir uniquement", "Passés uniquement"],
+                horizontal=True,
+                key="earn_filter"
+            )
+            
+            # Déterminer quoi afficher
+            if display_filter == "À venir uniquement":
+                to_display = future_earnings
+                header_text = "📅 UPCOMING EARNINGS"
+            elif display_filter == "Passés uniquement":
+                to_display = past_earnings
+                header_text = "📊 PAST EARNINGS"
+            else:
+                to_display = earnings_events
+                header_text = "📈 ALL EARNINGS"
+            
+            st.markdown(f'<div class="category-header">{header_text} - {len(to_display)} RESULTS</div>', unsafe_allow_html=True)
+            
+            for earning in to_display[:100]:
                 date = earning.get("date", "N/A")
                 symbol = earning.get("symbol", "N/A")
-                eps_actual = earning.get("epsActual", "N/A")
-                eps_estimate = earning.get("epsEstimate", "N/A")
+                eps_actual = earning.get("epsActual")
+                eps_estimate = earning.get("epsEstimate")
                 hour = earning.get("hour", "N/A")
                 quarter = earning.get("quarter", "N/A")
-                revenue_actual = earning.get("revenueActual", "N/A")
-                revenue_estimate = earning.get("revenueEstimate", "N/A")
+                revenue_actual = earning.get("revenueActual")
+                revenue_estimate = earning.get("revenueEstimate")
                 year = earning.get("year", "N/A")
                 
-                eps_info = f"EPS: {eps_estimate} (est.)" if eps_estimate != "N/A" else "EPS: N/A"
-                revenue_info = f"REV: {revenue_estimate}M (est.)" if revenue_estimate != "N/A" else ""
+                # Déterminer si passé
+                is_past = False
+                try:
+                    e_date = datetime.strptime(date, "%Y-%m-%d").date()
+                    is_past = e_date < today
+                except:
+                    pass
+                
+                past_class = "past" if is_past else ""
+                
+                # EPS Info avec comparaison
+                eps_html = ""
+                if eps_actual is not None and eps_estimate is not None:
+                    diff = eps_actual - eps_estimate
+                    beat_miss_class = "earnings-beat" if diff >= 0 else "earnings-miss"
+                    beat_miss_text = f"(Beat: +${abs(diff):.2f})" if diff >= 0 else f"(Miss: -${abs(diff):.2f})"
+                    eps_html = f"""
+                    <span class="{beat_miss_class}">
+                        EPS: ${eps_actual:.2f} vs ${eps_estimate:.2f} est. {beat_miss_text}
+                    </span>
+                    """
+                elif eps_estimate is not None:
+                    eps_html = f"EPS: ${eps_estimate:.2f} (est.)"
+                elif eps_actual is not None:
+                    eps_html = f"EPS: ${eps_actual:.2f} (actual)"
+                else:
+                    eps_html = "EPS: N/A"
+                
+                # Revenue Info avec comparaison
+                rev_html = ""
+                if revenue_actual is not None and revenue_estimate is not None:
+                    diff_rev = revenue_actual - revenue_estimate
+                    beat_miss_class_rev = "earnings-beat" if diff_rev >= 0 else "earnings-miss"
+                    beat_miss_text_rev = f"(Beat: +${abs(diff_rev):.0f}M)" if diff_rev >= 0 else f"(Miss: -${abs(diff_rev):.0f}M)"
+                    rev_html = f"""
+                    <br><span class="{beat_miss_class_rev}">
+                        REV: ${revenue_actual:.0f}M vs ${revenue_estimate:.0f}M est. {beat_miss_text_rev}
+                    </span>
+                    """
+                elif revenue_estimate is not None:
+                    rev_html = f"<br>REV: ${revenue_estimate:.0f}M (est.)"
+                elif revenue_actual is not None:
+                    rev_html = f"<br>REV: ${revenue_actual:.0f}M (actual)"
                 
                 st.markdown(f"""
-                <div class="earnings-card">
-                    <div class="earnings-ticker">{symbol}</div>
+                <div class="earnings-card {past_class}">
+                    <div class="earnings-ticker {past_class}">{symbol}</div>
                     <div class="earnings-info">
                         <div class="earnings-name">Q{quarter} {year} EARNINGS</div>
                         <div class="earnings-date">📅 {format_date(date)} • {hour}</div>
                     </div>
                     <div class="earnings-eps">
-                        {eps_info}<br>
-                        {revenue_info}
+                        {eps_html}
+                        {rev_html}
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
         else:
-            st.info("ℹ️ Aucun résultat trimestriel prévu dans la période sélectionnée")
+            st.info("ℹ️ Aucun résultat trimestriel dans la période sélectionnée")
     
-    # ========== SOUS-ONGLET 4: DIVIDENDES ==========
+    # ========== SOUS-ONGLET 4: DIVIDENDS & SPLITS (Polygon) ==========
     with sub_tab4:
-        st.markdown("#### 💵 DIVIDEND CALENDAR")
+        st.markdown("#### 💵 DIVIDENDS & STOCK SPLITS")
         
         st.markdown("""
         <div class="search-box">
             <div style="color:#FFAA00;font-size:12px;margin-bottom:10px;">
-                Entrez un ticker US pour voir son historique et calendrier de dividendes
+                Recherchez l'historique des dividendes et stock splits d'un ticker (Polygon.io)
             </div>
         </div>
         """, unsafe_allow_html=True)
         
-        col_d1, col_d2, col_d3 = st.columns([3, 1, 1])
+        col_d1, col_d2 = st.columns([4, 1])
         
         with col_d1:
             div_ticker = st.text_input(
-                "Ticker pour dividendes",
+                "Ticker",
                 placeholder="Ex: AAPL, MSFT, JNJ, KO...",
                 label_visibility="collapsed",
                 key="div_ticker"
             )
         
         with col_d2:
-            div_years = st.selectbox(
-                "Période",
-                options=[1, 2, 3, 5],
-                format_func=lambda x: f"{x} an{'s' if x>1 else ''}",
-                label_visibility="collapsed",
-                key="div_years"
-            )
-        
-        with col_d3:
             div_search_btn = st.button("🔍 SEARCH", use_container_width=True, key="div_search")
         
         st.markdown("""
@@ -974,53 +1126,86 @@ with tab_calendar:
         if div_ticker:
             ticker_div_clean = div_ticker.upper().strip()
             
-            from_date_div = (datetime.now() - timedelta(days=365*div_years)).strftime("%Y-%m-%d")
-            to_date_div = (datetime.now() + timedelta(days=180)).strftime("%Y-%m-%d")
+            # Onglets dividendes et splits
+            div_tab, split_tab = st.tabs(["💰 DIVIDENDS", "📊 STOCK SPLITS"])
             
-            with st.spinner(f"📡 Chargement des dividendes pour {ticker_div_clean}..."):
-                dividends = get_dividends(ticker_div_clean, from_date_div, to_date_div)
-            
-            if dividends:
-                col_dv1, col_dv2, col_dv3 = st.columns(3)
-                with col_dv1:
-                    st.metric("TICKER", ticker_div_clean)
-                with col_dv2:
-                    st.metric("PAIEMENTS", len(dividends))
-                with col_dv3:
-                    total_div = sum([d.get('amount', 0) for d in dividends])
-                    st.metric("TOTAL", f"${total_div:.2f}")
+            with div_tab:
+                with st.spinner(f"📡 Chargement des dividendes pour {ticker_div_clean}..."):
+                    dividends = get_dividends_polygon(ticker_div_clean)
                 
-                st.markdown('<hr>', unsafe_allow_html=True)
-                st.markdown(f'<div class="category-header">💰 {ticker_div_clean} - DIVIDEND HISTORY</div>', unsafe_allow_html=True)
-                
-                for div in dividends:
-                    amount = div.get("amount", 0)
-                    currency = div.get("currency", "USD")
-                    date = div.get("date", "N/A")
-                    declaration_date = div.get("declarationDate", "N/A")
-                    ex_date = div.get("exDate", "N/A")
-                    payment_date = div.get("payDate", "N/A")
-                    record_date = div.get("recordDate", "N/A")
+                if dividends:
+                    col_dv1, col_dv2, col_dv3 = st.columns(3)
+                    with col_dv1:
+                        st.metric("TICKER", ticker_div_clean)
+                    with col_dv2:
+                        st.metric("PAIEMENTS", len(dividends))
+                    with col_dv3:
+                        total_div = sum([d.get('cash_amount', 0) for d in dividends if d.get('cash_amount')])
+                        st.metric("TOTAL", f"${total_div:.2f}")
                     
-                    st.markdown(f"""
-                    <div class="dividend-card">
-                        <div class="dividend-amount">${amount:.4f}</div>
-                        <div class="dividend-info">
-                            <div class="dividend-date">📅 Payment Date: {format_date(payment_date)}</div>
-                            <div class="dividend-type">
-                                Ex-Date: {format_date(ex_date)} • Record: {format_date(record_date)} • Declaration: {format_date(declaration_date)}
+                    st.markdown('<hr>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="category-header">💰 {ticker_div_clean} - DIVIDEND HISTORY ({len(dividends)})</div>', unsafe_allow_html=True)
+                    
+                    for div in dividends[:50]:
+                        amount = div.get("cash_amount", 0)
+                        currency = div.get("currency", "USD")
+                        ex_date = div.get("ex_dividend_date", "N/A")
+                        payment_date = div.get("pay_date", "N/A")
+                        record_date = div.get("record_date", "N/A")
+                        declaration_date = div.get("declaration_date", "N/A")
+                        frequency = div.get("frequency", "N/A")
+                        div_type = div.get("dividend_type", "N/A")
+                        
+                        st.markdown(f"""
+                        <div class="dividend-card">
+                            <div class="dividend-amount">${amount:.4f}</div>
+                            <div class="dividend-info">
+                                <div class="dividend-date">💰 Payment: {format_date(payment_date) if payment_date != 'N/A' else 'N/A'}</div>
+                                <div class="dividend-type">
+                                    Ex-Date: {format_date(ex_date) if ex_date != 'N/A' else 'N/A'} • 
+                                    Record: {format_date(record_date) if record_date != 'N/A' else 'N/A'} • 
+                                    Type: {div_type} • Freq: {frequency}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-            else:
-                st.warning(f"⚠️ Aucun dividende trouvé pour {ticker_div_clean}")
+                        """, unsafe_allow_html=True)
+                else:
+                    st.warning(f"⚠️ Aucun dividende trouvé pour {ticker_div_clean}")
+            
+            with split_tab:
+                with st.spinner(f"📡 Chargement des splits pour {ticker_div_clean}..."):
+                    splits = get_stock_splits_polygon(ticker_div_clean)
+                
+                if splits:
+                    st.metric("STOCK SPLITS", len(splits))
+                    st.markdown('<hr>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="category-header">📊 {ticker_div_clean} - STOCK SPLITS HISTORY</div>', unsafe_allow_html=True)
+                    
+                    for split in splits:
+                        exec_date = split.get("execution_date", "N/A")
+                        split_from = split.get("split_from", 1)
+                        split_to = split.get("split_to", 1)
+                        
+                        ratio = f"{split_to}:{split_from}"
+                        ratio_decimal = split_to / split_from if split_from > 0 else 0
+                        
+                        st.markdown(f"""
+                        <div class="event-card">
+                            <span class="event-date">{format_date(exec_date) if exec_date != 'N/A' else 'N/A'}</span>
+                            <div class="event-title">STOCK SPLIT: {ratio} ({ratio_decimal:.2f}x)</div>
+                            <div class="event-details">
+                                Chaque action divisée en {split_to} nouvelles actions
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.info(f"ℹ️ Aucun stock split trouvé pour {ticker_div_clean}")
         else:
             st.markdown("""
             <div style="text-align:center;padding:50px;color:#666;">
                 <div style="font-size:40px;margin-bottom:20px;">💵</div>
-                <div style="font-size:14px;">Entrez un ticker ci-dessus pour voir son calendrier de dividendes</div>
-                <div style="font-size:11px;margin-top:10px;color:#444;">Recherchez des entreprises qui distribuent régulièrement des dividendes</div>
+                <div style="font-size:14px;">Entrez un ticker pour voir ses dividendes et stock splits</div>
+                <div style="font-size:11px;margin-top:10px;color:#444;">Recherchez l'historique complet des distributions</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -1030,7 +1215,7 @@ with tab_calendar:
 st.markdown('<hr>', unsafe_allow_html=True)
 st.markdown(f"""
 <div style='text-align: center; color: #666; font-size: 9px; font-family: "Courier New", monospace; padding: 10px;'>
-    © 2025 BLOOMBERG ENS® | FINNHUB API | SYSTÈME OPÉRATIONNEL<br>
+    © 2025 BLOOMBERG ENS® | FINNHUB + POLYGON.IO APIs | SYSTÈME OPÉRATIONNEL<br>
     AUTO-REFRESH: 60 SECONDES • DERNIÈRE MAJ: {datetime.now().strftime('%H:%M:%S')}
 </div>
 """, unsafe_allow_html=True)
