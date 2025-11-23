@@ -432,6 +432,57 @@ with tab_search:
         </div>
         """, unsafe_allow_html=True)
 
+# À ajouter dans vos fonctions Finnhub
+
+@st.cache_data(ttl=3600)  # Cache 1h car moins volatile
+def get_economic_calendar():
+    """Calendrier économique"""
+    try:
+        url = f"https://finnhub.io/api/v1/calendar/economic?token={FINNHUB_API_KEY}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.json()
+        return {}
+    except Exception as e:
+        st.error(f"Erreur: {e}")
+        return {}
+
+@st.cache_data(ttl=3600)
+def get_ipo_calendar(from_date, to_date):
+    """Calendrier IPO"""
+    try:
+        url = f"https://finnhub.io/api/v1/calendar/ipo?from={from_date}&to={to_date}&token={FINNHUB_API_KEY}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.json()
+        return {}
+    except Exception as e:
+        return {}
+
+@st.cache_data(ttl=3600)
+def get_earnings_calendar(from_date, to_date):
+    """Calendrier résultats trimestriels"""
+    try:
+        url = f"https://finnhub.io/api/v1/calendar/earnings?from={from_date}&to={to_date}&token={FINNHUB_API_KEY}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.json()
+        return {}
+    except Exception as e:
+        return {}
+
+@st.cache_data(ttl=3600)
+def get_dividends(ticker, from_date, to_date):
+    """Dividendes pour un ticker"""
+    try:
+        url = f"https://finnhub.io/api/v1/stock/dividend?symbol={ticker}&from={from_date}&to={to_date}&token={FINNHUB_API_KEY}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.json()
+        return []
+    except Exception as e:
+        return []
+
 # =============================================
 # FOOTER
 # =============================================
