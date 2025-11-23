@@ -352,7 +352,7 @@ with tab_global:
         for news in market_news[:50]:
             display_news_card(news, show_summary=True)
     else:
-        st.warning(⚠️ Aucune news disponible pour le moment")
+        st.warning("⚠️ Aucune news disponible pour le moment")
 
 # =============================================
 # ONGLET 2 : SEARCH TICKER
