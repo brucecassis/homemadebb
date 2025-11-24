@@ -21,3 +21,4 @@ python-docx
 openpyxl
 streamlit-autorefresh
 beautifulsoup4
+openbb
