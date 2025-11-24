@@ -1,9 +1,10 @@
 import streamlit as st
 import streamlit.components.v1 as components
-from openbb import obb
+import yfinance as yf
 import pandas as pd
 from datetime import datetime
 import time
+import requests
 
 # =============================================
 # PAGE CONFIG
@@ -253,144 +254,137 @@ if analyze_button or ticker:
     try:
         with st.spinner(f'🔄 CHARGEMENT DES DONNÉES POUR {ticker}...'):
             
+            # Récupération des données yfinance
+            stock = yf.Ticker(ticker)
+            info = stock.info
+            
             # ===== INFORMATIONS GÉNÉRALES =====
             st.markdown("### 📊 COMPANY OVERVIEW")
             
-            try:
-                # Profile de l'entreprise
-                profile = obb.equity.profile(ticker, provider="fmp")
-                
-                if profile and hasattr(profile, 'results'):
-                    data = profile.results[0] if isinstance(profile.results, list) else profile.results
-                    
-                    col1, col2, col3, col4 = st.columns(4)
-                    
-                    with col1:
-                        st.metric("COMPANY", data.name if hasattr(data, 'name') else ticker)
-                        st.metric("SECTOR", data.sector if hasattr(data, 'sector') else "N/A")
-                    
-                    with col2:
-                        st.metric("INDUSTRY", data.industry if hasattr(data, 'industry') else "N/A")
-                        st.metric("COUNTRY", data.country if hasattr(data, 'country') else "N/A")
-                    
-                    with col3:
-                        if hasattr(data, 'market_cap'):
-                            market_cap = f"${data.market_cap/1e9:.2f}B" if data.market_cap else "N/A"
-                            st.metric("MARKET CAP", market_cap)
-                        if hasattr(data, 'employees'):
-                            st.metric("EMPLOYEES", f"{data.employees:,}" if data.employees else "N/A")
-                    
-                    with col4:
-                        if hasattr(data, 'website'):
-                            st.markdown(f"**WEBSITE:** [{data.website}]({data.website})")
-                        if hasattr(data, 'ceo'):
-                            st.metric("CEO", data.ceo if data.ceo else "N/A")
-                    
-                    if hasattr(data, 'description') and data.description:
-                        with st.expander("📄 DESCRIPTION"):
-                            st.write(data.description)
+            col1, col2, col3, col4 = st.columns(4)
             
-            except Exception as e:
-                st.warning(f"⚠️ Profile non disponible: {str(e)}")
+            with col1:
+                st.metric("COMPANY", info.get('longName', ticker))
+                st.metric("SECTOR", info.get('sector', 'N/A'))
+            
+            with col2:
+                st.metric("INDUSTRY", info.get('industry', 'N/A'))
+                st.metric("COUNTRY", info.get('country', 'N/A'))
+            
+            with col3:
+                market_cap = info.get('marketCap')
+                if market_cap:
+                    market_cap_str = f"${market_cap/1e9:.2f}B"
+                else:
+                    market_cap_str = "N/A"
+                st.metric("MARKET CAP", market_cap_str)
+                
+                employees = info.get('fullTimeEmployees')
+                st.metric("EMPLOYEES", f"{employees:,}" if employees else "N/A")
+            
+            with col4:
+                website = info.get('website')
+                if website:
+                    st.markdown(f"**WEBSITE:** [{website}]({website})")
+                
+                ceo = info.get('companyOfficers')
+                if ceo and len(ceo) > 0:
+                    st.metric("CEO", ceo[0].get('name', 'N/A'))
+                else:
+                    st.metric("CEO", "N/A")
+            
+            description = info.get('longBusinessSummary')
+            if description:
+                with st.expander("📄 DESCRIPTION"):
+                    st.write(description)
             
             st.markdown('<hr>', unsafe_allow_html=True)
             
             # ===== RATIOS FINANCIERS =====
             st.markdown("### 💹 FINANCIAL RATIOS")
             
-            try:
-                ratios = obb.equity.fundamental.ratios(ticker, provider="fmp", limit=1)
-                
-                if ratios and hasattr(ratios, 'results') and ratios.results:
-                    ratio_data = ratios.results[0] if isinstance(ratios.results, list) else ratios.results
-                    
-                    col_ratio1, col_ratio2, col_ratio3, col_ratio4 = st.columns(4)
-                    
-                    with col_ratio1:
-                        st.markdown("**VALUATION**")
-                        pe = getattr(ratio_data, 'price_to_earnings_ratio', None) or getattr(ratio_data, 'pe_ratio', None)
-                        st.metric("P/E RATIO", f"{pe:.2f}" if pe else "N/A")
-                        
-                        pb = getattr(ratio_data, 'price_to_book_ratio', None) or getattr(ratio_data, 'pb_ratio', None)
-                        st.metric("P/B RATIO", f"{pb:.2f}" if pb else "N/A")
-                        
-                        ps = getattr(ratio_data, 'price_to_sales_ratio', None) or getattr(ratio_data, 'ps_ratio', None)
-                        st.metric("P/S RATIO", f"{ps:.2f}" if ps else "N/A")
-                    
-                    with col_ratio2:
-                        st.markdown("**PROFITABILITY**")
-                        roe = getattr(ratio_data, 'return_on_equity', None) or getattr(ratio_data, 'roe', None)
-                        st.metric("ROE", f"{roe*100:.2f}%" if roe else "N/A")
-                        
-                        roa = getattr(ratio_data, 'return_on_assets', None) or getattr(ratio_data, 'roa', None)
-                        st.metric("ROA", f"{roa*100:.2f}%" if roa else "N/A")
-                        
-                        margin = getattr(ratio_data, 'net_profit_margin', None) or getattr(ratio_data, 'profit_margin', None)
-                        st.metric("NET MARGIN", f"{margin*100:.2f}%" if margin else "N/A")
-                    
-                    with col_ratio3:
-                        st.markdown("**LIQUIDITY**")
-                        current = getattr(ratio_data, 'current_ratio', None)
-                        st.metric("CURRENT RATIO", f"{current:.2f}" if current else "N/A")
-                        
-                        quick = getattr(ratio_data, 'quick_ratio', None)
-                        st.metric("QUICK RATIO", f"{quick:.2f}" if quick else "N/A")
-                        
-                        cash = getattr(ratio_data, 'cash_ratio', None)
-                        st.metric("CASH RATIO", f"{cash:.2f}" if cash else "N/A")
-                    
-                    with col_ratio4:
-                        st.markdown("**LEVERAGE**")
-                        debt_equity = getattr(ratio_data, 'debt_to_equity', None) or getattr(ratio_data, 'debt_equity_ratio', None)
-                        st.metric("DEBT/EQUITY", f"{debt_equity:.2f}" if debt_equity else "N/A")
-                        
-                        debt_assets = getattr(ratio_data, 'debt_to_assets', None)
-                        st.metric("DEBT/ASSETS", f"{debt_assets:.2f}" if debt_assets else "N/A")
-                        
-                        interest = getattr(ratio_data, 'interest_coverage', None)
-                        st.metric("INT COVERAGE", f"{interest:.2f}" if interest else "N/A")
-                
-                else:
-                    st.info("📊 Ratios financiers non disponibles pour ce ticker")
+            col_ratio1, col_ratio2, col_ratio3, col_ratio4 = st.columns(4)
             
-            except Exception as e:
-                st.warning(f"⚠️ Ratios non disponibles: {str(e)}")
+            with col_ratio1:
+                st.markdown("**VALUATION**")
+                pe = info.get('trailingPE') or info.get('forwardPE')
+                st.metric("P/E RATIO", f"{pe:.2f}" if pe else "N/A")
+                
+                pb = info.get('priceToBook')
+                st.metric("P/B RATIO", f"{pb:.2f}" if pb else "N/A")
+                
+                ps = info.get('priceToSalesTrailing12Months')
+                st.metric("P/S RATIO", f"{ps:.2f}" if ps else "N/A")
+            
+            with col_ratio2:
+                st.markdown("**PROFITABILITY**")
+                roe = info.get('returnOnEquity')
+                st.metric("ROE", f"{roe*100:.2f}%" if roe else "N/A")
+                
+                roa = info.get('returnOnAssets')
+                st.metric("ROA", f"{roa*100:.2f}%" if roa else "N/A")
+                
+                margin = info.get('profitMargins')
+                st.metric("NET MARGIN", f"{margin*100:.2f}%" if margin else "N/A")
+            
+            with col_ratio3:
+                st.markdown("**LIQUIDITY**")
+                current = info.get('currentRatio')
+                st.metric("CURRENT RATIO", f"{current:.2f}" if current else "N/A")
+                
+                quick = info.get('quickRatio')
+                st.metric("QUICK RATIO", f"{quick:.2f}" if quick else "N/A")
+                
+                cash = info.get('cashRatio')
+                st.metric("CASH RATIO", f"{cash:.2f}" if cash else "N/A")
+            
+            with col_ratio4:
+                st.markdown("**LEVERAGE**")
+                debt_equity = info.get('debtToEquity')
+                st.metric("DEBT/EQUITY", f"{debt_equity:.2f}" if debt_equity else "N/A")
+                
+                total_debt = info.get('totalDebt')
+                total_assets = info.get('totalAssets')
+                if total_debt and total_assets and total_assets > 0:
+                    debt_assets = total_debt / total_assets
+                    st.metric("DEBT/ASSETS", f"{debt_assets:.2f}")
+                else:
+                    st.metric("DEBT/ASSETS", "N/A")
+                
+                interest = info.get('interestCoverage')
+                st.metric("INT COVERAGE", f"{interest:.2f}" if interest else "N/A")
             
             st.markdown('<hr>', unsafe_allow_html=True)
             
             # ===== MÉTRIQUES CLÉS =====
             st.markdown("### 📈 KEY METRICS")
             
-            try:
-                metrics = obb.equity.fundamental.metrics(ticker, provider="fmp", limit=1)
-                
-                if metrics and hasattr(metrics, 'results') and metrics.results:
-                    metric_data = metrics.results[0] if isinstance(metrics.results, list) else metrics.results
-                    
-                    col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
-                    
-                    with col_m1:
-                        revenue = getattr(metric_data, 'revenue_per_share', None)
-                        st.metric("REVENUE/SHARE", f"${revenue:.2f}" if revenue else "N/A")
-                    
-                    with col_m2:
-                        eps = getattr(metric_data, 'net_income_per_share', None) or getattr(metric_data, 'earnings_per_share', None)
-                        st.metric("EPS", f"${eps:.2f}" if eps else "N/A")
-                    
-                    with col_m3:
-                        book = getattr(metric_data, 'book_value_per_share', None)
-                        st.metric("BOOK VALUE/SHARE", f"${book:.2f}" if book else "N/A")
-                    
-                    with col_m4:
-                        fcf = getattr(metric_data, 'free_cash_flow_per_share', None)
-                        st.metric("FCF/SHARE", f"${fcf:.2f}" if fcf else "N/A")
-                    
-                    with col_m5:
-                        div = getattr(metric_data, 'dividend_yield', None)
-                        st.metric("DIV YIELD", f"{div*100:.2f}%" if div else "N/A")
+            col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
             
-            except Exception as e:
-                st.warning(f"⚠️ Métriques non disponibles: {str(e)}")
+            with col_m1:
+                revenue_per_share = info.get('revenuePerShare')
+                st.metric("REVENUE/SHARE", f"${revenue_per_share:.2f}" if revenue_per_share else "N/A")
+            
+            with col_m2:
+                eps = info.get('trailingEps')
+                st.metric("EPS", f"${eps:.2f}" if eps else "N/A")
+            
+            with col_m3:
+                book_value = info.get('bookValue')
+                st.metric("BOOK VALUE/SHARE", f"${book_value:.2f}" if book_value else "N/A")
+            
+            with col_m4:
+                fcf = info.get('freeCashflow')
+                shares = info.get('sharesOutstanding')
+                if fcf and shares and shares > 0:
+                    fcf_per_share = fcf / shares
+                    st.metric("FCF/SHARE", f"${fcf_per_share:.2f}")
+                else:
+                    st.metric("FCF/SHARE", "N/A")
+            
+            with col_m5:
+                div_yield = info.get('dividendYield')
+                st.metric("DIV YIELD", f"{div_yield*100:.2f}%" if div_yield else "N/A")
             
             st.markdown('<hr>', unsafe_allow_html=True)
             
@@ -398,14 +392,16 @@ if analyze_button or ticker:
             st.markdown("### 📰 LATEST NEWS")
             
             try:
-                news = obb.news.company(ticker, provider="fmp", limit=10)
+                news = stock.news
                 
-                if news and hasattr(news, 'results') and news.results:
-                    for article in news.results[:10]:
-                        title = getattr(article, 'title', 'No title')
-                        published = getattr(article, 'published_date', None) or getattr(article, 'date', None)
-                        url = getattr(article, 'url', None) or getattr(article, 'link', None)
-                        source = getattr(article, 'source', None) or getattr(article, 'site', 'Unknown')
+                if news and len(news) > 0:
+                    for article in news[:10]:
+                        title = article.get('title', 'No title')
+                        published = article.get('providerPublishTime')
+                        if published:
+                            published = datetime.fromtimestamp(published).strftime('%Y-%m-%d %H:%M')
+                        url = article.get('link')
+                        source = article.get('publisher', 'Unknown')
                         
                         st.markdown(f"""
                         <div class="news-item">
@@ -428,45 +424,50 @@ if analyze_button or ticker:
             st.markdown("### 📊 PRICE HISTORY (1 YEAR)")
             
             try:
-                historical = obb.equity.price.historical(ticker, provider="fmp", start_date="2024-01-01")
+                df = stock.history(period="1y")
                 
-                if historical and hasattr(historical, 'results') and historical.results:
-                    # Conversion en DataFrame
-                    df = pd.DataFrame([vars(x) for x in historical.results])
+                if not df.empty:
+                    # Stats rapides
+                    col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
                     
-                    if not df.empty and 'date' in df.columns:
-                        df = df.sort_values('date')
-                        
-                        # Stats rapides
-                        col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
-                        
-                        if 'close' in df.columns:
-                            current_price = df['close'].iloc[-1]
-                            year_ago_price = df['close'].iloc[0]
-                            change = ((current_price - year_ago_price) / year_ago_price) * 100
-                            
-                            with col_stat1:
-                                st.metric("CURRENT PRICE", f"${current_price:.2f}")
-                            with col_stat2:
-                                st.metric("1Y CHANGE", f"{change:+.2f}%")
-                            with col_stat3:
-                                st.metric("52W HIGH", f"${df['close'].max():.2f}")
-                            with col_stat4:
-                                st.metric("52W LOW", f"${df['close'].min():.2f}")
-                        
-                        # Afficher le DataFrame
-                        st.dataframe(
-                            df[['date', 'open', 'high', 'low', 'close', 'volume']].tail(20),
-                            use_container_width=True,
-                            hide_index=True
-                        )
+                    current_price = df['Close'].iloc[-1]
+                    year_ago_price = df['Close'].iloc[0]
+                    change = ((current_price - year_ago_price) / year_ago_price) * 100
+                    
+                    with col_stat1:
+                        st.metric("CURRENT PRICE", f"${current_price:.2f}")
+                    with col_stat2:
+                        st.metric("1Y CHANGE", f"{change:+.2f}%")
+                    with col_stat3:
+                        st.metric("52W HIGH", f"${df['Close'].max():.2f}")
+                    with col_stat4:
+                        st.metric("52W LOW", f"${df['Close'].min():.2f}")
+                    
+                    # Préparer le DataFrame pour affichage
+                    df_display = df.reset_index()
+                    df_display['Date'] = df_display['Date'].dt.strftime('%Y-%m-%d')
+                    df_display = df_display.rename(columns={
+                        'Date': 'date',
+                        'Open': 'open',
+                        'High': 'high',
+                        'Low': 'low',
+                        'Close': 'close',
+                        'Volume': 'volume'
+                    })
+                    
+                    # Afficher le DataFrame
+                    st.dataframe(
+                        df_display[['date', 'open', 'high', 'low', 'close', 'volume']].tail(20),
+                        use_container_width=True,
+                        hide_index=True
+                    )
             
             except Exception as e:
                 st.warning(f"⚠️ Historique non disponible: {str(e)}")
     
     except Exception as e:
         st.error(f"❌ ERREUR: {str(e)}")
-        st.info("💡 Vérifiez que le ticker est valide et que l'API OpenBB est configurée")
+        st.info("💡 Vérifiez que le ticker est valide")
 
 st.markdown('<hr>', unsafe_allow_html=True)
 
@@ -478,7 +479,7 @@ col_info1, col_info2 = st.columns([6, 6])
 with col_info1:
     st.markdown("""
     <div style="color:#666;font-size:10px;padding:5px;">
-        📊 DONNÉES: TRADINGVIEW + OPENBB (FMP PROVIDER)<br>
+        📊 DONNÉES: TRADINGVIEW + YAHOO FINANCE<br>
         🔄 GRAPHIQUES EN TEMPS RÉEL • DONNÉES FINANCIÈRES ACTUALISÉES
     </div>
     """, unsafe_allow_html=True)
@@ -498,7 +499,7 @@ with col_info2:
 st.markdown('<hr>', unsafe_allow_html=True)
 st.markdown(f"""
 <div style='text-align: center; color: #666; font-size: 9px; font-family: "Courier New", monospace; padding: 10px;'>
-    © 2025 BLOOMBERG ENS® | TRADINGVIEW CHARTS • OPENBB ANALYTICS | FINANCIAL DATA PLATFORM<br>
-    POWERED BY FMP • REAL-TIME CHARTING • LAST UPDATE: {datetime.now().strftime('%H:%M:%S')}
+    © 2025 BLOOMBERG ENS® | TRADINGVIEW CHARTS • YAHOO FINANCE ANALYTICS | FINANCIAL DATA PLATFORM<br>
+    POWERED BY YFINANCE • REAL-TIME CHARTING • LAST UPDATE: {datetime.now().strftime('%H:%M:%S')}
 </div>
 """, unsafe_allow_html=True)
