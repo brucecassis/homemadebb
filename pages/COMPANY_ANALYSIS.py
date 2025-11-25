@@ -7,6 +7,7 @@ from plotly.subplots import make_subplots
 import numpy as np
 from groq import Groq
 import json
+import streamlit.components.v1 as components
 
 # Configuration de la page
 st.set_page_config(
@@ -152,6 +153,15 @@ st.markdown("""
     
     .dataframe {
         font-family: 'Courier New', monospace !important;
+    }
+    
+    /* TradingView container styling */
+    .tradingview-container {
+        background-color: #000;
+        border: 2px solid #FFAA00;
+        border-radius: 0;
+        padding: 10px;
+        margin: 15px 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -309,6 +319,182 @@ Use emojis and be concise but insightful. Format with clear sections."""
     except Exception as e:
         return f"❌ Error during AI analysis: {str(e)}\n\nPlease check:\n- Your GROQ_API_KEY is correctly set in Streamlit secrets\n- You have internet connection\n- The Groq API is available"
 
+
+def get_tradingview_symbol(ticker):
+    """Convertit un ticker Yahoo Finance en symbole TradingView"""
+    # Mapping des suffixes Yahoo Finance vers TradingView
+    exchange_mapping = {
+        '.PA': 'EURONEXT:',  # Paris
+        '.DE': 'XETR:',       # Germany (Xetra)
+        '.SW': 'SIX:',        # Switzerland
+        '.L': 'LSE:',         # London
+        '.AS': 'EURONEXT:',   # Amsterdam
+        '.BR': 'EURONEXT:',   # Brussels
+        '.MI': 'MIL:',        # Milan
+        '.MC': 'BME:',        # Madrid
+        '.TO': 'TSX:',        # Toronto
+        '.HK': 'HKEX:',       # Hong Kong
+        '.T': 'TSE:',         # Tokyo
+        '.AX': 'ASX:',        # Australia
+        '.SI': 'SGX:',        # Singapore
+        '.KS': 'KRX:',        # Korea
+        '.NS': 'NSE:',        # India NSE
+        '.BO': 'BSE:',        # India BSE
+    }
+    
+    # Transformer le ticker pour TradingView
+    for suffix, exchange in exchange_mapping.items():
+        if ticker.endswith(suffix):
+            return exchange + ticker.replace(suffix, '')
+    
+    # Si pas de suffixe, c'est probablement un ticker US
+    if '.' not in ticker:
+        return ticker
+    
+    return ticker
+
+
+def render_tradingview_chart(symbol, theme="dark", style="1", interval="D", height=600):
+    """Render TradingView advanced chart widget"""
+    
+    # Couleurs personnalisées Bloomberg style
+    if theme == "dark":
+        bg_color = "000000"
+        grid_color = "1a1a1a"
+        up_color = "00ff00"
+        down_color = "ff0000"
+        text_color = "ffaa00"
+    else:
+        bg_color = "ffffff"
+        grid_color = "e0e0e0"
+        up_color = "26a69a"
+        down_color = "ef5350"
+        text_color = "000000"
+    
+    widget_html = f'''
+    <div class="tradingview-widget-container" style="height:{height}px;width:100%;">
+      <div id="tradingview_advanced" style="height:100%;width:100%;"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+      <script type="text/javascript">
+      new TradingView.widget({{
+        "autosize": true,
+        "symbol": "{symbol}",
+        "interval": "{interval}",
+        "timezone": "Europe/Paris",
+        "theme": "{theme}",
+        "style": "{style}",
+        "locale": "en",
+        "toolbar_bg": "#{bg_color}",
+        "enable_publishing": false,
+        "withdateranges": true,
+        "hide_side_toolbar": false,
+        "allow_symbol_change": true,
+        "watchlist": [],
+        "details": true,
+        "hotlist": true,
+        "calendar": true,
+        "studies": [
+            "STD;SMA",
+            "STD;RSI",
+            "STD;MACD"
+        ],
+        "container_id": "tradingview_advanced",
+        "show_popup_button": true,
+        "popup_width": "1000",
+        "popup_height": "650",
+        "overrides": {{
+            "paneProperties.background": "#{bg_color}",
+            "paneProperties.backgroundType": "solid",
+            "paneProperties.vertGridProperties.color": "#{grid_color}",
+            "paneProperties.horzGridProperties.color": "#{grid_color}",
+            "scalesProperties.textColor": "#{text_color}",
+            "mainSeriesProperties.candleStyle.upColor": "#{up_color}",
+            "mainSeriesProperties.candleStyle.downColor": "#{down_color}",
+            "mainSeriesProperties.candleStyle.wickUpColor": "#{up_color}",
+            "mainSeriesProperties.candleStyle.wickDownColor": "#{down_color}",
+            "mainSeriesProperties.candleStyle.borderUpColor": "#{up_color}",
+            "mainSeriesProperties.candleStyle.borderDownColor": "#{down_color}",
+            "mainSeriesProperties.hollowCandleStyle.upColor": "#{up_color}",
+            "mainSeriesProperties.hollowCandleStyle.downColor": "#{down_color}",
+            "mainSeriesProperties.barStyle.upColor": "#{up_color}",
+            "mainSeriesProperties.barStyle.downColor": "#{down_color}",
+            "mainSeriesProperties.lineStyle.color": "#{text_color}",
+            "mainSeriesProperties.areaStyle.color1": "rgba(255, 170, 0, 0.28)",
+            "mainSeriesProperties.areaStyle.color2": "rgba(255, 170, 0, 0.05)",
+            "mainSeriesProperties.areaStyle.linecolor": "#{text_color}"
+        }}
+      }});
+      </script>
+    </div>
+    '''
+    return widget_html
+
+
+def render_tradingview_mini(symbol, theme="dark"):
+    """Render TradingView mini chart widget"""
+    widget_html = f'''
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
+      {{
+        "symbol": "{symbol}",
+        "width": "100%",
+        "height": "220",
+        "locale": "en",
+        "dateRange": "12M",
+        "colorTheme": "{theme}",
+        "isTransparent": true,
+        "autosize": true,
+        "largeChartUrl": ""
+      }}
+      </script>
+    </div>
+    '''
+    return widget_html
+
+
+def render_tradingview_technical_analysis(symbol, theme="dark"):
+    """Render TradingView technical analysis widget"""
+    widget_html = f'''
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+      {{
+        "interval": "1D",
+        "width": "100%",
+        "isTransparent": true,
+        "height": "400",
+        "symbol": "{symbol}",
+        "showIntervalTabs": true,
+        "displayMode": "single",
+        "locale": "en",
+        "colorTheme": "{theme}"
+      }}
+      </script>
+    </div>
+    '''
+    return widget_html
+
+
+def render_tradingview_symbol_info(symbol, theme="dark"):
+    """Render TradingView symbol info widget"""
+    widget_html = f'''
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-info.js" async>
+      {{
+        "symbol": "{symbol}",
+        "width": "100%",
+        "locale": "en",
+        "colorTheme": "{theme}",
+        "isTransparent": true
+      }}
+      </script>
+    </div>
+    '''
+    return widget_html
+
+
 # ===== BARRE DE RECHERCHE =====
 st.markdown("### 🔍 COMPANY SEARCH")
 
@@ -331,24 +517,28 @@ st.markdown('<div style="border-bottom: 1px solid #333; margin: 8px 0;"></div>',
 if search_button and ticker_input:
     st.session_state['current_ticker'] = ticker_input
 
+# Permettre la recherche avec Entrée (le ticker_input déclenche automatiquement)
+if ticker_input and ticker_input != st.session_state.get('current_ticker', ''):
+    st.session_state['current_ticker'] = ticker_input
+
 # ⭐ UTILISER LE TICKER SAUVEGARDÉ ⭐
 display_ticker = st.session_state.get('current_ticker', None)
 
 # ===== AFFICHAGE DES DONNÉES =====
 if display_ticker:
-    with st.spinner(f'🔍 Analyzing {ticker_input}...'):
-        stock, info = get_company_info(ticker_input)
+    with st.spinner(f'🔍 Analyzing {display_ticker}...'):
+        stock, info = get_company_info(display_ticker)
         
         if stock and info:
             # ===== COMPANY HEADER =====
-            company_name = info.get('longName', ticker_input)
+            company_name = info.get('longName', display_ticker)
             sector = info.get('sector', 'N/A')
             industry = info.get('industry', 'N/A')
             website = info.get('website', 'N/A')
             
             st.markdown(f"""
             <div class="company-header">
-                <h1 style="font-size: 24px; margin: 0; color: #00FF00;">{company_name} ({ticker_input})</h1>
+                <h1 style="font-size: 24px; margin: 0; color: #00FF00;">{company_name} ({display_ticker})</h1>
                 <p style="margin: 5px 0; font-size: 12px; color: #FFAA00;">
                     <strong>Sector:</strong> {sector} | <strong>Industry:</strong> {industry}
                 </p>
@@ -359,13 +549,14 @@ if display_ticker:
             """, unsafe_allow_html=True)
             
             # ===== ONGLETS PRINCIPAUX =====
-            tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+            tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
                 "📊 OVERVIEW",
                 "💰 FINANCIALS",
                 "📈 PRICE & PERFORMANCE",
                 "📊 VALUATION",
                 "📰 NEWS & EVENTS",
-                "🔍 DETAILED INFO"
+                "🔍 DETAILED INFO",
+                "📺 TRADINGVIEW"
             ])
             
             # ===== TAB 1: OVERVIEW =====
@@ -489,7 +680,7 @@ if display_ticker:
             with tab2:
                 st.markdown("### 💰 FINANCIAL STATEMENTS")
                 
-                financials = get_financial_statements(ticker_input)
+                financials = get_financial_statements(display_ticker)
                 
                 if financials:
                     fin_tab1, fin_tab2, fin_tab3 = st.tabs([
@@ -545,7 +736,7 @@ if display_ticker:
                                         "Income Statement",
                                         income_df,
                                         company_name,
-                                        ticker_input
+                                        display_ticker
                                     )
                                     
                                     st.markdown("#### 🤖 AI FINANCIAL ANALYSIS")
@@ -634,7 +825,7 @@ if display_ticker:
                                         "Balance Sheet",
                                         balance_df,
                                         company_name,
-                                        ticker_input
+                                        display_ticker
                                     )
                                     
                                     st.markdown("#### 🤖 AI FINANCIAL ANALYSIS")
@@ -723,7 +914,7 @@ if display_ticker:
                                         "Cash Flow",
                                         cashflow_df,
                                         company_name,
-                                        ticker_input
+                                        display_ticker
                                     )
                                     
                                     st.markdown("#### 🤖 AI FINANCIAL ANALYSIS")
@@ -781,7 +972,7 @@ if display_ticker:
                     if st.button("📊 UPDATE CHART", use_container_width=True):
                         st.cache_data.clear()
                 
-                price_hist = get_price_history(ticker_input, period=time_period)
+                price_hist = get_price_history(display_ticker, period=time_period)
                 
                 if price_hist is not None and not price_hist.empty:
                     fig = make_subplots(
@@ -821,7 +1012,7 @@ if display_ticker:
                     )
                     
                     fig.update_layout(
-                        title=f"{ticker_input} Price Chart",
+                        title=f"{display_ticker} Price Chart",
                         paper_bgcolor='#000',
                         plot_bgcolor='#111',
                         font=dict(color='#FFAA00', size=10),
@@ -1230,15 +1421,135 @@ if display_ticker:
                     
                     info_df = pd.DataFrame(info_items)
                     st.dataframe(info_df, use_container_width=True, hide_index=True)
+            
+            # ===== TAB 7: TRADINGVIEW =====
+            with tab7:
+                st.markdown("### 📺 TRADINGVIEW INTERACTIVE CHART")
+                
+                # Convertir le ticker pour TradingView
+                tv_symbol = get_tradingview_symbol(display_ticker)
+                
+                st.markdown(f"""
+                <div style="background-color: #111; border-left: 3px solid #FFAA00; padding: 10px; margin: 10px 0;">
+                    <p style="margin: 0; font-size: 11px; color: #999;">
+                        <strong style="color: #FFAA00;">Yahoo Ticker:</strong> {display_ticker} | 
+                        <strong style="color: #FFAA00;">TradingView Symbol:</strong> {tv_symbol}
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Options de personnalisation
+                st.markdown("#### ⚙️ CHART SETTINGS")
+                
+                col_tv1, col_tv2, col_tv3, col_tv4 = st.columns(4)
+                
+                with col_tv1:
+                    chart_theme = st.selectbox(
+                        "THEME",
+                        options=["dark", "light"],
+                        index=0,
+                        key="tv_theme"
+                    )
+                
+                with col_tv2:
+                    chart_style = st.selectbox(
+                        "CHART STYLE",
+                        options=["1", "2", "3", "4", "5", "6", "7", "8", "9"],
+                        format_func=lambda x: {
+                            "1": "📊 Bars",
+                            "2": "🕯️ Candles", 
+                            "3": "📈 Line",
+                            "4": "📉 Area",
+                            "5": "🧱 Renko",
+                            "6": "📐 Kagi",
+                            "7": "⬜ Point & Figure",
+                            "8": "📏 Line Break",
+                            "9": "🔶 Heikin Ashi"
+                        }.get(x, x),
+                        index=1,
+                        key="tv_style"
+                    )
+                
+                with col_tv3:
+                    chart_interval = st.selectbox(
+                        "INTERVAL",
+                        options=["1", "5", "15", "30", "60", "240", "D", "W", "M"],
+                        format_func=lambda x: {
+                            "1": "1 min",
+                            "5": "5 min",
+                            "15": "15 min",
+                            "30": "30 min",
+                            "60": "1 hour",
+                            "240": "4 hours",
+                            "D": "1 Day",
+                            "W": "1 Week",
+                            "M": "1 Month"
+                        }.get(x, x),
+                        index=6,
+                        key="tv_interval"
+                    )
+                
+                with col_tv4:
+                    chart_height = st.selectbox(
+                        "HEIGHT",
+                        options=[400, 500, 600, 700, 800],
+                        index=2,
+                        key="tv_height"
+                    )
+                
+                st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+                
+                # Graphique principal TradingView
+                st.markdown("#### 📈 ADVANCED CHART")
+                
+                chart_html = render_tradingview_chart(
+                    tv_symbol, 
+                    theme=chart_theme, 
+                    style=chart_style, 
+                    interval=chart_interval, 
+                    height=chart_height
+                )
+                components.html(chart_html, height=chart_height + 20)
+                
+                st.markdown(f"""
+                <div style="background-color: #0a0a0a; border-left: 3px solid #00FF00; padding: 10px; margin: 10px 0;">
+                    <p style="margin: 0; font-size: 10px; color: #999;">
+                        <strong style="color: #00FF00;">💡 TIP:</strong> Use the chart toolbar to add indicators, draw trendlines, 
+                        and customize your analysis. Pre-loaded indicators: SMA, RSI, MACD
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                st.markdown('<div style="border-bottom: 1px solid #333; margin: 20px 0;"></div>', unsafe_allow_html=True)
+                
+                # Widgets supplémentaires
+                col_widget1, col_widget2 = st.columns(2)
+                
+                with col_widget1:
+                    with st.expander("📊 MINI CHART (COMPACT VIEW)", expanded=False):
+                        mini_html = render_tradingview_mini(tv_symbol, theme=chart_theme)
+                        components.html(mini_html, height=250)
+                
+                with col_widget2:
+                    with st.expander("🔬 TECHNICAL ANALYSIS", expanded=False):
+                        ta_html = render_tradingview_technical_analysis(tv_symbol, theme=chart_theme)
+                        components.html(ta_html, height=450)
+                
+                # Symbol Info Widget
+                st.markdown('<div style="border-bottom: 1px solid #333; margin: 20px 0;"></div>', unsafe_allow_html=True)
+                
+                with st.expander("ℹ️ SYMBOL INFORMATION", expanded=False):
+                    symbol_info_html = render_tradingview_symbol_info(tv_symbol, theme=chart_theme)
+                    components.html(symbol_info_html, height=200)
         
         else:
-            st.error(f"❌ Could not find data for ticker '{ticker_input}'. Please check the ticker symbol.")
+            st.error(f"❌ Could not find data for ticker '{display_ticker}'. Please check the ticker symbol.")
 
 elif not ticker_input and search_button:
     st.warning("⚠️ Please enter a ticker symbol")
 
 # ===== INFO SECTION =====
-if not search_button or not ticker_input:
+if not display_ticker:
     st.markdown("""
     <div style="background-color: #111; border: 2px solid #FFAA00; padding: 20px; margin: 20px 0;">
         <h3 style="margin: 0 0 15px 0; color: #FFAA00;">📊 COMPREHENSIVE COMPANY ANALYSIS</h3>
@@ -1252,6 +1563,7 @@ if not search_button or not ticker_input:
             <li><strong>Valuation:</strong> P/E, PEG, EV/EBITDA, analyst targets</li>
             <li><strong>News & Events:</strong> Latest news, earnings calendar, company events</li>
             <li><strong>Detailed Info:</strong> Ownership structure, institutional holders, ESG scores</li>
+            <li><strong style="color: #00FF00;">NEW! TradingView:</strong> Interactive professional charts with technical analysis</li>
         </ul>
         <p style="font-size: 10px; color: #FFAA00; margin: 15px 0 0 0;">
         <strong>📌 SUPPORTED MARKETS:</strong>
@@ -1302,7 +1614,7 @@ if not search_button or not ticker_input:
     for idx, (ticker, name) in enumerate(examples):
         with example_cols[idx]:
             if st.button(f"{ticker}\n{name}", use_container_width=True, key=f"example_{ticker}"):
-                st.session_state['ticker_search'] = ticker
+                st.session_state['current_ticker'] = ticker
                 st.rerun()
 
 # Footer
@@ -1312,6 +1624,6 @@ st.markdown(f"""
 <div style='text-align: center; color: #666; font-size: 9px; font-family: "Courier New", monospace; padding: 5px;'>
     © 2025 BLOOMBERG ENS® | COMPANY ANALYSIS | LAST UPDATE: {last_update}
     <br>
-    Data provided by Yahoo Finance
+    Data provided by Yahoo Finance & TradingView
 </div>
 """, unsafe_allow_html=True)
