@@ -288,15 +288,19 @@ def render_tradingview_chart(symbol, height=450):
         "overrides": {{
             "paneProperties.background": "#000000",
             "paneProperties.backgroundType": "solid",
-            "paneProperties.vertGridProperties.color": "#1a1a1a",
-            "paneProperties.horzGridProperties.color": "#1a1a1a",
-            "scalesProperties.textColor": "#ffaa00",
-            "mainSeriesProperties.candleStyle.upColor": "#00ff00",
-            "mainSeriesProperties.candleStyle.downColor": "#ff0000",
-            "mainSeriesProperties.candleStyle.wickUpColor": "#00ff00",
-            "mainSeriesProperties.candleStyle.wickDownColor": "#ff0000",
-            "mainSeriesProperties.candleStyle.borderUpColor": "#00ff00",
-            "mainSeriesProperties.candleStyle.borderDownColor": "#ff0000"
+            "paneProperties.vertGridProperties.color": "#262626",
+            "paneProperties.horzGridProperties.color": "#262626",
+            "paneProperties.crossHairProperties.color": "#FFAA00",
+            "scalesProperties.textColor": "#FFAA00",
+            "scalesProperties.lineColor": "#FFAA00",
+            "mainSeriesProperties.candleStyle.upColor": "#00FF00",
+            "mainSeriesProperties.candleStyle.downColor": "#FF0000",
+            "mainSeriesProperties.candleStyle.wickUpColor": "#00FF00",
+            "mainSeriesProperties.candleStyle.wickDownColor": "#FF0000",
+            "mainSeriesProperties.candleStyle.borderUpColor": "#00FF00",
+            "mainSeriesProperties.candleStyle.borderDownColor": "#FF0000",
+            "mainSeriesProperties.candleStyle.drawBorder": true,
+            "volumePaneSize": "medium"
         }}
       }});
       </script>
