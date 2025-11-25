@@ -154,15 +154,6 @@ st.markdown("""
     .dataframe {
         font-family: 'Courier New', monospace !important;
     }
-    
-    /* TradingView container styling */
-    .tradingview-container {
-        background-color: #000;
-        border: 2px solid #FFAA00;
-        border-radius: 0;
-        padding: 10px;
-        margin: 15px 0;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -184,12 +175,9 @@ def get_company_info(ticker):
     """Récupère les informations de l'entreprise via yfinance"""
     try:
         import yfinance as yf
-        
         stock = yf.Ticker(ticker)
         info = stock.info
-        
         return stock, info
-        
     except Exception as e:
         st.error(f"Error fetching data for {ticker}: {e}")
         return None, None
@@ -200,9 +188,7 @@ def get_financial_statements(ticker):
     """Récupère les états financiers"""
     try:
         import yfinance as yf
-        
         stock = yf.Ticker(ticker)
-        
         return {
             'income_stmt': stock.income_stmt,
             'balance_sheet': stock.balance_sheet,
@@ -211,7 +197,6 @@ def get_financial_statements(ticker):
             'quarterly_balance': stock.quarterly_balance_sheet,
             'quarterly_cashflow': stock.quarterly_cashflow
         }
-        
     except Exception as e:
         st.error(f"Error fetching financials: {e}")
         return None
@@ -221,12 +206,9 @@ def get_price_history(ticker, period='1y'):
     """Récupère l'historique des prix"""
     try:
         import yfinance as yf
-        
         stock = yf.Ticker(ticker)
         hist = stock.history(period=period)
-        
         return hist
-        
     except Exception as e:
         st.error(f"Error fetching price history: {e}")
         return None
@@ -234,265 +216,92 @@ def get_price_history(ticker, period='1y'):
 def analyze_financials_with_ai(data_type, dataframe, company_name, ticker):
     """Analyse les données financières avec Groq AI"""
     try:
-        # Récupérer la clé API depuis les secrets
         api_key = st.secrets.get("GROQ_API_KEY", None)
-        
         if not api_key:
-            return "❌ Error: GROQ_API_KEY not found in secrets. Please add it in Streamlit settings."
+            return "❌ Error: GROQ_API_KEY not found in secrets."
         
-        # Initialiser le client Groq
         client = Groq(api_key=api_key)
-        
-        # Convertir le DataFrame en format lisible
         df_recent = dataframe.iloc[:, :3] if len(dataframe.columns) >= 3 else dataframe
         data_str = df_recent.to_string()
         
-        # Prompts selon le type
         prompts = {
-            "Income Statement": f"""You are a financial analyst. Analyze this Income Statement for {company_name} ({ticker}).
-
-Data (in millions):
-{data_str}
-
-Provide a comprehensive analysis covering:
-1. 📊 Revenue Trends: Growth rate, consistency
-2. 💰 Profitability Analysis: Gross, Operating, and Net margins
-3. 📈 Key Strengths: What's performing well
-4. 🚨 Concerns: Areas of weakness or risk
-5. 🎯 Recommendations: Actionable insights
-
-Use emojis and be concise but insightful. Format with clear sections.""",
-
-            "Balance Sheet": f"""You are a financial analyst. Analyze this Balance Sheet for {company_name} ({ticker}).
-
-Data (in millions):
-{data_str}
-
-Provide a comprehensive analysis covering:
-1. 💪 Asset Quality: Composition and trends
-2. 💳 Liability Structure: Debt levels and management
-3. 📊 Financial Ratios: Current ratio, Debt-to-Equity, etc.
-4. 🏦 Liquidity Position: Cash and working capital
-5. ⚠️ Risks & Strengths: Key observations
-6. 🎯 Recommendations: Strategic insights
-
-Use emojis and be concise but insightful. Format with clear sections.""",
-
-            "Cash Flow": f"""You are a financial analyst. Analyze this Cash Flow Statement for {company_name} ({ticker}).
-
-Data (in millions):
-{data_str}
-
-Provide a comprehensive analysis covering:
-1. 💵 Operating Cash Flow: Quality and trends
-2. 📊 Free Cash Flow: Generation capability
-3. 💰 Investment Activities: CAPEX and strategy
-4. 🏦 Financing Activities: Debt and dividends
-5. 🔄 Cash Management: Efficiency and sustainability
-6. 🎯 Recommendations: Key insights
-
-Use emojis and be concise but insightful. Format with clear sections."""
+            "Income Statement": f"""Analyze this Income Statement for {company_name} ({ticker}).
+Data: {data_str}
+Cover: Revenue Trends, Profitability, Strengths, Concerns, Recommendations.""",
+            "Balance Sheet": f"""Analyze this Balance Sheet for {company_name} ({ticker}).
+Data: {data_str}
+Cover: Assets, Liabilities, Ratios, Liquidity, Risks, Recommendations.""",
+            "Cash Flow": f"""Analyze this Cash Flow for {company_name} ({ticker}).
+Data: {data_str}
+Cover: Operating CF, Free CF, Investments, Financing, Recommendations."""
         }
         
-        prompt = prompts.get(data_type, prompts["Income Statement"])
-        
-        # Appel API Groq
         chat_completion = client.chat.completions.create(
             messages=[
-                {
-                    "role": "system",
-                    "content": "You are an expert financial analyst with deep knowledge of financial statements, ratios, and investment analysis. Provide clear, actionable insights."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
+                {"role": "system", "content": "Expert financial analyst. Be concise."},
+                {"role": "user", "content": prompts.get(data_type, prompts["Income Statement"])}
             ],
             model="llama-3.3-70b-versatile",
             temperature=0.7,
             max_tokens=2000
         )
-        
-        analysis = chat_completion.choices[0].message.content
-        return analysis
-        
+        return chat_completion.choices[0].message.content
     except Exception as e:
-        return f"❌ Error during AI analysis: {str(e)}\n\nPlease check:\n- Your GROQ_API_KEY is correctly set in Streamlit secrets\n- You have internet connection\n- The Groq API is available"
+        return f"❌ Error: {str(e)}"
 
 
 def get_tradingview_symbol(ticker):
     """Convertit un ticker Yahoo Finance en symbole TradingView"""
-    # Mapping des suffixes Yahoo Finance vers TradingView
     exchange_mapping = {
-        '.PA': 'EURONEXT:',  # Paris
-        '.DE': 'XETR:',       # Germany (Xetra)
-        '.SW': 'SIX:',        # Switzerland
-        '.L': 'LSE:',         # London
-        '.AS': 'EURONEXT:',   # Amsterdam
-        '.BR': 'EURONEXT:',   # Brussels
-        '.MI': 'MIL:',        # Milan
-        '.MC': 'BME:',        # Madrid
-        '.TO': 'TSX:',        # Toronto
-        '.HK': 'HKEX:',       # Hong Kong
-        '.T': 'TSE:',         # Tokyo
-        '.AX': 'ASX:',        # Australia
-        '.SI': 'SGX:',        # Singapore
-        '.KS': 'KRX:',        # Korea
-        '.NS': 'NSE:',        # India NSE
-        '.BO': 'BSE:',        # India BSE
+        '.PA': 'EURONEXT:', '.DE': 'XETR:', '.SW': 'SIX:', '.L': 'LSE:',
+        '.AS': 'EURONEXT:', '.BR': 'EURONEXT:', '.MI': 'MIL:', '.MC': 'BME:',
+        '.TO': 'TSX:', '.HK': 'HKEX:', '.T': 'TSE:', '.AX': 'ASX:',
     }
-    
-    # Transformer le ticker pour TradingView
     for suffix, exchange in exchange_mapping.items():
         if ticker.endswith(suffix):
             return exchange + ticker.replace(suffix, '')
-    
-    # Si pas de suffixe, c'est probablement un ticker US
-    if '.' not in ticker:
-        return ticker
-    
     return ticker
 
 
-def render_tradingview_chart(symbol, theme="dark", style="1", interval="D", height=600):
-    """Render TradingView advanced chart widget"""
-    
-    # Couleurs personnalisées Bloomberg style
-    if theme == "dark":
-        bg_color = "000000"
-        grid_color = "1a1a1a"
-        up_color = "00ff00"
-        down_color = "ff0000"
-        text_color = "ffaa00"
-    else:
-        bg_color = "ffffff"
-        grid_color = "e0e0e0"
-        up_color = "26a69a"
-        down_color = "ef5350"
-        text_color = "000000"
-    
-    widget_html = f'''
+def render_tradingview_chart(symbol, height=450):
+    """Render TradingView chart - Bloomberg style"""
+    return f'''
     <div class="tradingview-widget-container" style="height:{height}px;width:100%;">
-      <div id="tradingview_advanced" style="height:100%;width:100%;"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-      <script type="text/javascript">
+      <div id="tv_chart" style="height:100%;width:100%;"></div>
+      <script src="https://s3.tradingview.com/tv.js"></script>
+      <script>
       new TradingView.widget({{
         "autosize": true,
         "symbol": "{symbol}",
-        "interval": "{interval}",
+        "interval": "D",
         "timezone": "Europe/Paris",
-        "theme": "{theme}",
-        "style": "{style}",
+        "theme": "dark",
+        "style": "1",
         "locale": "en",
-        "toolbar_bg": "#{bg_color}",
+        "toolbar_bg": "#000000",
         "enable_publishing": false,
         "withdateranges": true,
         "hide_side_toolbar": false,
-        "allow_symbol_change": true,
-        "watchlist": [],
-        "details": true,
-        "hotlist": true,
-        "calendar": true,
-        "studies": [
-            "STD;SMA",
-            "STD;RSI",
-            "STD;MACD"
-        ],
-        "container_id": "tradingview_advanced",
-        "show_popup_button": true,
-        "popup_width": "1000",
-        "popup_height": "650",
+        "allow_symbol_change": false,
+        "container_id": "tv_chart",
+        "studies": ["STD;SMA"],
         "overrides": {{
-            "paneProperties.background": "#{bg_color}",
+            "paneProperties.background": "#000000",
             "paneProperties.backgroundType": "solid",
-            "paneProperties.vertGridProperties.color": "#{grid_color}",
-            "paneProperties.horzGridProperties.color": "#{grid_color}",
-            "scalesProperties.textColor": "#{text_color}",
-            "mainSeriesProperties.candleStyle.upColor": "#{up_color}",
-            "mainSeriesProperties.candleStyle.downColor": "#{down_color}",
-            "mainSeriesProperties.candleStyle.wickUpColor": "#{up_color}",
-            "mainSeriesProperties.candleStyle.wickDownColor": "#{down_color}",
-            "mainSeriesProperties.candleStyle.borderUpColor": "#{up_color}",
-            "mainSeriesProperties.candleStyle.borderDownColor": "#{down_color}",
-            "mainSeriesProperties.hollowCandleStyle.upColor": "#{up_color}",
-            "mainSeriesProperties.hollowCandleStyle.downColor": "#{down_color}",
-            "mainSeriesProperties.barStyle.upColor": "#{up_color}",
-            "mainSeriesProperties.barStyle.downColor": "#{down_color}",
-            "mainSeriesProperties.lineStyle.color": "#{text_color}",
-            "mainSeriesProperties.areaStyle.color1": "rgba(255, 170, 0, 0.28)",
-            "mainSeriesProperties.areaStyle.color2": "rgba(255, 170, 0, 0.05)",
-            "mainSeriesProperties.areaStyle.linecolor": "#{text_color}"
+            "paneProperties.vertGridProperties.color": "#1a1a1a",
+            "paneProperties.horzGridProperties.color": "#1a1a1a",
+            "scalesProperties.textColor": "#ffaa00",
+            "mainSeriesProperties.candleStyle.upColor": "#00ff00",
+            "mainSeriesProperties.candleStyle.downColor": "#ff0000",
+            "mainSeriesProperties.candleStyle.wickUpColor": "#00ff00",
+            "mainSeriesProperties.candleStyle.wickDownColor": "#ff0000",
+            "mainSeriesProperties.candleStyle.borderUpColor": "#00ff00",
+            "mainSeriesProperties.candleStyle.borderDownColor": "#ff0000"
         }}
       }});
       </script>
     </div>
     '''
-    return widget_html
-
-
-def render_tradingview_mini(symbol, theme="dark"):
-    """Render TradingView mini chart widget"""
-    widget_html = f'''
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
-      {{
-        "symbol": "{symbol}",
-        "width": "100%",
-        "height": "220",
-        "locale": "en",
-        "dateRange": "12M",
-        "colorTheme": "{theme}",
-        "isTransparent": true,
-        "autosize": true,
-        "largeChartUrl": ""
-      }}
-      </script>
-    </div>
-    '''
-    return widget_html
-
-
-def render_tradingview_technical_analysis(symbol, theme="dark"):
-    """Render TradingView technical analysis widget"""
-    widget_html = f'''
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
-      {{
-        "interval": "1D",
-        "width": "100%",
-        "isTransparent": true,
-        "height": "400",
-        "symbol": "{symbol}",
-        "showIntervalTabs": true,
-        "displayMode": "single",
-        "locale": "en",
-        "colorTheme": "{theme}"
-      }}
-      </script>
-    </div>
-    '''
-    return widget_html
-
-
-def render_tradingview_symbol_info(symbol, theme="dark"):
-    """Render TradingView symbol info widget"""
-    widget_html = f'''
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-info.js" async>
-      {{
-        "symbol": "{symbol}",
-        "width": "100%",
-        "locale": "en",
-        "colorTheme": "{theme}",
-        "isTransparent": true
-      }}
-      </script>
-    </div>
-    '''
-    return widget_html
 
 
 # ===== BARRE DE RECHERCHE =====
@@ -502,26 +311,18 @@ col_search1, col_search2 = st.columns([4, 1])
 
 with col_search1:
     ticker_input = st.text_input(
-        "",
-        placeholder="Enter ticker symbol (e.g., AAPL, MSFT, TSLA, MC.PA...)",
-        key="ticker_search",
-        label_visibility="collapsed"
+        "", placeholder="Enter ticker (AAPL, MSFT, MC.PA...)",
+        key="ticker_search", label_visibility="collapsed"
     ).upper()
 
 with col_search2:
-    search_button = st.button("🔍 ANALYZE", use_container_width=True, key="search_company")
+    search_button = st.button("🔍 ANALYZE", use_container_width=True)
 
 st.markdown('<div style="border-bottom: 1px solid #333; margin: 8px 0;"></div>', unsafe_allow_html=True)
 
-# ⭐ SAUVEGARDER LE TICKER DANS SESSION STATE ⭐
 if search_button and ticker_input:
     st.session_state['current_ticker'] = ticker_input
 
-# Permettre la recherche avec Entrée (le ticker_input déclenche automatiquement)
-if ticker_input and ticker_input != st.session_state.get('current_ticker', ''):
-    st.session_state['current_ticker'] = ticker_input
-
-# ⭐ UTILISER LE TICKER SAUVEGARDÉ ⭐
 display_ticker = st.session_state.get('current_ticker', None)
 
 # ===== AFFICHAGE DES DONNÉES =====
@@ -530,7 +331,6 @@ if display_ticker:
         stock, info = get_company_info(display_ticker)
         
         if stock and info:
-            # ===== COMPANY HEADER =====
             company_name = info.get('longName', display_ticker)
             sector = info.get('sector', 'N/A')
             industry = info.get('industry', 'N/A')
@@ -548,22 +348,15 @@ if display_ticker:
             </div>
             """, unsafe_allow_html=True)
             
-            # ===== ONGLETS PRINCIPAUX =====
-            tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-                "📊 OVERVIEW",
-                "💰 FINANCIALS",
-                "📈 PRICE & PERFORMANCE",
-                "📊 VALUATION",
-                "📰 NEWS & EVENTS",
-                "🔍 DETAILED INFO",
-                "📺 TRADINGVIEW"
+            tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+                "📊 OVERVIEW", "💰 FINANCIALS", "📈 PRICE & PERFORMANCE",
+                "📊 VALUATION", "📰 NEWS & EVENTS", "🔍 DETAILED INFO"
             ])
             
             # ===== TAB 1: OVERVIEW =====
             with tab1:
                 st.markdown("### 📊 COMPANY OVERVIEW")
                 
-                # Prix actuel et métriques clés
                 col_ov1, col_ov2, col_ov3, col_ov4 = st.columns(4)
                 
                 current_price = info.get('currentPrice', info.get('regularMarketPrice', 0))
@@ -572,24 +365,15 @@ if display_ticker:
                 change_pct = (change / previous_close * 100) if previous_close else 0
                 
                 with col_ov1:
-                    st.metric(
-                        "CURRENT PRICE",
-                        f"${current_price:.2f}" if current_price else "N/A",
-                        delta=f"{change:+.2f} ({change_pct:+.2f}%)"
-                    )
+                    st.metric("CURRENT PRICE", f"${current_price:.2f}" if current_price else "N/A",
+                              delta=f"{change:+.2f} ({change_pct:+.2f}%)")
                 
                 with col_ov2:
                     market_cap = info.get('marketCap', 0)
                     if market_cap:
-                        if market_cap >= 1e12:
-                            cap_display = f"${market_cap/1e12:.2f}T"
-                        elif market_cap >= 1e9:
-                            cap_display = f"${market_cap/1e9:.2f}B"
-                        else:
-                            cap_display = f"${market_cap/1e6:.2f}M"
+                        cap_display = f"${market_cap/1e12:.2f}T" if market_cap >= 1e12 else f"${market_cap/1e9:.2f}B" if market_cap >= 1e9 else f"${market_cap/1e6:.2f}M"
                     else:
                         cap_display = "N/A"
-                    
                     st.metric("MARKET CAP", cap_display)
                 
                 with col_ov3:
@@ -599,34 +383,33 @@ if display_ticker:
                 with col_ov4:
                     dividend_yield = info.get('dividendYield', 0)
                     if dividend_yield:
-                        if dividend_yield < 1:
-                            st.metric("DIVIDEND YIELD", f"{dividend_yield*100:.2f}%")
-                        else:
-                            st.metric("DIVIDEND YIELD", f"{dividend_yield:.2f}%")
+                        st.metric("DIVIDEND YIELD", f"{dividend_yield*100:.2f}%" if dividend_yield < 1 else f"{dividend_yield:.2f}%")
                     else:
                         st.metric("DIVIDEND YIELD", "N/A")
                 
                 st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
                 
+                # ===== TRADINGVIEW CHART =====
+                st.markdown("#### 📈 PRICE CHART")
+                tv_symbol = get_tradingview_symbol(display_ticker)
+                components.html(render_tradingview_chart(tv_symbol, height=450), height=470)
+                
+                st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+                
                 # Trading Information
                 st.markdown("#### 📊 TRADING INFORMATION")
-                
                 col_trade1, col_trade2, col_trade3, col_trade4 = st.columns(4)
                 
                 with col_trade1:
                     volume = info.get('volume', 0)
-                    avg_volume = info.get('averageVolume', 0)
                     st.metric("VOLUME", f"{volume:,.0f}" if volume else "N/A")
-                    st.caption(f"Avg: {avg_volume:,.0f}" if avg_volume else "")
                 
                 with col_trade2:
-                    day_high = info.get('dayHigh', 0)
-                    day_low = info.get('dayLow', 0)
+                    day_high, day_low = info.get('dayHigh', 0), info.get('dayLow', 0)
                     st.metric("DAY RANGE", f"${day_low:.2f} - ${day_high:.2f}" if day_low and day_high else "N/A")
                 
                 with col_trade3:
-                    year_high = info.get('fiftyTwoWeekHigh', 0)
-                    year_low = info.get('fiftyTwoWeekLow', 0)
+                    year_high, year_low = info.get('fiftyTwoWeekHigh', 0), info.get('fiftyTwoWeekLow', 0)
                     st.metric("52W RANGE", f"${year_low:.2f} - ${year_high:.2f}" if year_low and year_high else "N/A")
                 
                 with col_trade4:
@@ -635,995 +418,214 @@ if display_ticker:
                 
                 st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
                 
-                # Company Description
+                # Description
                 st.markdown("#### 📝 COMPANY DESCRIPTION")
-                
                 description = info.get('longBusinessSummary', 'No description available.')
                 st.markdown(f"""
                 <div style="background-color: #111; padding: 15px; border-left: 3px solid #FFAA00;">
-                    <p style="font-size: 11px; color: #999; line-height: 1.6;">
-                        {description}
-                    </p>
+                    <p style="font-size: 11px; color: #999; line-height: 1.6;">{description}</p>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Key People
+                # Executives
                 st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
                 st.markdown("#### 👥 KEY EXECUTIVES")
-                
                 officers = info.get('companyOfficers', [])
-                
                 if officers:
                     exec_data = []
                     for officer in officers[:5]:
                         total_pay = officer.get('totalPay', None)
-                        
-                        if isinstance(total_pay, dict):
-                            pay_display = f"${total_pay.get('fmt', 'N/A')}"
-                        elif isinstance(total_pay, (int, float)):
-                            pay_display = f"${total_pay:,.0f}" if total_pay else 'N/A'
-                        else:
-                            pay_display = 'N/A'
-                        
-                        exec_data.append({
-                            'Name': officer.get('name', 'N/A'),
-                            'Title': officer.get('title', 'N/A'),
-                            'Pay': pay_display
-                        })
-                    
-                    exec_df = pd.DataFrame(exec_data)
-                    st.dataframe(exec_df, use_container_width=True, hide_index=True)
+                        pay_display = f"${total_pay:,.0f}" if isinstance(total_pay, (int, float)) and total_pay else 'N/A'
+                        exec_data.append({'Name': officer.get('name', 'N/A'), 'Title': officer.get('title', 'N/A'), 'Pay': pay_display})
+                    st.dataframe(pd.DataFrame(exec_data), use_container_width=True, hide_index=True)
                 else:
                     st.info("Executive information not available")
             
             # ===== TAB 2: FINANCIALS =====
             with tab2:
                 st.markdown("### 💰 FINANCIAL STATEMENTS")
-                
                 financials = get_financial_statements(display_ticker)
                 
                 if financials:
-                    fin_tab1, fin_tab2, fin_tab3 = st.tabs([
-                        "📊 INCOME STATEMENT",
-                        "📊 BALANCE SHEET",
-                        "📊 CASH FLOW"
-                    ])
+                    fin_tab1, fin_tab2, fin_tab3 = st.tabs(["📊 INCOME STATEMENT", "📊 BALANCE SHEET", "📊 CASH FLOW"])
                     
-                    # ===== INCOME STATEMENT =====
                     with fin_tab1:
                         st.markdown("#### 📊 INCOME STATEMENT")
-                        
-                        period_type = st.radio(
-                            "Period",
-                            options=["Annual", "Quarterly"],
-                            horizontal=True,
-                            key="income_period"
-                        )
-                        
-                        if period_type == "Annual":
-                            income_df = financials['income_stmt']
-                        else:
-                            income_df = financials['quarterly_income']
+                        period_type = st.radio("Period", ["Annual", "Quarterly"], horizontal=True, key="income_period")
+                        income_df = financials['income_stmt'] if period_type == "Annual" else financials['quarterly_income']
                         
                         if income_df is not None and not income_df.empty:
                             income_display = income_df.copy()
-                            
                             for col in income_display.columns:
-                                income_display[col] = income_display[col].apply(
-                                    lambda x: f"${x/1e6:,.0f}M" if pd.notna(x) and x != 0 else "-"
-                                )
-                            
+                                income_display[col] = income_display[col].apply(lambda x: f"${x/1e6:,.0f}M" if pd.notna(x) and x != 0 else "-")
                             st.dataframe(income_display, use_container_width=True)
                             
-                            # ⭐ BOUTON AI POUR INCOME STATEMENT ⭐
                             st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-                            
-                            col_ai1, col_ai2 = st.columns([1, 3])
-                            
-                            with col_ai1:
-                                analyze_button = st.button(
-                                    "🤖 ANALYZE WITH AI",
-                                    key="analyze_income",
-                                    use_container_width=True
-                                )
-                            
-                            with col_ai2:
-                                st.caption("Get AI-powered insights on this financial statement")
-                            
-                            if analyze_button:
-                                with st.spinner('🤖 AI is analyzing the financial data...'):
-                                    analysis = analyze_financials_with_ai(
-                                        "Income Statement",
-                                        income_df,
-                                        company_name,
-                                        display_ticker
-                                    )
-                                    
-                                    st.markdown("#### 🤖 AI FINANCIAL ANALYSIS")
-                                    st.markdown(f"""
-                                    <div style="background-color: #0a0a0a; border-left: 3px solid #00FF00; padding: 15px; margin: 10px 0;">
-                                        {analysis.replace(chr(10), '<br>')}
-                                    </div>
-                                    """, unsafe_allow_html=True)
-                            
-                            # Key metrics
-                            st.markdown("#### 📊 KEY METRICS")
-                            
-                            col_inc1, col_inc2, col_inc3, col_inc4 = st.columns(4)
-                            
-                            try:
-                                revenue = income_df.loc['Total Revenue'].iloc[0]
-                                gross_profit = income_df.loc['Gross Profit'].iloc[0] if 'Gross Profit' in income_df.index else 0
-                                operating_income = income_df.loc['Operating Income'].iloc[0] if 'Operating Income' in income_df.index else 0
-                                net_income = income_df.loc['Net Income'].iloc[0] if 'Net Income' in income_df.index else 0
-                                
-                                with col_inc1:
-                                    st.metric("REVENUE", f"${revenue/1e9:.2f}B" if revenue else "N/A")
-                                
-                                with col_inc2:
-                                    gross_margin = (gross_profit / revenue * 100) if revenue and gross_profit else 0
-                                    st.metric("GROSS MARGIN", f"{gross_margin:.1f}%" if gross_margin else "N/A")
-                                
-                                with col_inc3:
-                                    operating_margin = (operating_income / revenue * 100) if revenue and operating_income else 0
-                                    st.metric("OPERATING MARGIN", f"{operating_margin:.1f}%" if operating_margin else "N/A")
-                                
-                                with col_inc4:
-                                    net_margin = (net_income / revenue * 100) if revenue and net_income else 0
-                                    st.metric("NET MARGIN", f"{net_margin:.1f}%" if net_margin else "N/A")
-                            
-                            except:
-                                st.warning("Could not calculate key metrics")
-                        
-                        else:
-                            st.warning("Income statement data not available")
+                            if st.button("🤖 ANALYZE WITH AI", key="analyze_income"):
+                                with st.spinner('🤖 Analyzing...'):
+                                    analysis = analyze_financials_with_ai("Income Statement", income_df, company_name, display_ticker)
+                                    st.markdown(f'<div style="background-color: #0a0a0a; border-left: 3px solid #00FF00; padding: 15px;">{analysis}</div>', unsafe_allow_html=True)
                     
-                    # ===== BALANCE SHEET =====
                     with fin_tab2:
                         st.markdown("#### 📊 BALANCE SHEET")
-                        
-                        period_type_bs = st.radio(
-                            "Period",
-                            options=["Annual", "Quarterly"],
-                            horizontal=True,
-                            key="balance_period"
-                        )
-                        
-                        if period_type_bs == "Annual":
-                            balance_df = financials['balance_sheet']
-                        else:
-                            balance_df = financials['quarterly_balance']
+                        period_type_bs = st.radio("Period", ["Annual", "Quarterly"], horizontal=True, key="balance_period")
+                        balance_df = financials['balance_sheet'] if period_type_bs == "Annual" else financials['quarterly_balance']
                         
                         if balance_df is not None and not balance_df.empty:
                             balance_display = balance_df.copy()
-                            
                             for col in balance_display.columns:
-                                balance_display[col] = balance_display[col].apply(
-                                    lambda x: f"${x/1e6:,.0f}M" if pd.notna(x) and x != 0 else "-"
-                                )
-                            
+                                balance_display[col] = balance_display[col].apply(lambda x: f"${x/1e6:,.0f}M" if pd.notna(x) and x != 0 else "-")
                             st.dataframe(balance_display, use_container_width=True)
                             
-                            # ⭐ BOUTON AI POUR BALANCE SHEET ⭐
-                            st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-                            
-                            col_ai1, col_ai2 = st.columns([1, 3])
-                            
-                            with col_ai1:
-                                analyze_button_bs = st.button(
-                                    "🤖 ANALYZE WITH AI",
-                                    key="analyze_balance",
-                                    use_container_width=True
-                                )
-                            
-                            with col_ai2:
-                                st.caption("Get AI-powered insights on this financial statement")
-                            
-                            if analyze_button_bs:
-                                with st.spinner('🤖 AI is analyzing the financial data...'):
-                                    analysis = analyze_financials_with_ai(
-                                        "Balance Sheet",
-                                        balance_df,
-                                        company_name,
-                                        display_ticker
-                                    )
-                                    
-                                    st.markdown("#### 🤖 AI FINANCIAL ANALYSIS")
-                                    st.markdown(f"""
-                                    <div style="background-color: #0a0a0a; border-left: 3px solid #00FF00; padding: 15px; margin: 10px 0;">
-                                        {analysis.replace(chr(10), '<br>')}
-                                    </div>
-                                    """, unsafe_allow_html=True)
-                            
-                            # Key ratios
-                            st.markdown("#### 📊 KEY RATIOS")
-                            
-                            col_bs1, col_bs2, col_bs3, col_bs4 = st.columns(4)
-                            
-                            try:
-                                total_assets = balance_df.loc['Total Assets'].iloc[0] if 'Total Assets' in balance_df.index else 0
-                                total_liabilities = balance_df.loc['Total Liabilities Net Minority Interest'].iloc[0] if 'Total Liabilities Net Minority Interest' in balance_df.index else 0
-                                stockholder_equity = balance_df.loc['Stockholders Equity'].iloc[0] if 'Stockholders Equity' in balance_df.index else 0
-                                current_assets = balance_df.loc['Current Assets'].iloc[0] if 'Current Assets' in balance_df.index else 0
-                                current_liabilities = balance_df.loc['Current Liabilities'].iloc[0] if 'Current Liabilities' in balance_df.index else 0
-                                
-                                with col_bs1:
-                                    st.metric("TOTAL ASSETS", f"${total_assets/1e9:.2f}B" if total_assets else "N/A")
-                                
-                                with col_bs2:
-                                    debt_to_equity = (total_liabilities / stockholder_equity) if stockholder_equity else 0
-                                    st.metric("DEBT/EQUITY", f"{debt_to_equity:.2f}" if debt_to_equity else "N/A")
-                                
-                                with col_bs3:
-                                    current_ratio = (current_assets / current_liabilities) if current_liabilities else 0
-                                    st.metric("CURRENT RATIO", f"{current_ratio:.2f}" if current_ratio else "N/A")
-                                
-                                with col_bs4:
-                                    st.metric("EQUITY", f"${stockholder_equity/1e9:.2f}B" if stockholder_equity else "N/A")
-                            
-                            except:
-                                st.warning("Could not calculate key ratios")
-                        
-                        else:
-                            st.warning("Balance sheet data not available")
+                            if st.button("🤖 ANALYZE WITH AI", key="analyze_balance"):
+                                with st.spinner('🤖 Analyzing...'):
+                                    analysis = analyze_financials_with_ai("Balance Sheet", balance_df, company_name, display_ticker)
+                                    st.markdown(f'<div style="background-color: #0a0a0a; border-left: 3px solid #00FF00; padding: 15px;">{analysis}</div>', unsafe_allow_html=True)
                     
-                    # ===== CASH FLOW =====
                     with fin_tab3:
                         st.markdown("#### 📊 CASH FLOW STATEMENT")
-                        
-                        period_type_cf = st.radio(
-                            "Period",
-                            options=["Annual", "Quarterly"],
-                            horizontal=True,
-                            key="cashflow_period"
-                        )
-                        
-                        if period_type_cf == "Annual":
-                            cashflow_df = financials['cash_flow']
-                        else:
-                            cashflow_df = financials['quarterly_cashflow']
+                        period_type_cf = st.radio("Period", ["Annual", "Quarterly"], horizontal=True, key="cashflow_period")
+                        cashflow_df = financials['cash_flow'] if period_type_cf == "Annual" else financials['quarterly_cashflow']
                         
                         if cashflow_df is not None and not cashflow_df.empty:
                             cashflow_display = cashflow_df.copy()
-                            
                             for col in cashflow_display.columns:
-                                cashflow_display[col] = cashflow_display[col].apply(
-                                    lambda x: f"${x/1e6:,.0f}M" if pd.notna(x) and x != 0 else "-"
-                                )
-                            
+                                cashflow_display[col] = cashflow_display[col].apply(lambda x: f"${x/1e6:,.0f}M" if pd.notna(x) and x != 0 else "-")
                             st.dataframe(cashflow_display, use_container_width=True)
                             
-                            # ⭐ BOUTON AI POUR CASH FLOW ⭐
-                            st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-                            
-                            col_ai1, col_ai2 = st.columns([1, 3])
-                            
-                            with col_ai1:
-                                analyze_button_cf = st.button(
-                                    "🤖 ANALYZE WITH AI",
-                                    key="analyze_cashflow",
-                                    use_container_width=True
-                                )
-                            
-                            with col_ai2:
-                                st.caption("Get AI-powered insights on this financial statement")
-                            
-                            if analyze_button_cf:
-                                with st.spinner('🤖 AI is analyzing the financial data...'):
-                                    analysis = analyze_financials_with_ai(
-                                        "Cash Flow",
-                                        cashflow_df,
-                                        company_name,
-                                        display_ticker
-                                    )
-                                    
-                                    st.markdown("#### 🤖 AI FINANCIAL ANALYSIS")
-                                    st.markdown(f"""
-                                    <div style="background-color: #0a0a0a; border-left: 3px solid #00FF00; padding: 15px; margin: 10px 0;">
-                                        {analysis.replace(chr(10), '<br>')}
-                                    </div>
-                                    """, unsafe_allow_html=True)
-                            
-                            # Key cash flow metrics
-                            st.markdown("#### 📊 CASH FLOW METRICS")
-                            
-                            col_cf1, col_cf2, col_cf3 = st.columns(3)
-                            
-                            try:
-                                operating_cf = cashflow_df.loc['Operating Cash Flow'].iloc[0] if 'Operating Cash Flow' in cashflow_df.index else 0
-                                investing_cf = cashflow_df.loc['Investing Cash Flow'].iloc[0] if 'Investing Cash Flow' in cashflow_df.index else 0
-                                financing_cf = cashflow_df.loc['Financing Cash Flow'].iloc[0] if 'Financing Cash Flow' in cashflow_df.index else 0
-                                free_cf = cashflow_df.loc['Free Cash Flow'].iloc[0] if 'Free Cash Flow' in cashflow_df.index else 0
-                                
-                                with col_cf1:
-                                    st.metric("OPERATING CF", f"${operating_cf/1e9:.2f}B" if operating_cf else "N/A")
-                                
-                                with col_cf2:
-                                    st.metric("FREE CF", f"${free_cf/1e9:.2f}B" if free_cf else "N/A")
-                                
-                                with col_cf3:
-                                    fcf_margin = (free_cf / revenue * 100) if 'revenue' in locals() and revenue and free_cf else 0
-                                    st.metric("FCF MARGIN", f"{fcf_margin:.1f}%" if fcf_margin else "N/A")
-                            
-                            except:
-                                st.warning("Could not calculate cash flow metrics")
-                        
-                        else:
-                            st.warning("Cash flow data not available")
-                
-                else:
-                    st.error("Could not retrieve financial statements")
+                            if st.button("🤖 ANALYZE WITH AI", key="analyze_cashflow"):
+                                with st.spinner('🤖 Analyzing...'):
+                                    analysis = analyze_financials_with_ai("Cash Flow", cashflow_df, company_name, display_ticker)
+                                    st.markdown(f'<div style="background-color: #0a0a0a; border-left: 3px solid #00FF00; padding: 15px;">{analysis}</div>', unsafe_allow_html=True)
             
             # ===== TAB 3: PRICE & PERFORMANCE =====
             with tab3:
                 st.markdown("### 📈 PRICE & PERFORMANCE")
-                
-                col_perf1, col_perf2 = st.columns([3, 1])
-                
-                with col_perf1:
-                    time_period = st.selectbox(
-                        "TIME PERIOD",
-                        options=['1mo', '3mo', '6mo', '1y', '2y', '5y', 'max'],
-                        index=3,
-                        key="price_period"
-                    )
-                
-                with col_perf2:
-                    if st.button("📊 UPDATE CHART", use_container_width=True):
-                        st.cache_data.clear()
-                
+                time_period = st.selectbox("TIME PERIOD", ['1mo', '3mo', '6mo', '1y', '2y', '5y', 'max'], index=3)
                 price_hist = get_price_history(display_ticker, period=time_period)
                 
                 if price_hist is not None and not price_hist.empty:
-                    fig = make_subplots(
-                        rows=2, cols=1,
-                        shared_xaxes=True,
-                        vertical_spacing=0.03,
-                        subplot_titles=('Price', 'Volume'),
-                        row_heights=[0.7, 0.3]
-                    )
+                    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03,
+                                       subplot_titles=('Price', 'Volume'), row_heights=[0.7, 0.3])
                     
-                    fig.add_trace(
-                        go.Candlestick(
-                            x=price_hist.index,
-                            open=price_hist['Open'],
-                            high=price_hist['High'],
-                            low=price_hist['Low'],
-                            close=price_hist['Close'],
-                            name='Price',
-                            increasing_line_color='#00FF00',
-                            decreasing_line_color='#FF0000'
-                        ),
-                        row=1, col=1
-                    )
+                    fig.add_trace(go.Candlestick(x=price_hist.index, open=price_hist['Open'], high=price_hist['High'],
+                                                  low=price_hist['Low'], close=price_hist['Close'], name='Price',
+                                                  increasing_line_color='#00FF00', decreasing_line_color='#FF0000'), row=1, col=1)
                     
-                    colors = ['#00FF00' if price_hist['Close'].iloc[i] >= price_hist['Open'].iloc[i] 
-                             else '#FF0000' for i in range(len(price_hist))]
+                    colors = ['#00FF00' if price_hist['Close'].iloc[i] >= price_hist['Open'].iloc[i] else '#FF0000' for i in range(len(price_hist))]
+                    fig.add_trace(go.Bar(x=price_hist.index, y=price_hist['Volume'], marker_color=colors, showlegend=False), row=2, col=1)
                     
-                    fig.add_trace(
-                        go.Bar(
-                            x=price_hist.index,
-                            y=price_hist['Volume'],
-                            name='Volume',
-                            marker_color=colors,
-                            showlegend=False
-                        ),
-                        row=2, col=1
-                    )
-                    
-                    fig.update_layout(
-                        title=f"{display_ticker} Price Chart",
-                        paper_bgcolor='#000',
-                        plot_bgcolor='#111',
-                        font=dict(color='#FFAA00', size=10),
-                        xaxis_rangeslider_visible=False,
-                        height=600,
-                        hovermode='x unified'
-                    )
-                    
+                    fig.update_layout(paper_bgcolor='#000', plot_bgcolor='#111', font=dict(color='#FFAA00', size=10),
+                                     xaxis_rangeslider_visible=False, height=600)
                     fig.update_xaxes(gridcolor='#333')
                     fig.update_yaxes(gridcolor='#333')
-                    
                     st.plotly_chart(fig, use_container_width=True)
                     
-                    st.markdown("#### 📊 PERFORMANCE STATISTICS")
-                    
+                    # Stats
                     returns = price_hist['Close'].pct_change()
-                    
-                    col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
-                    
-                    with col_stat1:
-                        total_return = ((price_hist['Close'].iloc[-1] / price_hist['Close'].iloc[0]) - 1) * 100
-                        st.metric("TOTAL RETURN", f"{total_return:+.2f}%")
-                    
-                    with col_stat2:
-                        volatility = returns.std() * np.sqrt(252) * 100
-                        st.metric("VOLATILITY (Ann.)", f"{volatility:.2f}%")
-                    
-                    with col_stat3:
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric("TOTAL RETURN", f"{((price_hist['Close'].iloc[-1] / price_hist['Close'].iloc[0]) - 1) * 100:+.2f}%")
+                    with col2:
+                        st.metric("VOLATILITY", f"{returns.std() * np.sqrt(252) * 100:.2f}%")
+                    with col3:
                         sharpe = (returns.mean() * 252) / (returns.std() * np.sqrt(252)) if returns.std() > 0 else 0
-                        st.metric("SHARPE RATIO", f"{sharpe:.2f}")
-                    
-                    with col_stat4:
-                        max_drawdown = ((price_hist['Close'] / price_hist['Close'].cummax()) - 1).min() * 100
-                        st.metric("MAX DRAWDOWN", f"{max_drawdown:.2f}%")
-                    
-                    st.markdown("#### 📊 TECHNICAL INDICATORS")
-                    
-                    price_hist['MA50'] = price_hist['Close'].rolling(50).mean()
-                    price_hist['MA200'] = price_hist['Close'].rolling(200).mean()
-                    
-                    fig_ma = go.Figure()
-                    
-                    fig_ma.add_trace(go.Scatter(
-                        x=price_hist.index,
-                        y=price_hist['Close'],
-                        mode='lines',
-                        name='Close Price',
-                        line=dict(color='#FFAA00', width=2)
-                    ))
-                    
-                    fig_ma.add_trace(go.Scatter(
-                        x=price_hist.index,
-                        y=price_hist['MA50'],
-                        mode='lines',
-                        name='MA 50',
-                        line=dict(color='#00FF00', width=1, dash='dash')
-                    ))
-                    
-                    fig_ma.add_trace(go.Scatter(
-                        x=price_hist.index,
-                        y=price_hist['MA200'],
-                        mode='lines',
-                        name='MA 200',
-                        line=dict(color='#FF0000', width=1, dash='dash')
-                    ))
-                    
-                    fig_ma.update_layout(
-                        title="Price with Moving Averages",
-                        paper_bgcolor='#000',
-                        plot_bgcolor='#111',
-                        font=dict(color='#FFAA00', size=10),
-                        xaxis=dict(gridcolor='#333'),
-                        yaxis=dict(gridcolor='#333'),
-                        height=400
-                    )
-                    
-                    st.plotly_chart(fig_ma, use_container_width=True)
-                    
-                    current_price_val = price_hist['Close'].iloc[-1]
-                    ma50_val = price_hist['MA50'].iloc[-1]
-                    ma200_val = price_hist['MA200'].iloc[-1]
-                    
-                    col_ma1, col_ma2, col_ma3 = st.columns(3)
-                    
-                    with col_ma1:
-                        st.metric("CURRENT PRICE", f"${current_price_val:.2f}")
-                    
-                    with col_ma2:
-                        ma50_diff = ((current_price_val / ma50_val) - 1) * 100 if pd.notna(ma50_val) else 0
-                        st.metric("vs MA50", f"{ma50_diff:+.2f}%")
-                    
-                    with col_ma3:
-                        ma200_diff = ((current_price_val / ma200_val) - 1) * 100 if pd.notna(ma200_val) else 0
-                        st.metric("vs MA200", f"{ma200_diff:+.2f}%")
-                
-                else:
-                    st.error("Could not retrieve price history")
+                        st.metric("SHARPE", f"{sharpe:.2f}")
+                    with col4:
+                        st.metric("MAX DRAWDOWN", f"{((price_hist['Close'] / price_hist['Close'].cummax()) - 1).min() * 100:.2f}%")
             
             # ===== TAB 4: VALUATION =====
             with tab4:
                 st.markdown("### 📊 VALUATION METRICS")
+                col1, col2 = st.columns(2)
                 
-                col_val1, col_val2 = st.columns(2)
-                
-                with col_val1:
+                with col1:
                     st.markdown("#### 💰 VALUATION RATIOS")
-                    
-                    valuation_metrics = {
-                        'P/E Ratio (TTM)': info.get('trailingPE', 'N/A'),
-                        'Forward P/E': info.get('forwardPE', 'N/A'),
-                        'PEG Ratio': info.get('pegRatio', 'N/A'),
-                        'Price/Sales (TTM)': info.get('priceToSalesTrailing12Months', 'N/A'),
-                        'Price/Book': info.get('priceToBook', 'N/A'),
-                        'EV/Revenue': info.get('enterpriseToRevenue', 'N/A'),
-                        'EV/EBITDA': info.get('enterpriseToEbitda', 'N/A')
-                    }
-                    
-                    val_data = []
-                    for metric, value in valuation_metrics.items():
-                        if isinstance(value, (int, float)):
-                            val_data.append({'Metric': metric, 'Value': f"{value:.2f}"})
-                        else:
-                            val_data.append({'Metric': metric, 'Value': str(value)})
-                    
-                    val_df = pd.DataFrame(val_data)
-                    st.dataframe(val_df, use_container_width=True, hide_index=True)
+                    val_metrics = {'P/E (TTM)': info.get('trailingPE'), 'Forward P/E': info.get('forwardPE'),
+                                  'PEG': info.get('pegRatio'), 'P/S': info.get('priceToSalesTrailing12Months'),
+                                  'P/B': info.get('priceToBook'), 'EV/EBITDA': info.get('enterpriseToEbitda')}
+                    val_data = [{'Metric': k, 'Value': f"{v:.2f}" if isinstance(v, (int, float)) else 'N/A'} for k, v in val_metrics.items()]
+                    st.dataframe(pd.DataFrame(val_data), use_container_width=True, hide_index=True)
                 
-                with col_val2:
-                    st.markdown("#### 📊 PROFITABILITY METRICS")
-                    
-                    profitability_metrics = {
-                        'Profit Margin': info.get('profitMargins', 'N/A'),
-                        'Operating Margin': info.get('operatingMargins', 'N/A'),
-                        'ROA (Return on Assets)': info.get('returnOnAssets', 'N/A'),
-                        'ROE (Return on Equity)': info.get('returnOnEquity', 'N/A'),
-                        'ROIC': info.get('returnOnCapital', 'N/A')
-                    }
-                    
-                    prof_data = []
-                    for metric, value in profitability_metrics.items():
-                        if isinstance(value, (int, float)):
-                            prof_data.append({'Metric': metric, 'Value': f"{value*100:.2f}%"})
-                        else:
-                            prof_data.append({'Metric': metric, 'Value': str(value)})
-                    
-                    prof_df = pd.DataFrame(prof_data)
-                    st.dataframe(prof_df, use_container_width=True, hide_index=True)
+                with col2:
+                    st.markdown("#### 📊 PROFITABILITY")
+                    prof_metrics = {'Profit Margin': info.get('profitMargins'), 'Operating Margin': info.get('operatingMargins'),
+                                   'ROA': info.get('returnOnAssets'), 'ROE': info.get('returnOnEquity')}
+                    prof_data = [{'Metric': k, 'Value': f"{v*100:.2f}%" if isinstance(v, (int, float)) else 'N/A'} for k, v in prof_metrics.items()]
+                    st.dataframe(pd.DataFrame(prof_data), use_container_width=True, hide_index=True)
                 
-                st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-                
-                st.markdown("#### 📈 GROWTH METRICS")
-                
-                col_growth1, col_growth2, col_growth3, col_growth4 = st.columns(4)
-                
-                with col_growth1:
-                    revenue_growth = info.get('revenueGrowth', 0)
-                    if isinstance(revenue_growth, (int, float)):
-                        st.metric("REVENUE GROWTH", f"{revenue_growth*100:.2f}%")
-                    else:
-                        st.metric("REVENUE GROWTH", "N/A")
-                
-                with col_growth2:
-                    earnings_growth = info.get('earningsGrowth', 0)
-                    if isinstance(earnings_growth, (int, float)):
-                        st.metric("EARNINGS GROWTH", f"{earnings_growth*100:.2f}%")
-                    else:
-                        st.metric("EARNINGS GROWTH", "N/A")
-                
-                with col_growth3:
-                    earnings_quarterly_growth = info.get('earningsQuarterlyGrowth', 0)
-                    if isinstance(earnings_quarterly_growth, (int, float)):
-                        st.metric("EARNINGS GROWTH (Q)", f"{earnings_quarterly_growth*100:.2f}%")
-                    else:
-                        st.metric("EARNINGS GROWTH (Q)", "N/A")
-                
-                with col_growth4:
-                    revenue_per_share = info.get('revenuePerShare', 0)
-                    if isinstance(revenue_per_share, (int, float)):
-                        st.metric("REVENUE/SHARE", f"${revenue_per_share:.2f}")
-                    else:
-                        st.metric("REVENUE/SHARE", "N/A")
-                
-                st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
                 st.markdown("#### 🎯 ANALYST TARGETS")
-                
-                col_target1, col_target2, col_target3 = st.columns(3)
-                
-                with col_target1:
-                    target_high = info.get('targetHighPrice', 0)
-                    st.metric("TARGET HIGH", f"${target_high:.2f}" if target_high else "N/A")
-                
-                with col_target2:
-                    target_mean = info.get('targetMeanPrice', 0)
-                    st.metric("TARGET MEAN", f"${target_mean:.2f}" if target_mean else "N/A")
-                
-                with col_target3:
-                    target_low = info.get('targetLowPrice', 0)
-                    st.metric("TARGET LOW", f"${target_low:.2f}" if target_low else "N/A")
-                
-                if target_mean and current_price:
-                    upside = ((target_mean / current_price) - 1) * 100
-                    
-                    if upside > 0:
-                        st.markdown(f"""
-                        <div class="info-box">
-                            <p style="margin: 0; font-size: 12px; color: #00FF00; font-weight: bold;">
-                            📈 UPSIDE POTENTIAL: +{upside:.2f}%
-                            </p>
-                            <p style="margin: 5px 0 0 0; font-size: 10px; color: #999;">
-                            Based on analyst consensus target
-                            </p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"""
-                        <div class="warning-box">
-                            <p style="margin: 0; font-size: 12px; color: #FF6600; font-weight: bold;">
-                            📉 DOWNSIDE RISK: {upside:.2f}%
-                            </p>
-                            <p style="margin: 5px 0 0 0; font-size: 10px; color: #999;">
-                            Based on analyst consensus target
-                            </p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                
-                st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-                st.markdown("#### 📊 ANALYST RECOMMENDATIONS")
-                
-                recommendation = info.get('recommendationKey', 'N/A')
-                num_analysts = info.get('numberOfAnalystOpinions', 0)
-                
-                col_rec1, col_rec2 = st.columns(2)
-                
-                with col_rec1:
-                    st.metric("CONSENSUS", recommendation.upper() if recommendation else "N/A")
-                
-                with col_rec2:
-                    st.metric("# ANALYSTS", f"{num_analysts}" if num_analysts else "N/A")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("TARGET HIGH", f"${info.get('targetHighPrice', 0):.2f}" if info.get('targetHighPrice') else "N/A")
+                with col2:
+                    st.metric("TARGET MEAN", f"${info.get('targetMeanPrice', 0):.2f}" if info.get('targetMeanPrice') else "N/A")
+                with col3:
+                    st.metric("TARGET LOW", f"${info.get('targetLowPrice', 0):.2f}" if info.get('targetLowPrice') else "N/A")
             
-            # ===== TAB 5: NEWS & EVENTS =====
+            # ===== TAB 5: NEWS =====
             with tab5:
                 st.markdown("### 📰 NEWS & EVENTS")
-                
                 try:
                     news = stock.news
-                    
                     if news:
-                        st.markdown("#### 📰 RECENT NEWS")
-                        
-                        for idx, article in enumerate(news[:10]):
+                        for article in news[:10]:
                             title = article.get('title', 'No title')
                             publisher = article.get('publisher', 'Unknown')
                             link = article.get('link', '#')
-                            publish_time = article.get('providerPublishTime', 0)
-                            
-                            if publish_time:
-                                date_str = datetime.fromtimestamp(publish_time).strftime('%Y-%m-%d %H:%M')
-                            else:
-                                date_str = 'Unknown date'
-                            
                             st.markdown(f"""
                             <div style="background-color: #0a0a0a; border-left: 3px solid #FFAA00; padding: 10px; margin: 5px 0;">
-                                <p style="margin: 0; font-size: 12px; color: #FFAA00; font-weight: bold;">
-                                    {title}
-                                </p>
-                                <p style="margin: 5px 0 0 0; font-size: 9px; color: #666;">
-                                    {publisher} | {date_str}
-                                </p>
-                                <a href="{link}" target="_blank" style="font-size: 9px; color: #00FFFF;">
-                                    Read more →
-                                </a>
+                                <p style="margin: 0; font-size: 12px; color: #FFAA00; font-weight: bold;">{title}</p>
+                                <p style="margin: 5px 0; font-size: 9px; color: #666;">{publisher}</p>
+                                <a href="{link}" target="_blank" style="font-size: 9px; color: #00FFFF;">Read more →</a>
                             </div>
                             """, unsafe_allow_html=True)
-                    else:
-                        st.info("No recent news available")
-                
                 except:
-                    st.warning("Could not retrieve news")
-                
-                st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-                st.markdown("#### 📅 CALENDAR EVENTS")
-                
-                try:
-                    calendar = stock.calendar
-                    
-                    if calendar is not None and not calendar.empty:
-                        st.dataframe(calendar, use_container_width=True)
-                    else:
-                        st.info("No calendar events available")
-                
-                except:
-                    st.info("Calendar data not available")
-                
-                st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-                st.markdown("#### 📊 EARNINGS HISTORY")
-                
-                try:
-                    earnings_dates = stock.earnings_dates
-                    
-                    if earnings_dates is not None and not earnings_dates.empty:
-                        recent_earnings = earnings_dates.head(8)
-                        st.dataframe(recent_earnings, use_container_width=True)
-                    else:
-                        st.info("No earnings history available")
-                
-                except:
-                    st.info("Earnings history not available")
+                    st.info("News not available")
             
             # ===== TAB 6: DETAILED INFO =====
             with tab6:
-                st.markdown("### 🔍 DETAILED COMPANY INFORMATION")
+                st.markdown("### 🔍 DETAILED INFO")
                 
-                st.markdown("#### 👥 OWNERSHIP STRUCTURE")
-                
-                col_own1, col_own2, col_own3 = st.columns(3)
-                
-                with col_own1:
-                    insider_pct = info.get('heldPercentInsiders', 0)
-                    if isinstance(insider_pct, (int, float)):
-                        st.metric("INSIDER OWNERSHIP", f"{insider_pct*100:.2f}%")
-                    else:
-                        st.metric("INSIDER OWNERSHIP", "N/A")
-                
-                with col_own2:
-                    institution_pct = info.get('heldPercentInstitutions', 0)
-                    if isinstance(institution_pct, (int, float)):
-                        st.metric("INSTITUTIONAL", f"{institution_pct*100:.2f}%")
-                    else:
-                        st.metric("INSTITUTIONAL", "N/A")
-                
-                with col_own3:
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    insider = info.get('heldPercentInsiders', 0)
+                    st.metric("INSIDER %", f"{insider*100:.2f}%" if isinstance(insider, (int, float)) else "N/A")
+                with col2:
+                    inst = info.get('heldPercentInstitutions', 0)
+                    st.metric("INSTITUTIONAL %", f"{inst*100:.2f}%" if isinstance(inst, (int, float)) else "N/A")
+                with col3:
                     float_shares = info.get('floatShares', 0)
-                    if float_shares:
-                        if float_shares >= 1e9:
-                            float_display = f"{float_shares/1e9:.2f}B"
-                        elif float_shares >= 1e6:
-                            float_display = f"{float_shares/1e6:.2f}M"
-                        else:
-                            float_display = f"{float_shares:,.0f}"
-                        st.metric("FLOAT SHARES", float_display)
-                    else:
-                        st.metric("FLOAT SHARES", "N/A")
+                    st.metric("FLOAT", f"{float_shares/1e9:.2f}B" if float_shares >= 1e9 else f"{float_shares/1e6:.2f}M" if float_shares else "N/A")
                 
-                st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-                st.markdown("#### 🏦 MAJOR HOLDERS")
-                
-                try:
-                    major_holders = stock.major_holders
-                    
-                    if major_holders is not None and not major_holders.empty:
-                        st.dataframe(major_holders, use_container_width=True, hide_index=True)
-                    else:
-                        st.info("Major holders data not available")
-                
-                except:
-                    st.info("Major holders data not available")
-                
-                st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-                st.markdown("#### 🏢 TOP INSTITUTIONAL HOLDERS")
-                
-                try:
-                    institutional_holders = stock.institutional_holders
-                    
-                    if institutional_holders is not None and not institutional_holders.empty:
-                        st.dataframe(institutional_holders.head(10), use_container_width=True, hide_index=True)
-                    else:
-                        st.info("Institutional holders data not available")
-                
-                except:
-                    st.info("Institutional holders data not available")
-                
-                st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-                st.markdown("#### 🌱 ESG & SUSTAINABILITY")
-                
-                esg_scores = {
-                    'ESG Score': info.get('esgScores', {}).get('totalEsg', 'N/A') if isinstance(info.get('esgScores'), dict) else 'N/A',
-                    'Environment Score': info.get('esgScores', {}).get('environmentScore', 'N/A') if isinstance(info.get('esgScores'), dict) else 'N/A',
-                    'Social Score': info.get('esgScores', {}).get('socialScore', 'N/A') if isinstance(info.get('esgScores'), dict) else 'N/A',
-                    'Governance Score': info.get('esgScores', {}).get('governanceScore', 'N/A') if isinstance(info.get('esgScores'), dict) else 'N/A'
-                }
-                
-                esg_available = any(v != 'N/A' for v in esg_scores.values())
-                
-                if esg_available:
-                    col_esg1, col_esg2, col_esg3, col_esg4 = st.columns(4)
-                    
-                    cols = [col_esg1, col_esg2, col_esg3, col_esg4]
-                    
-                    for idx, (label, value) in enumerate(esg_scores.items()):
-                        with cols[idx]:
-                            if isinstance(value, (int, float)):
-                                st.metric(label, f"{value:.1f}")
-                            else:
-                                st.metric(label, value)
-                else:
-                    st.info("ESG data not available for this company")
-                
-                st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-                st.markdown("#### 📊 RAW DATA (ALL AVAILABLE INFO)")
-                
-                with st.expander("🔍 VIEW RAW DATA", expanded=False):
-                    info_items = []
-                    for key, value in info.items():
-                        if not isinstance(value, (dict, list)):
-                            info_items.append({'Field': key, 'Value': str(value)})
-                    
-                    info_df = pd.DataFrame(info_items)
-                    st.dataframe(info_df, use_container_width=True, hide_index=True)
-            
-            # ===== TAB 7: TRADINGVIEW =====
-            with tab7:
-                st.markdown("### 📺 TRADINGVIEW INTERACTIVE CHART")
-                
-                # Convertir le ticker pour TradingView
-                tv_symbol = get_tradingview_symbol(display_ticker)
-                
-                st.markdown(f"""
-                <div style="background-color: #111; border-left: 3px solid #FFAA00; padding: 10px; margin: 10px 0;">
-                    <p style="margin: 0; font-size: 11px; color: #999;">
-                        <strong style="color: #FFAA00;">Yahoo Ticker:</strong> {display_ticker} | 
-                        <strong style="color: #FFAA00;">TradingView Symbol:</strong> {tv_symbol}
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Options de personnalisation
-                st.markdown("#### ⚙️ CHART SETTINGS")
-                
-                col_tv1, col_tv2, col_tv3, col_tv4 = st.columns(4)
-                
-                with col_tv1:
-                    chart_theme = st.selectbox(
-                        "THEME",
-                        options=["dark", "light"],
-                        index=0,
-                        key="tv_theme"
-                    )
-                
-                with col_tv2:
-                    chart_style = st.selectbox(
-                        "CHART STYLE",
-                        options=["1", "2", "3", "4", "5", "6", "7", "8", "9"],
-                        format_func=lambda x: {
-                            "1": "📊 Bars",
-                            "2": "🕯️ Candles", 
-                            "3": "📈 Line",
-                            "4": "📉 Area",
-                            "5": "🧱 Renko",
-                            "6": "📐 Kagi",
-                            "7": "⬜ Point & Figure",
-                            "8": "📏 Line Break",
-                            "9": "🔶 Heikin Ashi"
-                        }.get(x, x),
-                        index=1,
-                        key="tv_style"
-                    )
-                
-                with col_tv3:
-                    chart_interval = st.selectbox(
-                        "INTERVAL",
-                        options=["1", "5", "15", "30", "60", "240", "D", "W", "M"],
-                        format_func=lambda x: {
-                            "1": "1 min",
-                            "5": "5 min",
-                            "15": "15 min",
-                            "30": "30 min",
-                            "60": "1 hour",
-                            "240": "4 hours",
-                            "D": "1 Day",
-                            "W": "1 Week",
-                            "M": "1 Month"
-                        }.get(x, x),
-                        index=6,
-                        key="tv_interval"
-                    )
-                
-                with col_tv4:
-                    chart_height = st.selectbox(
-                        "HEIGHT",
-                        options=[400, 500, 600, 700, 800],
-                        index=2,
-                        key="tv_height"
-                    )
-                
-                st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-                
-                # Graphique principal TradingView
-                st.markdown("#### 📈 ADVANCED CHART")
-                
-                chart_html = render_tradingview_chart(
-                    tv_symbol, 
-                    theme=chart_theme, 
-                    style=chart_style, 
-                    interval=chart_interval, 
-                    height=chart_height
-                )
-                components.html(chart_html, height=chart_height + 20)
-                
-                st.markdown(f"""
-                <div style="background-color: #0a0a0a; border-left: 3px solid #00FF00; padding: 10px; margin: 10px 0;">
-                    <p style="margin: 0; font-size: 10px; color: #999;">
-                        <strong style="color: #00FF00;">💡 TIP:</strong> Use the chart toolbar to add indicators, draw trendlines, 
-                        and customize your analysis. Pre-loaded indicators: SMA, RSI, MACD
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                st.markdown('<div style="border-bottom: 1px solid #333; margin: 20px 0;"></div>', unsafe_allow_html=True)
-                
-                # Widgets supplémentaires
-                col_widget1, col_widget2 = st.columns(2)
-                
-                with col_widget1:
-                    with st.expander("📊 MINI CHART (COMPACT VIEW)", expanded=False):
-                        mini_html = render_tradingview_mini(tv_symbol, theme=chart_theme)
-                        components.html(mini_html, height=250)
-                
-                with col_widget2:
-                    with st.expander("🔬 TECHNICAL ANALYSIS", expanded=False):
-                        ta_html = render_tradingview_technical_analysis(tv_symbol, theme=chart_theme)
-                        components.html(ta_html, height=450)
-                
-                # Symbol Info Widget
-                st.markdown('<div style="border-bottom: 1px solid #333; margin: 20px 0;"></div>', unsafe_allow_html=True)
-                
-                with st.expander("ℹ️ SYMBOL INFORMATION", expanded=False):
-                    symbol_info_html = render_tradingview_symbol_info(tv_symbol, theme=chart_theme)
-                    components.html(symbol_info_html, height=200)
+                with st.expander("🔍 RAW DATA"):
+                    info_items = [{'Field': k, 'Value': str(v)} for k, v in info.items() if not isinstance(v, (dict, list))]
+                    st.dataframe(pd.DataFrame(info_items), use_container_width=True, hide_index=True)
         
         else:
-            st.error(f"❌ Could not find data for ticker '{display_ticker}'. Please check the ticker symbol.")
+            st.error(f"❌ Could not find data for '{display_ticker}'")
 
 elif not ticker_input and search_button:
     st.warning("⚠️ Please enter a ticker symbol")
 
-# ===== INFO SECTION =====
+# Info section when no ticker
 if not display_ticker:
     st.markdown("""
     <div style="background-color: #111; border: 2px solid #FFAA00; padding: 20px; margin: 20px 0;">
-        <h3 style="margin: 0 0 15px 0; color: #FFAA00;">📊 COMPREHENSIVE COMPANY ANALYSIS</h3>
-        <p style="font-size: 11px; color: #999; margin: 10px 0;">
-        Enter any stock ticker to get instant access to:
-        </p>
-        <ul style="font-size: 10px; color: #999; margin: 10px 0 10px 20px;">
-            <li><strong>Company Overview:</strong> Key metrics, description, executives</li>
-            <li><strong>Financial Statements:</strong> Income statement, balance sheet, cash flow (annual & quarterly)</li>
-            <li><strong>Price & Performance:</strong> Interactive charts, technical indicators, moving averages</li>
-            <li><strong>Valuation:</strong> P/E, PEG, EV/EBITDA, analyst targets</li>
-            <li><strong>News & Events:</strong> Latest news, earnings calendar, company events</li>
-            <li><strong>Detailed Info:</strong> Ownership structure, institutional holders, ESG scores</li>
-            <li><strong style="color: #00FF00;">NEW! TradingView:</strong> Interactive professional charts with technical analysis</li>
-        </ul>
-        <p style="font-size: 10px; color: #FFAA00; margin: 15px 0 0 0;">
-        <strong>📌 SUPPORTED MARKETS:</strong>
-        </p>
-        <ul style="font-size: 9px; color: #999; margin: 5px 0 0 20px;">
-            <li><strong>US:</strong> AAPL, MSFT, GOOGL, TSLA, NVDA...</li>
-            <li><strong>Europe:</strong> MC.PA (LVMH), AIR.PA (Airbus), SAP.DE (SAP)...</li>
-            <li><strong>Switzerland:</strong> NESN.SW (Nestlé), NOVN.SW (Novartis), ROG.SW (Roche)...</li>
-            <li><strong>UK:</strong> SHEL.L (Shell), BP.L (BP), HSBA.L (HSBC)...</li>
-        </ul>
-        <p style="font-size: 10px; color: #00FFFF; margin: 15px 0 0 0; font-weight: bold;">
-        💡 TIP: Use Yahoo Finance ticker format (add exchange suffix for non-US stocks)
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("#### 🔍 POPULAR TICKERS")
-    st.markdown("""
-    <div style="background-color: #0a0a0a; border: 1px solid #333; padding: 15px; margin: 10px 0;">
-        <p style="margin: 0 0 10px 0; font-size: 10px; color: #FFAA00;">
-        Try these popular tickers:
-        </p>
-        <ul style="margin: 0; font-size: 11px; color: #999; list-style: none; padding: 0;">
-            <li style="margin: 5px 0;">🇺🇸 <strong style="color: #00FFFF;">AAPL</strong> - Apple Inc.</li>
-            <li style="margin: 5px 0;">🇺🇸 <strong style="color: #00FFFF;">MSFT</strong> - Microsoft Corp.</li>
-            <li style="margin: 5px 0;">🇺🇸 <strong style="color: #00FFFF;">TSLA</strong> - Tesla Inc.</li>
-            <li style="margin: 5px 0;">🇫🇷 <strong style="color: #00FFFF;">MC.PA</strong> - LVMH</li>
-            <li style="margin: 5px 0;">🇫🇷 <strong style="color: #00FFFF;">AIR.PA</strong> - Airbus</li>
-            <li style="margin: 5px 0;">🇨🇭 <strong style="color: #00FFFF;">NESN.SW</strong> - Nestlé</li>
-            <li style="margin: 5px 0;">🇨🇭 <strong style="color: #00FFFF;">NOVN.SW</strong> - Novartis</li>
-            <li style="margin: 5px 0;">🇬🇧 <strong style="color: #00FFFF;">SHEL.L</strong> - Shell</li>
+        <h3 style="color: #FFAA00;">📊 COMPANY ANALYSIS</h3>
+        <p style="font-size: 11px; color: #999;">Enter any stock ticker to analyze:</p>
+        <ul style="font-size: 10px; color: #999;">
+            <li>🇺🇸 US: AAPL, MSFT, GOOGL, TSLA</li>
+            <li>🇫🇷 France: MC.PA, AIR.PA</li>
+            <li>🇨🇭 Switzerland: NESN.SW, NOVN.SW</li>
+            <li>🇬🇧 UK: SHEL.L, BP.L</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
-    
-    st.markdown("#### 🔍 EXAMPLE TICKERS")
-    
-    example_cols = st.columns(5)
-    
-    examples = [
-        ('AAPL', 'Apple'),
-        ('MSFT', 'Microsoft'),
-        ('MC.PA', 'LVMH'),
-        ('NESN.SW', 'Nestlé'),
-        ('SHEL.L', 'Shell')
-    ]
-    
-    for idx, (ticker, name) in enumerate(examples):
-        with example_cols[idx]:
-            if st.button(f"{ticker}\n{name}", use_container_width=True, key=f"example_{ticker}"):
-                st.session_state['current_ticker'] = ticker
-                st.rerun()
 
 # Footer
-st.markdown('<div style="border-top: 1px solid #333; margin: 10px 0;"></div>', unsafe_allow_html=True)
-last_update = datetime.now().strftime('%H:%M:%S')
 st.markdown(f"""
-<div style='text-align: center; color: #666; font-size: 9px; font-family: "Courier New", monospace; padding: 5px;'>
-    © 2025 BLOOMBERG ENS® | COMPANY ANALYSIS | LAST UPDATE: {last_update}
-    <br>
-    Data provided by Yahoo Finance & TradingView
+<div style='text-align: center; color: #666; font-size: 9px; padding: 10px; border-top: 1px solid #333; margin-top: 20px;'>
+    © 2025 BLOOMBERG ENS® | Data: Yahoo Finance & TradingView | {datetime.now().strftime('%H:%M:%S')}
 </div>
 """, unsafe_allow_html=True)
