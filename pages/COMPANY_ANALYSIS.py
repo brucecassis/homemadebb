@@ -316,7 +316,8 @@ col_search1, col_search2 = st.columns([4, 1])
 with col_search1:
     ticker_input = st.text_input(
         "", placeholder="Enter ticker (AAPL, MSFT, MC.PA...)",
-        key="ticker_search", label_visibility="collapsed"
+        key="ticker_search", label_visibility="collapsed",
+        on_change=lambda: st.session_state.update({'current_ticker': st.session_state.ticker_search.upper()})
     ).upper()
 
 with col_search2:
@@ -352,9 +353,8 @@ if display_ticker:
             </div>
             """, unsafe_allow_html=True)
             
-            tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-                "📊 OVERVIEW", "💰 FINANCIALS", "📈 PRICE & PERFORMANCE",
-                "📊 VALUATION", "📰 NEWS & EVENTS", "🔍 DETAILED INFO"
+            tab1, tab2, tab4, tab6 = st.tabs([
+                "📊 OVERVIEW", "💰 FINANCIALS", "📊 VALUATION", "🔍 DETAILED INFO"
             ])
             
             # ===== TAB 1: OVERVIEW =====
@@ -502,41 +502,6 @@ if display_ticker:
                                     analysis = analyze_financials_with_ai("Cash Flow", cashflow_df, company_name, display_ticker)
                                     st.markdown(f'<div style="background-color: #0a0a0a; border-left: 3px solid #00FF00; padding: 15px;">{analysis}</div>', unsafe_allow_html=True)
             
-            # ===== TAB 3: PRICE & PERFORMANCE =====
-            with tab3:
-                st.markdown("### 📈 PRICE & PERFORMANCE")
-                time_period = st.selectbox("TIME PERIOD", ['1mo', '3mo', '6mo', '1y', '2y', '5y', 'max'], index=3)
-                price_hist = get_price_history(display_ticker, period=time_period)
-                
-                if price_hist is not None and not price_hist.empty:
-                    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03,
-                                       subplot_titles=('Price', 'Volume'), row_heights=[0.7, 0.3])
-                    
-                    fig.add_trace(go.Candlestick(x=price_hist.index, open=price_hist['Open'], high=price_hist['High'],
-                                                  low=price_hist['Low'], close=price_hist['Close'], name='Price',
-                                                  increasing_line_color='#00FF00', decreasing_line_color='#FF0000'), row=1, col=1)
-                    
-                    colors = ['#00FF00' if price_hist['Close'].iloc[i] >= price_hist['Open'].iloc[i] else '#FF0000' for i in range(len(price_hist))]
-                    fig.add_trace(go.Bar(x=price_hist.index, y=price_hist['Volume'], marker_color=colors, showlegend=False), row=2, col=1)
-                    
-                    fig.update_layout(paper_bgcolor='#000', plot_bgcolor='#111', font=dict(color='#FFAA00', size=10),
-                                     xaxis_rangeslider_visible=False, height=600)
-                    fig.update_xaxes(gridcolor='#333')
-                    fig.update_yaxes(gridcolor='#333')
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Stats
-                    returns = price_hist['Close'].pct_change()
-                    col1, col2, col3, col4 = st.columns(4)
-                    with col1:
-                        st.metric("TOTAL RETURN", f"{((price_hist['Close'].iloc[-1] / price_hist['Close'].iloc[0]) - 1) * 100:+.2f}%")
-                    with col2:
-                        st.metric("VOLATILITY", f"{returns.std() * np.sqrt(252) * 100:.2f}%")
-                    with col3:
-                        sharpe = (returns.mean() * 252) / (returns.std() * np.sqrt(252)) if returns.std() > 0 else 0
-                        st.metric("SHARPE", f"{sharpe:.2f}")
-                    with col4:
-                        st.metric("MAX DRAWDOWN", f"{((price_hist['Close'] / price_hist['Close'].cummax()) - 1).min() * 100:.2f}%")
             
             # ===== TAB 4: VALUATION =====
             with tab4:
@@ -567,25 +532,6 @@ if display_ticker:
                 with col3:
                     st.metric("TARGET LOW", f"${info.get('targetLowPrice', 0):.2f}" if info.get('targetLowPrice') else "N/A")
             
-            # ===== TAB 5: NEWS =====
-            with tab5:
-                st.markdown("### 📰 NEWS & EVENTS")
-                try:
-                    news = stock.news
-                    if news:
-                        for article in news[:10]:
-                            title = article.get('title', 'No title')
-                            publisher = article.get('publisher', 'Unknown')
-                            link = article.get('link', '#')
-                            st.markdown(f"""
-                            <div style="background-color: #0a0a0a; border-left: 3px solid #FFAA00; padding: 10px; margin: 5px 0;">
-                                <p style="margin: 0; font-size: 12px; color: #FFAA00; font-weight: bold;">{title}</p>
-                                <p style="margin: 5px 0; font-size: 9px; color: #666;">{publisher}</p>
-                                <a href="{link}" target="_blank" style="font-size: 9px; color: #00FFFF;">Read more →</a>
-                            </div>
-                            """, unsafe_allow_html=True)
-                except:
-                    st.info("News not available")
             
             # ===== TAB 6: DETAILED INFO =====
             with tab6:
