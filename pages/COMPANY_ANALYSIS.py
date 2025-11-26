@@ -353,8 +353,8 @@ if display_ticker:
             </div>
             """, unsafe_allow_html=True)
             
-            tab1, tab2, tab3, tab4, tab5 = st.tabs([
-                "📊 OVERVIEW", "💰 FINANCIALS","🔬 ADVANCED ANALYSIS", "📊 VALUATION", "🔍 DETAILED INFO"
+            tab1, tab2, tab3 = st.tabs([
+                "📊 OVERVIEW", "💰 FINANCIALS", "🔬 ADVANCED ANALYSIS"
             ])
             
             # ===== TAB 1: OVERVIEW =====
@@ -503,8 +503,8 @@ if display_ticker:
                                     st.markdown(f'<div style="background-color: #0a0a0a; border-left: 3px solid #00FF00; padding: 15px;">{analysis}</div>', unsafe_allow_html=True)
             
             
-            # ===== TAB 4: VALUATION =====
-            with tab4:
+            # ===== TAB 3: VALUATION =====
+            with tab3:
                 st.markdown("### 📊 VALUATION METRICS")
                 col1, col2 = st.columns(2)
                 
@@ -532,7 +532,7 @@ if display_ticker:
                 with col3:
                     st.metric("TARGET LOW", f"${info.get('targetLowPrice', 0):.2f}" if info.get('targetLowPrice') else "N/A")
 
-            with tab4:
+            with tab3:
     st.markdown("### 🔬 ADVANCED ANALYSIS")
     
     # Sous-onglets pour organiser l'information
