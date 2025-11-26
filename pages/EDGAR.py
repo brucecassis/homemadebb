@@ -448,7 +448,8 @@ with tab2:
             "TICKER SYMBOL",
             placeholder="Ex: AAPL, TSLA, MSFT...",
             help="Entrez le ticker pour voir les transactions insider",
-            key="ticker_insider"
+            key="ticker_insider",
+            on_change=lambda: st.session_state.update({'display_ticker_insider': st.session_state.ticker_insider})
         ).upper()
     
     with col2:
@@ -461,41 +462,39 @@ with tab2:
         st.session_state['display_ticker_insider'] = ticker_insider
     
     # Récupérer le ticker à afficher
-    display_ticker_insider = st.session_state.get('display_ticker_insider', None)
+    display_ticker_insider = st.session_state.get('display_ticker_insider', '')
     
-    # Intégration du site OpenInsider via iframe
+    # Intégration du site OpenInsider
     if display_ticker_insider:
         st.markdown(f"#### 📊 INSIDER TRANSACTIONS FOR {display_ticker_insider}")
         
         # URL OpenInsider pour un ticker spécifique
         openinsider_url = f"http://openinsider.com/screener?s={display_ticker_insider}"
         
-        # Afficher le site dans un iframe
-        st.markdown(f"""
-        <iframe 
-            src="{openinsider_url}" 
-            width="100%" 
-            height="800" 
-            style="border: 2px solid #FFAA00; background-color: #000;"
-        ></iframe>
-        """, unsafe_allow_html=True)
+        st.markdown(f"**Direct Link:** [🔗 View on OpenInsider]({openinsider_url})")
         
-        st.markdown(f"[🔗 Open in new tab]({openinsider_url})", unsafe_allow_html=True)
+        # Note importante
+        st.warning("⚠️ Note: Some websites block iframe embedding. If the content doesn't load, use the direct link above.")
+        
+        # Essayer avec components.iframe
+        import streamlit.components.v1 as components
+        components.iframe(openinsider_url, height=800, scrolling=True)
     
     else:
         # Afficher la page principale d'OpenInsider par défaut
         st.markdown("#### 📊 LATEST INSIDER ACTIVITY")
         
-        st.markdown("""
-        <iframe 
-            src="http://openinsider.com/" 
-            width="100%" 
-            height="800" 
-            style="border: 2px solid #FFAA00; background-color: #000;"
-        ></iframe>
-        """, unsafe_allow_html=True)
+        openinsider_url = "http://openinsider.com/"
+        st.markdown(f"**Direct Link:** [🔗 View on OpenInsider]({openinsider_url})")
+        
+        st.warning("⚠️ Note: Some websites block iframe embedding. If the content doesn't load, use the direct link above.")
+        
+        import streamlit.components.v1 as components
+        components.iframe(openinsider_url, height=800, scrolling=True)
         
         st.info("💡 Enter a ticker symbol above to filter insider transactions for a specific company.")
+        
+
 # Footer
 st.markdown('<div style="border-top: 1px solid #333; margin: 10px 0;"></div>', unsafe_allow_html=True)
 last_update = datetime.now().strftime('%H:%M:%S')
