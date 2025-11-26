@@ -503,366 +503,297 @@ if display_ticker:
                                     st.markdown(f'<div style="background-color: #0a0a0a; border-left: 3px solid #00FF00; padding: 15px;">{analysis}</div>', unsafe_allow_html=True)
             
             
-            # ===== TAB 3: VALUATION =====
+            # ===== TAB 3: ADVANCED ANALYSIS =====
             with tab3:
-                st.markdown("### 📊 VALUATION METRICS")
-                col1, col2 = st.columns(2)
+                st.markdown("### 🔬 ADVANCED ANALYSIS")
                 
-                with col1:
-                    st.markdown("#### 💰 VALUATION RATIOS")
-                    val_metrics = {'P/E (TTM)': info.get('trailingPE'), 'Forward P/E': info.get('forwardPE'),
-                                  'PEG': info.get('pegRatio'), 'P/S': info.get('priceToSalesTrailing12Months'),
-                                  'P/B': info.get('priceToBook'), 'EV/EBITDA': info.get('enterpriseToEbitda')}
-                    val_data = [{'Metric': k, 'Value': f"{v:.2f}" if isinstance(v, (int, float)) else 'N/A'} for k, v in val_metrics.items()]
-                    st.dataframe(pd.DataFrame(val_data), use_container_width=True, hide_index=True)
+                # Sous-onglets pour organiser l'information
+                analysis_tab1, analysis_tab2, analysis_tab3, analysis_tab4, analysis_tab5 = st.tabs([
+                    "💰 VALUATION", "📊 FINANCIAL HEALTH", "📈 TECHNICAL", "👥 OWNERSHIP", "⚖️ PEER COMPARISON"
+                ])
                 
-                with col2:
-                    st.markdown("#### 📊 PROFITABILITY")
-                    prof_metrics = {'Profit Margin': info.get('profitMargins'), 'Operating Margin': info.get('operatingMargins'),
-                                   'ROA': info.get('returnOnAssets'), 'ROE': info.get('returnOnEquity')}
-                    prof_data = [{'Metric': k, 'Value': f"{v*100:.2f}%" if isinstance(v, (int, float)) else 'N/A'} for k, v in prof_metrics.items()]
-                    st.dataframe(pd.DataFrame(prof_data), use_container_width=True, hide_index=True)
+                # ===== SUB-TAB 1: VALUATION =====
+                with analysis_tab1:
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown("#### 💰 VALUATION RATIOS")
+                        val_metrics = {
+                            'P/E (TTM)': info.get('trailingPE'),
+                            'Forward P/E': info.get('forwardPE'),
+                            'PEG': info.get('pegRatio'),
+                            'P/S': info.get('priceToSalesTrailing12Months'),
+                            'P/B': info.get('priceToBook'),
+                            'EV/EBITDA': info.get('enterpriseToEbitda'),
+                            'EV/Revenue': info.get('enterpriseToRevenue')
+                        }
+                        val_data = [{'Metric': k, 'Value': f"{v:.2f}" if isinstance(v, (int, float)) else 'N/A'} for k, v in val_metrics.items()]
+                        st.dataframe(pd.DataFrame(val_data), use_container_width=True, hide_index=True)
+                    
+                    with col2:
+                        st.markdown("#### 📊 PROFITABILITY")
+                        prof_metrics = {
+                            'Profit Margin': info.get('profitMargins'),
+                            'Operating Margin': info.get('operatingMargins'),
+                            'EBITDA Margin': info.get('ebitdaMargins'),
+                            'ROA': info.get('returnOnAssets'),
+                            'ROE': info.get('returnOnEquity'),
+                            'ROIC': info.get('returnOnCapital')
+                        }
+                        prof_data = [{'Metric': k, 'Value': f"{v*100:.2f}%" if isinstance(v, (int, float)) else 'N/A'} for k, v in prof_metrics.items()]
+                        st.dataframe(pd.DataFrame(prof_data), use_container_width=True, hide_index=True)
+                    
+                    st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+                    
+                    st.markdown("#### 🎯 ANALYST TARGETS & RECOMMENDATIONS")
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric("TARGET HIGH", f"${info.get('targetHighPrice', 0):.2f}" if info.get('targetHighPrice') else "N/A")
+                    with col2:
+                        st.metric("TARGET MEAN", f"${info.get('targetMeanPrice', 0):.2f}" if info.get('targetMeanPrice') else "N/A")
+                    with col3:
+                        st.metric("TARGET LOW", f"${info.get('targetLowPrice', 0):.2f}" if info.get('targetLowPrice') else "N/A")
+                    with col4:
+                        num_analysts = info.get('numberOfAnalystOpinions', 0)
+                        st.metric("ANALYSTS", f"{num_analysts}" if num_analysts else "N/A")
+                    
+                    # Recommendations
+                    recommendation = info.get('recommendationKey', 'N/A').upper()
+                    rec_color = '#00FF00' if recommendation in ['BUY', 'STRONG_BUY'] else '#FFAA00' if recommendation == 'HOLD' else '#FF0000'
+                    st.markdown(f"""
+                    <div style="background-color: #111; border-left: 3px solid {rec_color}; padding: 15px; margin: 10px 0;">
+                        <p style="font-size: 12px; color: #FFAA00; font-weight: bold;">CONSENSUS: <span style="color: {rec_color};">{recommendation}</span></p>
+                    </div>
+                    """, unsafe_allow_html=True)
                 
-                st.markdown("#### 🎯 ANALYST TARGETS")
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("TARGET HIGH", f"${info.get('targetHighPrice', 0):.2f}" if info.get('targetHighPrice') else "N/A")
-                with col2:
-                    st.metric("TARGET MEAN", f"${info.get('targetMeanPrice', 0):.2f}" if info.get('targetMeanPrice') else "N/A")
-                with col3:
-                    st.metric("TARGET LOW", f"${info.get('targetLowPrice', 0):.2f}" if info.get('targetLowPrice') else "N/A")
-
-            with tab3:
-    st.markdown("### 🔬 ADVANCED ANALYSIS")
-    
-    # Sous-onglets pour organiser l'information
-    analysis_tab1, analysis_tab2, analysis_tab3, analysis_tab4, analysis_tab5 = st.tabs([
-        "💰 VALUATION", "📊 FINANCIAL HEALTH", "📈 TECHNICAL", "👥 OWNERSHIP", "⚖️ PEER COMPARISON"
-    ])
-    
-    # ===== SUB-TAB 1: VALUATION =====
-    with analysis_tab1:
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("#### 💰 VALUATION RATIOS")
-            val_metrics = {
-                'P/E (TTM)': info.get('trailingPE'),
-                'Forward P/E': info.get('forwardPE'),
-                'PEG': info.get('pegRatio'),
-                'P/S': info.get('priceToSalesTrailing12Months'),
-                'P/B': info.get('priceToBook'),
-                'EV/EBITDA': info.get('enterpriseToEbitda'),
-                'EV/Revenue': info.get('enterpriseToRevenue')
-            }
-            val_data = [{'Metric': k, 'Value': f"{v:.2f}" if isinstance(v, (int, float)) else 'N/A'} for k, v in val_metrics.items()]
-            st.dataframe(pd.DataFrame(val_data), use_container_width=True, hide_index=True)
-        
-        with col2:
-            st.markdown("#### 📊 PROFITABILITY")
-            prof_metrics = {
-                'Profit Margin': info.get('profitMargins'),
-                'Operating Margin': info.get('operatingMargins'),
-                'EBITDA Margin': info.get('ebitdaMargins'),
-                'ROA': info.get('returnOnAssets'),
-                'ROE': info.get('returnOnEquity'),
-                'ROIC': info.get('returnOnCapital')
-            }
-            prof_data = [{'Metric': k, 'Value': f"{v*100:.2f}%" if isinstance(v, (int, float)) else 'N/A'} for k, v in prof_metrics.items()]
-            st.dataframe(pd.DataFrame(prof_data), use_container_width=True, hide_index=True)
-        
-        st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-        
-        st.markdown("#### 🎯 ANALYST TARGETS & RECOMMENDATIONS")
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("TARGET HIGH", f"${info.get('targetHighPrice', 0):.2f}" if info.get('targetHighPrice') else "N/A")
-        with col2:
-            st.metric("TARGET MEAN", f"${info.get('targetMeanPrice', 0):.2f}" if info.get('targetMeanPrice') else "N/A")
-        with col3:
-            st.metric("TARGET LOW", f"${info.get('targetLowPrice', 0):.2f}" if info.get('targetLowPrice') else "N/A")
-        with col4:
-            num_analysts = info.get('numberOfAnalystOpinions', 0)
-            st.metric("ANALYSTS", f"{num_analysts}" if num_analysts else "N/A")
-        
-        # Recommendations
-        recommendation = info.get('recommendationKey', 'N/A').upper()
-        rec_color = '#00FF00' if recommendation in ['BUY', 'STRONG_BUY'] else '#FFAA00' if recommendation == 'HOLD' else '#FF0000'
-        st.markdown(f"""
-        <div style="background-color: #111; border-left: 3px solid {rec_color}; padding: 15px; margin: 10px 0;">
-            <p style="font-size: 12px; color: #FFAA00; font-weight: bold;">CONSENSUS: <span style="color: {rec_color};">{recommendation}</span></p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # ===== SUB-TAB 2: FINANCIAL HEALTH =====
-    with analysis_tab2:
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("#### 💧 LIQUIDITY RATIOS")
-            liquidity_metrics = {
-                'Current Ratio': info.get('currentRatio'),
-                'Quick Ratio': info.get('quickRatio'),
-                'Cash Ratio': (info.get('totalCash', 0) / info.get('totalCurrentLiabilities', 1)) if info.get('totalCurrentLiabilities') else None,
-                'Working Capital': info.get('workingCapital')
-            }
-            liq_data = []
-            for k, v in liquidity_metrics.items():
-                if k == 'Working Capital' and isinstance(v, (int, float)):
-                    display = f"${v/1e9:.2f}B" if v >= 1e9 else f"${v/1e6:.2f}M"
-                elif isinstance(v, (int, float)):
-                    display = f"{v:.2f}"
-                else:
-                    display = 'N/A'
-                liq_data.append({'Metric': k, 'Value': display})
-            st.dataframe(pd.DataFrame(liq_data), use_container_width=True, hide_index=True)
-        
-        with col2:
-            st.markdown("#### 📊 LEVERAGE RATIOS")
-            debt_metrics = {
-                'Debt/Equity': info.get('debtToEquity'),
-                'Total Debt': info.get('totalDebt'),
-                'Net Debt': (info.get('totalDebt', 0) - info.get('totalCash', 0)),
-                'Interest Coverage': (info.get('ebitda', 0) / info.get('interestExpense', 1)) if info.get('interestExpense') else None
-            }
-            debt_data = []
-            for k, v in debt_metrics.items():
-                if k in ['Total Debt', 'Net Debt'] and isinstance(v, (int, float)):
-                    display = f"${v/1e9:.2f}B" if abs(v) >= 1e9 else f"${v/1e6:.2f}M"
-                elif isinstance(v, (int, float)):
-                    display = f"{v:.2f}"
-                else:
-                    display = 'N/A'
-                debt_data.append({'Metric': k, 'Value': display})
-            st.dataframe(pd.DataFrame(debt_data), use_container_width=True, hide_index=True)
-        
-        st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-        
-        st.markdown("#### 💰 CASH MANAGEMENT")
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            total_cash = info.get('totalCash', 0)
-            st.metric("TOTAL CASH", f"${total_cash/1e9:.2f}B" if total_cash >= 1e9 else f"${total_cash/1e6:.2f}M" if total_cash else "N/A")
-        with col2:
-            fcf = info.get('freeCashflow', 0)
-            st.metric("FREE CASH FLOW", f"${fcf/1e9:.2f}B" if fcf >= 1e9 else f"${fcf/1e6:.2f}M" if fcf else "N/A")
-        with col3:
-            op_cf = info.get('operatingCashflow', 0)
-            st.metric("OPERATING CF", f"${op_cf/1e9:.2f}B" if op_cf >= 1e9 else f"${op_cf/1e6:.2f}M" if op_cf else "N/A")
-        with col4:
-            fcf_margin = (fcf / info.get('totalRevenue', 1) * 100) if info.get('totalRevenue') and fcf else None
-            st.metric("FCF MARGIN", f"{fcf_margin:.2f}%" if fcf_margin else "N/A")
-    
-    # ===== SUB-TAB 3: TECHNICAL ANALYSIS =====
-    with analysis_tab3:
-        st.markdown("#### 📈 TECHNICAL INDICATORS")
-        
-        price_hist = get_price_history(display_ticker, period='6mo')
-        if price_hist is not None and not price_hist.empty:
-            # Calcul des indicateurs techniques
-            close = price_hist['Close']
-            
-            # RSI
-            delta = close.diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-            rs = gain / loss
-            rsi = 100 - (100 / (1 + rs))
-            current_rsi = rsi.iloc[-1] if not rsi.empty else None
-            
-            # Moving Averages
-            sma_20 = close.rolling(window=20).mean().iloc[-1]
-            sma_50 = close.rolling(window=50).mean().iloc[-1]
-            sma_200 = close.rolling(window=200).mean().iloc[-1] if len(close) >= 200 else None
-            
-            # MACD
-            ema_12 = close.ewm(span=12, adjust=False).mean()
-            ema_26 = close.ewm(span=26, adjust=False).mean()
-            macd = ema_12 - ema_26
-            signal = macd.ewm(span=9, adjust=False).mean()
-            macd_current = macd.iloc[-1] if not macd.empty else None
-            signal_current = signal.iloc[-1] if not signal.empty else None
-            
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                rsi_color = '#00FF00' if current_rsi and current_rsi < 30 else '#FF0000' if current_rsi and current_rsi > 70 else '#FFAA00'
-                st.markdown(f'<p style="color: #FFAA00; font-size: 10px; font-weight: bold;">RSI (14)</p><p style="color: {rsi_color}; font-size: 20px; font-weight: bold;">{current_rsi:.2f}</p>', unsafe_allow_html=True)
-            with col2:
-                st.metric("SMA 20", f"${sma_20:.2f}" if pd.notna(sma_20) else "N/A")
-            with col3:
-                st.metric("SMA 50", f"${sma_50:.2f}" if pd.notna(sma_50) else "N/A")
-            with col4:
-                st.metric("SMA 200", f"${sma_200:.2f}" if pd.notna(sma_200) else "N/A")
-            
-            st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-            
-            # Signal d'achat/vente
-            current_price = info.get('currentPrice', close.iloc[-1])
-            signals = []
-            if current_rsi:
-                if current_rsi < 30:
-                    signals.append("🟢 RSI oversold - potential BUY signal")
-                elif current_rsi > 70:
-                    signals.append("🔴 RSI overbought - potential SELL signal")
-            
-            if sma_20 and sma_50:
-                if sma_20 > sma_50:
-                    signals.append("🟢 Golden Cross (SMA20 > SMA50)")
-                else:
-                    signals.append("🔴 Death Cross (SMA20 < SMA50)")
-            
-            if macd_current and signal_current:
-                if macd_current > signal_current:
-                    signals.append("🟢 MACD Bullish")
-                else:
-                    signals.append("🔴 MACD Bearish")
-            
-            st.markdown("#### 📊 TECHNICAL SIGNALS")
-            for signal in signals:
-                color = '#00FF00' if '🟢' in signal else '#FF0000'
-                st.markdown(f'<div style="background-color: #111; border-left: 3px solid {color}; padding: 10px; margin: 5px 0;"><p style="font-size: 11px; color: #FFAA00;">{signal}</p></div>', unsafe_allow_html=True)
-        else:
-            st.info("Not enough data for technical analysis")
-        
-        st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-        
-        st.markdown("#### 📊 SUPPORT & RESISTANCE")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("52W HIGH", f"${info.get('fiftyTwoWeekHigh', 0):.2f}" if info.get('fiftyTwoWeekHigh') else "N/A")
-        with col2:
-            st.metric("52W LOW", f"${info.get('fiftyTwoWeekLow', 0):.2f}" if info.get('fiftyTwoWeekLow') else "N/A")
-        with col3:
-            beta = info.get('beta', 0)
-            st.metric("BETA", f"{beta:.2f}" if beta else "N/A")
-    
-    # ===== SUB-TAB 4: OWNERSHIP =====
-    with analysis_tab4:
-        st.markdown("#### 👥 OWNERSHIP STRUCTURE")
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            insider = info.get('heldPercentInsiders', 0)
-            st.metric("INSIDER OWNERSHIP", f"{insider*100:.2f}%" if isinstance(insider, (int, float)) else "N/A")
-        with col2:
-            inst = info.get('heldPercentInstitutions', 0)
-            st.metric("INSTITUTIONAL", f"{inst*100:.2f}%" if isinstance(inst, (int, float)) else "N/A")
-        with col3:
-            float_shares = info.get('floatShares', 0)
-            st.metric("FLOAT SHARES", f"{float_shares/1e9:.2f}B" if float_shares >= 1e9 else f"{float_shares/1e6:.2f}M" if float_shares else "N/A")
-        
-        st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-        
-        st.markdown("#### 📊 SHARE STRUCTURE")
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            shares_out = info.get('sharesOutstanding', 0)
-            st.metric("SHARES OUT", f"{shares_out/1e9:.2f}B" if shares_out >= 1e9 else f"{shares_out/1e6:.2f}M" if shares_out else "N/A")
-        with col2:
-            implied_shares = info.get('impliedSharesOutstanding', 0)
-            st.metric("IMPLIED SHARES", f"{implied_shares/1e9:.2f}B" if implied_shares >= 1e9 else f"{implied_shares/1e6:.2f}M" if implied_shares else "N/A")
-        with col3:
-            short_percent = info.get('shortPercentOfFloat', 0)
-            st.metric("SHORT % OF FLOAT", f"{short_percent*100:.2f}%" if isinstance(short_percent, (int, float)) else "N/A")
-        with col4:
-            short_ratio = info.get('shortRatio', 0)
-            st.metric("SHORT RATIO", f"{short_ratio:.2f}" if short_ratio else "N/A")
-        
-        st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-        
-        # Top Holders (if available)
-        st.markdown("#### 🏦 MAJOR HOLDERS")
-        try:
-            major_holders = stock.major_holders
-            if major_holders is not None and not major_holders.empty:
-                st.dataframe(major_holders, use_container_width=True, hide_index=True)
-            else:
-                st.info("Major holders data not available")
-        except:
-            st.info("Major holders data not available")
-    
-    # ===== SUB-TAB 5: PEER COMPARISON =====
-    with analysis_tab5:
-        st.markdown("#### ⚖️ PEER COMPARISON")
-        
-        # Note: Pour une vraie comparaison, il faudrait récupérer les données des concurrents
-        # Ici on affiche les métriques clés de l'entreprise actuelle
-        
-        peers_text = info.get('sector', 'N/A')
-        st.markdown(f"""
-        <div style="background-color: #111; border-left: 3px solid #FFAA00; padding: 15px; margin: 10px 0;">
-            <p style="font-size: 11px; color: #999;">Sector: <strong style="color: #FFAA00;">{peers_text}</strong></p>
-            <p style="font-size: 10px; color: #666; margin-top: 5px;">For detailed peer comparison, consider comparing with other companies in the {peers_text} sector.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("#### 📊 COMPANY VS SECTOR METRICS")
-        
-        comparison_metrics = {
-            'Market Cap': info.get('marketCap'),
-            'P/E Ratio': info.get('trailingPE'),
-            'Profit Margin': info.get('profitMargins'),
-            'ROE': info.get('returnOnEquity'),
-            'Debt/Equity': info.get('debtToEquity'),
-            'Revenue Growth': info.get('revenueGrowth')
-        }
-        
-        comp_data = []
-        for k, v in comparison_metrics.items():
-            if k == 'Market Cap' and isinstance(v, (int, float)):
-                display = f"${v/1e12:.2f}T" if v >= 1e12 else f"${v/1e9:.2f}B"
-            elif k in ['Profit Margin', 'ROE', 'Revenue Growth'] and isinstance(v, (int, float)):
-                display = f"{v*100:.2f}%"
-            elif isinstance(v, (int, float)):
-                display = f"{v:.2f}"
-            else:
-                display = 'N/A'
-            comp_data.append({'Metric': k, 'Value': display, 'Sector Avg': 'N/A'})
-        
-        st.dataframe(pd.DataFrame(comp_data), use_container_width=True, hide_index=True)
-        
-        st.info("💡 Tip: For detailed peer analysis, search for competitor tickers in the same sector.")
-            
-            # ===== TAB 5: DETAILED INFO =====
-            with tab5:
-                st.markdown("### 🔍 DETAILED INFO")
+                # ===== SUB-TAB 2: FINANCIAL HEALTH =====
+                with analysis_tab2:
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown("#### 💧 LIQUIDITY RATIOS")
+                        liquidity_metrics = {
+                            'Current Ratio': info.get('currentRatio'),
+                            'Quick Ratio': info.get('quickRatio'),
+                            'Cash Ratio': (info.get('totalCash', 0) / info.get('totalCurrentLiabilities', 1)) if info.get('totalCurrentLiabilities') else None,
+                            'Working Capital': info.get('workingCapital')
+                        }
+                        liq_data = []
+                        for k, v in liquidity_metrics.items():
+                            if k == 'Working Capital' and isinstance(v, (int, float)):
+                                display = f"${v/1e9:.2f}B" if v >= 1e9 else f"${v/1e6:.2f}M"
+                            elif isinstance(v, (int, float)):
+                                display = f"{v:.2f}"
+                            else:
+                                display = 'N/A'
+                            liq_data.append({'Metric': k, 'Value': display})
+                        st.dataframe(pd.DataFrame(liq_data), use_container_width=True, hide_index=True)
+                    
+                    with col2:
+                        st.markdown("#### 📊 LEVERAGE RATIOS")
+                        debt_metrics = {
+                            'Debt/Equity': info.get('debtToEquity'),
+                            'Total Debt': info.get('totalDebt'),
+                            'Net Debt': (info.get('totalDebt', 0) - info.get('totalCash', 0)),
+                            'Interest Coverage': (info.get('ebitda', 0) / info.get('interestExpense', 1)) if info.get('interestExpense') else None
+                        }
+                        debt_data = []
+                        for k, v in debt_metrics.items():
+                            if k in ['Total Debt', 'Net Debt'] and isinstance(v, (int, float)):
+                                display = f"${v/1e9:.2f}B" if abs(v) >= 1e9 else f"${v/1e6:.2f}M"
+                            elif isinstance(v, (int, float)):
+                                display = f"{v:.2f}"
+                            else:
+                                display = 'N/A'
+                            debt_data.append({'Metric': k, 'Value': display})
+                        st.dataframe(pd.DataFrame(debt_data), use_container_width=True, hide_index=True)
+                    
+                    st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+                    
+                    st.markdown("#### 💰 CASH MANAGEMENT")
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        total_cash = info.get('totalCash', 0)
+                        st.metric("TOTAL CASH", f"${total_cash/1e9:.2f}B" if total_cash >= 1e9 else f"${total_cash/1e6:.2f}M" if total_cash else "N/A")
+                    with col2:
+                        fcf = info.get('freeCashflow', 0)
+                        st.metric("FREE CASH FLOW", f"${fcf/1e9:.2f}B" if fcf >= 1e9 else f"${fcf/1e6:.2f}M" if fcf else "N/A")
+                    with col3:
+                        op_cf = info.get('operatingCashflow', 0)
+                        st.metric("OPERATING CF", f"${op_cf/1e9:.2f}B" if op_cf >= 1e9 else f"${op_cf/1e6:.2f}M" if op_cf else "N/A")
+                    with col4:
+                        fcf_margin = (fcf / info.get('totalRevenue', 1) * 100) if info.get('totalRevenue') and fcf else None
+                        st.metric("FCF MARGIN", f"{fcf_margin:.2f}%" if fcf_margin else "N/A")
                 
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    insider = info.get('heldPercentInsiders', 0)
-                    st.metric("INSIDER %", f"{insider*100:.2f}%" if isinstance(insider, (int, float)) else "N/A")
-                with col2:
-                    inst = info.get('heldPercentInstitutions', 0)
-                    st.metric("INSTITUTIONAL %", f"{inst*100:.2f}%" if isinstance(inst, (int, float)) else "N/A")
-                with col3:
-                    float_shares = info.get('floatShares', 0)
-                    st.metric("FLOAT", f"{float_shares/1e9:.2f}B" if float_shares >= 1e9 else f"{float_shares/1e6:.2f}M" if float_shares else "N/A")
+                # ===== SUB-TAB 3: TECHNICAL ANALYSIS =====
+                with analysis_tab3:
+                    st.markdown("#### 📈 TECHNICAL INDICATORS")
+                    
+                    price_hist = get_price_history(display_ticker, period='6mo')
+                    if price_hist is not None and not price_hist.empty:
+                        # Calcul des indicateurs techniques
+                        close = price_hist['Close']
+                        
+                        # RSI
+                        delta = close.diff()
+                        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                        rs = gain / loss
+                        rsi = 100 - (100 / (1 + rs))
+                        current_rsi = rsi.iloc[-1] if not rsi.empty else None
+                        
+                        # Moving Averages
+                        sma_20 = close.rolling(window=20).mean().iloc[-1]
+                        sma_50 = close.rolling(window=50).mean().iloc[-1]
+                        sma_200 = close.rolling(window=200).mean().iloc[-1] if len(close) >= 200 else None
+                        
+                        # MACD
+                        ema_12 = close.ewm(span=12, adjust=False).mean()
+                        ema_26 = close.ewm(span=26, adjust=False).mean()
+                        macd = ema_12 - ema_26
+                        signal = macd.ewm(span=9, adjust=False).mean()
+                        macd_current = macd.iloc[-1] if not macd.empty else None
+                        signal_current = signal.iloc[-1] if not signal.empty else None
+                        
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            rsi_color = '#00FF00' if current_rsi and current_rsi < 30 else '#FF0000' if current_rsi and current_rsi > 70 else '#FFAA00'
+                            st.markdown(f'<p style="color: #FFAA00; font-size: 10px; font-weight: bold;">RSI (14)</p><p style="color: {rsi_color}; font-size: 20px; font-weight: bold;">{current_rsi:.2f}</p>', unsafe_allow_html=True)
+                        with col2:
+                            st.metric("SMA 20", f"${sma_20:.2f}" if pd.notna(sma_20) else "N/A")
+                        with col3:
+                            st.metric("SMA 50", f"${sma_50:.2f}" if pd.notna(sma_50) else "N/A")
+                        with col4:
+                            st.metric("SMA 200", f"${sma_200:.2f}" if pd.notna(sma_200) else "N/A")
+                        
+                        st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+                        
+                        # Signal d'achat/vente
+                        current_price = info.get('currentPrice', close.iloc[-1])
+                        signals = []
+                        if current_rsi:
+                            if current_rsi < 30:
+                                signals.append("🟢 RSI oversold - potential BUY signal")
+                            elif current_rsi > 70:
+                                signals.append("🔴 RSI overbought - potential SELL signal")
+                        
+                        if sma_20 and sma_50:
+                            if sma_20 > sma_50:
+                                signals.append("🟢 Golden Cross (SMA20 > SMA50)")
+                            else:
+                                signals.append("🔴 Death Cross (SMA20 < SMA50)")
+                        
+                        if macd_current and signal_current:
+                            if macd_current > signal_current:
+                                signals.append("🟢 MACD Bullish")
+                            else:
+                                signals.append("🔴 MACD Bearish")
+                        
+                        st.markdown("#### 📊 TECHNICAL SIGNALS")
+                        for signal_text in signals:
+                            color = '#00FF00' if '🟢' in signal_text else '#FF0000'
+                            st.markdown(f'<div style="background-color: #111; border-left: 3px solid {color}; padding: 10px; margin: 5px 0;"><p style="font-size: 11px; color: #FFAA00;">{signal_text}</p></div>', unsafe_allow_html=True)
+                    else:
+                        st.info("Not enough data for technical analysis")
+                    
+                    st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+                    
+                    st.markdown("#### 📊 SUPPORT & RESISTANCE")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("52W HIGH", f"${info.get('fiftyTwoWeekHigh', 0):.2f}" if info.get('fiftyTwoWeekHigh') else "N/A")
+                    with col2:
+                        st.metric("52W LOW", f"${info.get('fiftyTwoWeekLow', 0):.2f}" if info.get('fiftyTwoWeekLow') else "N/A")
+                    with col3:
+                        beta = info.get('beta', 0)
+                        st.metric("BETA", f"{beta:.2f}" if beta else "N/A")
                 
-                with st.expander("🔍 RAW DATA"):
-                    info_items = [{'Field': k, 'Value': str(v)} for k, v in info.items() if not isinstance(v, (dict, list))]
-                    st.dataframe(pd.DataFrame(info_items), use_container_width=True, hide_index=True)
+                # ===== SUB-TAB 4: OWNERSHIP =====
+                with analysis_tab4:
+                    st.markdown("#### 👥 OWNERSHIP STRUCTURE")
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        insider = info.get('heldPercentInsiders', 0)
+                        st.metric("INSIDER OWNERSHIP", f"{insider*100:.2f}%" if isinstance(insider, (int, float)) else "N/A")
+                    with col2:
+                        inst = info.get('heldPercentInstitutions', 0)
+                        st.metric("INSTITUTIONAL", f"{inst*100:.2f}%" if isinstance(inst, (int, float)) else "N/A")
+                    with col3:
+                        float_shares = info.get('floatShares', 0)
+                        st.metric("FLOAT SHARES", f"{float_shares/1e9:.2f}B" if float_shares >= 1e9 else f"{float_shares/1e6:.2f}M" if float_shares else "N/A")
+                    
+                    st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+                    
+                    st.markdown("#### 📊 SHARE STRUCTURE")
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        shares_out = info.get('sharesOutstanding', 0)
+                        st.metric("SHARES OUT", f"{shares_out/1e9:.2f}B" if shares_out >= 1e9 else f"{shares_out/1e6:.2f}M" if shares_out else "N/A")
+                    with col2:
+                        implied_shares = info.get('impliedSharesOutstanding', 0)
+                        st.metric("IMPLIED SHARES", f"{implied_shares/1e9:.2f}B" if implied_shares >= 1e9 else f"{implied_shares/1e6:.2f}M" if implied_shares else "N/A")
+                    with col3:
+                        short_percent = info.get('shortPercentOfFloat', 0)
+                        st.metric("SHORT % OF FLOAT", f"{short_percent*100:.2f}%" if isinstance(short_percent, (int, float)) else "N/A")
+                    with col4:
+                        short_ratio = info.get('shortRatio', 0)
+                        st.metric("SHORT RATIO", f"{short_ratio:.2f}" if short_ratio else "N/A")
+                    
+                    st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+                    
+                    # Top Holders (if available)
+                    st.markdown("#### 🏦 MAJOR HOLDERS")
+                    try:
+                        major_holders = stock.major_holders
+                        if major_holders is not None and not major_holders.empty:
+                            st.dataframe(major_holders, use_container_width=True, hide_index=True)
+                        else:
+                            st.info("Major holders data not available")
+                    except:
+                        st.info("Major holders data not available")
+                
+                # ===== SUB-TAB 5: PEER COMPARISON =====
+                with analysis_tab5:
+                    st.markdown("#### ⚖️ PEER COMPARISON")
+                    
+                    peers_text = info.get('sector', 'N/A')
+                    st.markdown(f"""
+                    <div style="background-color: #111; border-left: 3px solid #FFAA00; padding: 15px; margin: 10px 0;">
+                        <p style="font-size: 11px; color: #999;">Sector: <strong style="color: #FFAA00;">{peers_text}</strong></p>
+                        <p style="font-size: 10px; color: #666; margin-top: 5px;">For detailed peer comparison, consider comparing with other companies in the {peers_text} sector.</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    st.markdown("#### 📊 COMPANY VS SECTOR METRICS")
+                    
+                    comparison_metrics = {
+                        'Market Cap': info.get('marketCap'),
+                        'P/E Ratio': info.get('trailingPE'),
+                        'Profit Margin': info.get('profitMargins'),
+                        'ROE': info.get('returnOnEquity'),
+                        'Debt/Equity': info.get('debtToEquity'),
+                        'Revenue Growth': info.get('revenueGrowth')
+                    }
+                    
+                    comp_data = []
+                    for k, v in comparison_metrics.items():
+                        if k == 'Market Cap' and isinstance(v, (int, float)):
+                            display = f"${v/1e12:.2f}T" if v >= 1e12 else f"${v/1e9:.2f}B"
+                        elif k in ['Profit Margin', 'ROE', 'Revenue Growth'] and isinstance(v, (int, float)):
+                            display = f"{v*100:.2f}%"
+                        elif isinstance(v, (int, float)):
+                            display = f"{v:.2f}"
+                        else:
+                            display = 'N/A'
+                        comp_data.append({'Metric': k, 'Value': display, 'Sector Avg': 'N/A'})
+                    
+                    st.dataframe(pd.DataFrame(comp_data), use_container_width=True, hide_index=True)
+                    
+                    st.info("💡 Tip: For detailed peer analysis, search for competitor tickers in the same sector.")
         
         else:
             st.error(f"❌ Could not find data for '{display_ticker}'")
-
-elif not ticker_input and search_button:
-    st.warning("⚠️ Please enter a ticker symbol")
-
-# Info section when no ticker
-if not display_ticker:
-    st.markdown("""
-    <div style="background-color: #111; border: 2px solid #FFAA00; padding: 20px; margin: 20px 0;">
-        <h3 style="color: #FFAA00;">📊 COMPANY ANALYSIS</h3>
-        <p style="font-size: 11px; color: #999;">Enter any stock ticker to analyze:</p>
-        <ul style="font-size: 10px; color: #999;">
-            <li>🇺🇸 US: AAPL, MSFT, GOOGL, TSLA</li>
-            <li>🇫🇷 France: MC.PA, AIR.PA</li>
-            <li>🇨🇭 Switzerland: NESN.SW, NOVN.SW</li>
-            <li>🇬🇧 UK: SHEL.L, BP.L</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
-
 # Footer
 st.markdown(f"""
 <div style='text-align: center; color: #666; font-size: 9px; padding: 10px; border-top: 1px solid #333; margin-top: 20px;'>
