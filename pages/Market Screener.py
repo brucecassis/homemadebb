@@ -403,7 +403,7 @@ else:
     '''
 
 # Afficher le widget
-st.components.v1.html(tradingview_widget, height=widget_height + 50, scrolling=True)
+st.components.v1.html(tradingview_widget, height=widget_height + 500, scrolling=True)
 
 st.markdown('<hr>', unsafe_allow_html=True)
 
