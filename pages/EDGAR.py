@@ -456,12 +456,19 @@ with tab2:
     
     st.markdown('<div style="border-bottom: 1px solid #333; margin: 10px 0;"></div>', unsafe_allow_html=True)
     
+    # Stocker le ticker dans session_state quand on clique sur le bouton
+    if search_insider_btn and ticker_insider:
+        st.session_state['display_ticker_insider'] = ticker_insider
+    
+    # Récupérer le ticker à afficher
+    display_ticker_insider = st.session_state.get('display_ticker_insider', None)
+    
     # Intégration du site OpenInsider via iframe
-    if ticker_insider:
-        st.markdown(f"#### 📊 INSIDER TRANSACTIONS FOR {ticker_insider}")
+    if display_ticker_insider:
+        st.markdown(f"#### 📊 INSIDER TRANSACTIONS FOR {display_ticker_insider}")
         
         # URL OpenInsider pour un ticker spécifique
-        openinsider_url = f"http://openinsider.com/screener?s={ticker_insider}"
+        openinsider_url = f"http://openinsider.com/screener?s={display_ticker_insider}"
         
         # Afficher le site dans un iframe
         st.markdown(f"""
@@ -489,7 +496,6 @@ with tab2:
         """, unsafe_allow_html=True)
         
         st.info("💡 Enter a ticker symbol above to filter insider transactions for a specific company.")
-
 # Footer
 st.markdown('<div style="border-top: 1px solid #333; margin: 10px 0;"></div>', unsafe_allow_html=True)
 last_update = datetime.now().strftime('%H:%M:%S')
