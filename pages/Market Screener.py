@@ -145,36 +145,6 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# =============================================
-# BOUTONS DE NAVIGATION
-# =============================================
-nav_cols = st.columns(6)
-
-with nav_cols[0]:
-    if st.button("📊 MARKETS", use_container_width=True):
-        st.switch_page("app.py")
-
-with nav_cols[1]:
-    if st.button("🔍 SCREENER", use_container_width=True):
-        pass  # Déjà sur cette page
-
-with nav_cols[2]:
-    if st.button("📰 NEWS", use_container_width=True):
-        st.switch_page("pages/NEWS.py")
-
-with nav_cols[3]:
-    if st.button("📁 EDGAR", use_container_width=True):
-        st.switch_page("pages/EDGAR.py")
-
-with nav_cols[4]:
-    if st.button("💰 PRICING", use_container_width=True):
-        st.switch_page("pages/PRICING.py")
-
-with nav_cols[5]:
-    if st.button("🤖 CHATBOT", use_container_width=True):
-        st.switch_page("pages/CHATBOT.py")
-
-st.markdown('<hr>', unsafe_allow_html=True)
 
 # =============================================
 # TITRE DE LA PAGE
