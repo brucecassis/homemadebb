@@ -5,8 +5,15 @@ import traceback
 from datetime import datetime
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import json
+
+# Import optionnel de matplotlib
+try:
+    import matplotlib.pyplot as plt
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    plt = None
+    MATPLOTLIB_AVAILABLE = False
 
 # =============================================
 # PAGE CONFIG
@@ -293,6 +300,15 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+# Avertissement si matplotlib n'est pas disponible
+if not MATPLOTLIB_AVAILABLE:
+    st.markdown("""
+    <div style="background:#2a2a0a;border:2px solid #FFA500;padding:10px;margin:10px 0;color:#FFA500;font-size:10px;">
+        ⚠️ matplotlib n'est pas installé. Les fonctionnalités de visualisation sont limitées.<br>
+        Pour l'installer: pip install matplotlib
+    </div>
+    """, unsafe_allow_html=True)
+
 # =============================================
 # INITIALISATION SESSION STATE
 # =============================================
@@ -343,10 +359,13 @@ def execute_python_code(code, use_persistent_vars=True):
         exec_globals.update({
             'pd': pd,
             'np': np,
-            'plt': plt,
             'json': json,
             'st': st
         })
+        
+        # Ajouter matplotlib seulement si disponible
+        if MATPLOTLIB_AVAILABLE:
+            exec_globals['plt'] = plt
         
         exec_locals = {}
         
@@ -536,7 +555,7 @@ df"""
                             st.download_button("⬇️ DOWNLOAD JSON", json_str, "data.json", "application/json")
                     
                     # Si c'est une figure matplotlib
-                    elif isinstance(result['returned_value'], plt.Figure):
+                    elif MATPLOTLIB_AVAILABLE and isinstance(result['returned_value'], plt.Figure):
                         st.pyplot(result['returned_value'])
                     
                     # Sinon, afficher comme texte
@@ -599,28 +618,6 @@ print("\\nFirst 5 rows:")
 print(df.head())
 
 df""",
-        
-        "📊 Data Visualization": """import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-
-# Créer des données
-x = np.linspace(0, 10, 100)
-y1 = np.sin(x)
-y2 = np.cos(x)
-
-# Créer le graphique
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.plot(x, y1, label='sin(x)', linewidth=2)
-ax.plot(x, y2, label='cos(x)', linewidth=2)
-ax.set_xlabel('x')
-ax.set_ylabel('y')
-ax.set_title('Sine and Cosine Functions')
-ax.legend()
-ax.grid(True, alpha=0.3)
-
-print("Plot créé!")
-fig""",
         
         "🔢 Statistical Analysis": """import pandas as pd
 import numpy as np
@@ -744,6 +741,30 @@ print(grouped)
 grouped"""
     }
     
+    # Ajouter le template de visualisation seulement si matplotlib est disponible
+    if MATPLOTLIB_AVAILABLE:
+        predefined_templates["📊 Data Visualization"] = """import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Créer des données
+x = np.linspace(0, 10, 100)
+y1 = np.sin(x)
+y2 = np.cos(x)
+
+# Créer le graphique
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.plot(x, y1, label='sin(x)', linewidth=2)
+ax.plot(x, y2, label='cos(x)', linewidth=2)
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+ax.set_title('Sine and Cosine Functions')
+ax.legend()
+ax.grid(True, alpha=0.3)
+
+print("Plot créé!")
+fig"""
+    
     st.markdown('<p style="color:#00FFFF;font-size:11px;font-weight:bold;margin:15px 0;">🎯 PREDEFINED TEMPLATES</p>', unsafe_allow_html=True)
     
     col_temp1, col_temp2 = st.columns(2)
@@ -852,9 +873,9 @@ with st.expander("📖 DOCUMENTATION & HELP"):
     Les bibliothèques suivantes sont automatiquement disponibles:
     - **pandas** (as pd): Manipulation de données
     - **numpy** (as np): Calculs numériques
-    - **matplotlib.pyplot** (as plt): Visualisation de données
     - **json**: Manipulation JSON
     - **streamlit** (as st): Interface Streamlit
+    - **matplotlib.pyplot** (as plt): Visualisation de données (si installé)
     
     <p style="color:#00FFFF;font-weight:bold;font-size:13px;margin-top:20px;">⚙️ Fonctionnalités</p>
     
