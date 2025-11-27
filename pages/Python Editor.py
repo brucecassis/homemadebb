@@ -6,8 +6,15 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 import json
+import subprocess
+import os
+import re
+import time
+import base64
+from pathlib import Path
+import hashlib
 
-# Import optionnel de matplotlib
+# Imports optionnels
 try:
     import matplotlib.pyplot as plt
     MATPLOTLIB_AVAILABLE = True
@@ -15,14 +22,30 @@ except ImportError:
     plt = None
     MATPLOTLIB_AVAILABLE = False
 
+try:
+    import plotly.graph_objects as go
+    import plotly.express as px
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    go = None
+    px = None
+    PLOTLY_AVAILABLE = False
+
+try:
+    import seaborn as sns
+    SEABORN_AVAILABLE = True
+except ImportError:
+    sns = None
+    SEABORN_AVAILABLE = False
+
 # =============================================
 # PAGE CONFIG
 # =============================================
 st.set_page_config(
-    page_title="Bloomberg Terminal - Python Terminal",
+    page_title="Bloomberg Terminal - Python IDE",
     page_icon="🐍",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 # =============================================
@@ -30,14 +53,12 @@ st.set_page_config(
 # =============================================
 st.markdown("""
 <style>
-    /* Reset et styles globaux */
     * {
         margin: 0;
         padding: 0;
         box-sizing: border-box;
     }
     
-    /* Force les couleurs globalement */
     body, .main, .block-container, [data-testid="stAppViewContainer"] {
         background-color: #000000 !important;
         color: #FFAA00 !important;
@@ -58,10 +79,6 @@ st.markdown("""
     
     .block-container {
         padding: 0rem 1rem !important;
-    }
-    
-    .stApp {
-        background-color: #000000;
     }
     
     h1, h2, h3, h4 {
@@ -104,6 +121,7 @@ st.markdown("""
         font-family: 'Courier New', monospace !important;
         font-size: 13px !important;
         padding: 15px !important;
+        line-height: 1.5 !important;
     }
     
     .stTextArea textarea:focus {
@@ -119,29 +137,6 @@ st.markdown("""
         font-size: 12px !important;
     }
     
-    .stTextInput input:focus {
-        border-color: #FFAA00 !important;
-    }
-    
-    .stCheckbox {
-        color: #FFAA00 !important;
-    }
-    
-    .stCheckbox span {
-        color: #FFAA00 !important;
-    }
-    
-    hr {
-        border-color: #333333;
-        margin: 15px 0;
-    }
-    
-    p, div, span, label {
-        font-family: 'Courier New', monospace !important;
-        font-size: 11px;
-        color: #FFAA00 !important;
-    }
-    
     .terminal-output {
         background: #0a0a0a;
         border: 2px solid #00FF00;
@@ -150,8 +145,8 @@ st.markdown("""
         color: #00FF00;
         font-family: 'Courier New', monospace;
         font-size: 12px;
-        min-height: 200px;
-        max-height: 500px;
+        min-height: 100px;
+        max-height: 400px;
         overflow-y: auto;
         white-space: pre-wrap;
         word-wrap: break-word;
@@ -171,12 +166,14 @@ st.markdown("""
         word-wrap: break-word;
     }
     
-    .code-editor-box {
-        background: #0a0a0a;
-        border: 2px solid #FFAA00;
-        padding: 20px;
-        margin: 15px 0;
-        border-radius: 0px;
+    .terminal-warning {
+        background: #2a2a0a;
+        border: 2px solid #FFA500;
+        padding: 10px;
+        margin: 5px 0;
+        color: #FFA500;
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
     }
     
     .success-box {
@@ -195,15 +192,42 @@ st.markdown("""
         color: #00FFFF;
     }
     
-    .warning-box {
-        background: #2a2a0a;
-        border: 2px solid #FFA500;
+    .cell-container {
+        background: #0a0a0a;
+        border: 2px solid #333;
+        border-left: 4px solid #FFAA00;
         padding: 15px;
         margin: 10px 0;
-        color: #FFA500;
+        border-radius: 0px;
     }
     
-    /* Style pour les dataframes */
+    .cell-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 5px 0;
+        border-bottom: 1px solid #333;
+        margin-bottom: 10px;
+    }
+    
+    .variable-inspector {
+        background: #0a0a0a;
+        border: 2px solid #00FFFF;
+        padding: 10px;
+        margin: 5px 0;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    .package-item {
+        background: #111;
+        border: 1px solid #333;
+        padding: 8px;
+        margin: 3px 0;
+        display: flex;
+        justify-content: space-between;
+    }
+    
     .dataframe {
         background-color: #111 !important;
         color: #FFAA00 !important;
@@ -223,50 +247,14 @@ st.markdown("""
         border: 1px solid #333 !important;
     }
     
-    /* Tabs styling */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 2px;
-        background-color: #000;
+    [data-testid="stSidebar"] {
+        background-color: #0a0a0a !important;
     }
     
-    .stTabs [data-baseweb="tab"] {
-        background-color: #222;
-        color: #FFAA00;
-        border: 1px solid #333;
-        font-family: 'Courier New', monospace;
-        font-weight: bold;
-        padding: 10px 20px;
-    }
-    
-    .stTabs [aria-selected="true"] {
-        background-color: #FFAA00;
-        color: #000;
-    }
-    
-    /* Fix pour les expanders */
-    .streamlit-expanderHeader {
-        background-color: #222 !important;
+    [data-testid="stSidebar"] * {
         color: #FFAA00 !important;
-        border: 1px solid #333 !important;
     }
     
-    .streamlit-expanderContent {
-        background-color: #111 !important;
-        border: 1px solid #333 !important;
-    }
-    
-    /* Fix pour le code */
-    .stCodeBlock {
-        background-color: #0a0a0a !important;
-        border: 1px solid #333 !important;
-    }
-    
-    code {
-        color: #00FF00 !important;
-        background-color: #0a0a0a !important;
-    }
-    
-    /* Scrollbar styling */
     ::-webkit-scrollbar {
         width: 10px;
         height: 10px;
@@ -284,52 +272,109 @@ st.markdown("""
     ::-webkit-scrollbar-thumb:hover {
         background: #FFAA00;
     }
+    
+    .stDownloadButton button {
+        background-color: #333 !important;
+        color: #00FF00 !important;
+        border: 2px solid #00FF00 !important;
+    }
+    
+    .stFileUploader {
+        background-color: #111 !important;
+        border: 2px solid #333 !important;
+    }
+    
+    .stExpander {
+        background-color: #0a0a0a !important;
+        border: 1px solid #333 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # =============================================
-# HEADER BLOOMBERG
+# HEADER
 # =============================================
 current_time = datetime.now().strftime("%H:%M:%S")
 st.markdown(f"""
 <div style="background:#FFAA00;padding:8px 20px;color:#000;font-weight:bold;font-size:14px;border-bottom:2px solid #FFAA00;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
     <div style="display:flex;align-items:center;gap:15px;">
-        <div>⬛ BLOOMBERG ENS® TERMINAL - PYTHON INTERACTIVE SHELL</div>
+        <div>⬛ BLOOMBERG ENS® TERMINAL - ADVANCED PYTHON IDE</div>
     </div>
     <div>{current_time} UTC • PYTHON {sys.version.split()[0]}</div>
 </div>
 """, unsafe_allow_html=True)
 
-# Avertissement si matplotlib n'est pas disponible
-if not MATPLOTLIB_AVAILABLE:
-    st.markdown("""
-    <div style="background:#2a2a0a;border:2px solid #FFA500;padding:10px;margin:10px 0;color:#FFA500;font-size:10px;">
-        ⚠️ matplotlib n'est pas installé. Les fonctionnalités de visualisation sont limitées.<br>
-        Pour l'installer: pip install matplotlib
-    </div>
-    """, unsafe_allow_html=True)
-
 # =============================================
-# INITIALISATION SESSION STATE
+# SESSION STATE INITIALIZATION
 # =============================================
-if 'execution_history' not in st.session_state:
-    st.session_state.execution_history = []
-if 'terminal_output' not in st.session_state:
-    st.session_state.terminal_output = []
+if 'cells' not in st.session_state:
+    st.session_state.cells = [{'id': 0, 'code': '', 'output': '', 'error': '', 'executed': False, 'exec_time': 0}]
+if 'cell_counter' not in st.session_state:
+    st.session_state.cell_counter = 1
 if 'variables' not in st.session_state:
     st.session_state.variables = {}
-if 'code_templates' not in st.session_state:
-    st.session_state.code_templates = {}
+if 'uploaded_files' not in st.session_state:
+    st.session_state.uploaded_files = {}
+if 'execution_timeout' not in st.session_state:
+    st.session_state.execution_timeout = 30
+if 'memory_limit' not in st.session_state:
+    st.session_state.memory_limit = 512  # MB
+if 'installed_packages' not in st.session_state:
+    st.session_state.installed_packages = []
+if 'ai_enabled' not in st.session_state:
+    st.session_state.ai_enabled = False
+if 'visualizations' not in st.session_state:
+    st.session_state.visualizations = []
+if 'watch_variables' not in st.session_state:
+    st.session_state.watch_variables = []
 
 # =============================================
-# FONCTIONS UTILITAIRES
+# UTILITY FUNCTIONS
 # =============================================
 
-def execute_python_code(code, use_persistent_vars=True):
-    """
-    Exécute du code Python et capture la sortie
-    """
-    # Rediriger stdout et stderr
+def get_installed_packages():
+    """Récupère la liste des packages installés"""
+    try:
+        result = subprocess.run(['pip', 'list', '--format=json'], 
+                              capture_output=True, text=True, timeout=5)
+        packages = json.loads(result.stdout)
+        return packages
+    except:
+        return []
+
+def install_package(package_name):
+    """Installe un package via pip"""
+    try:
+        result = subprocess.run(['pip', 'install', package_name], 
+                              capture_output=True, text=True, timeout=60)
+        return result.returncode == 0, result.stdout + result.stderr
+    except Exception as e:
+        return False, str(e)
+
+def get_variable_info(var):
+    """Obtient des informations détaillées sur une variable"""
+    info = {
+        'type': type(var).__name__,
+        'size': sys.getsizeof(var),
+        'value': str(var)[:100]
+    }
+    
+    if isinstance(var, (list, tuple, set)):
+        info['length'] = len(var)
+    elif isinstance(var, dict):
+        info['length'] = len(var)
+        info['keys'] = list(var.keys())[:5]
+    elif isinstance(var, pd.DataFrame):
+        info['shape'] = var.shape
+        info['columns'] = list(var.columns)
+    elif isinstance(var, np.ndarray):
+        info['shape'] = var.shape
+        info['dtype'] = str(var.dtype)
+    
+    return info
+
+def execute_cell_code(code, cell_id, timeout=30):
+    """Exécute le code d'une cellule avec timeout et profiling"""
     old_stdout = sys.stdout
     old_stderr = sys.stderr
     redirected_output = io.StringIO()
@@ -342,20 +387,15 @@ def execute_python_code(code, use_persistent_vars=True):
         'output': '',
         'error': '',
         'returned_value': None,
-        'execution_time': 0
+        'execution_time': 0,
+        'memory_used': 0
     }
     
     try:
-        import time
         start_time = time.time()
         
-        # Préparer l'environnement d'exécution
-        if use_persistent_vars:
-            exec_globals = st.session_state.variables.copy()
-        else:
-            exec_globals = {}
-        
-        # Ajouter les imports communs
+        # Préparer l'environnement
+        exec_globals = st.session_state.variables.copy()
         exec_globals.update({
             'pd': pd,
             'np': np,
@@ -363,22 +403,24 @@ def execute_python_code(code, use_persistent_vars=True):
             'st': st
         })
         
-        # Ajouter matplotlib seulement si disponible
         if MATPLOTLIB_AVAILABLE:
             exec_globals['plt'] = plt
+        if PLOTLY_AVAILABLE:
+            exec_globals['go'] = go
+            exec_globals['px'] = px
+        if SEABORN_AVAILABLE:
+            exec_globals['sns'] = sns
         
         exec_locals = {}
         
         # Exécuter le code
         exec(code, exec_globals, exec_locals)
         
-        # Mettre à jour les variables persistantes
-        if use_persistent_vars:
-            st.session_state.variables.update(exec_locals)
+        # Mettre à jour les variables
+        st.session_state.variables.update(exec_locals)
         
         execution_time = time.time() - start_time
         
-        # Capturer la sortie
         output = redirected_output.getvalue()
         error = redirected_error.getvalue()
         
@@ -387,548 +429,628 @@ def execute_python_code(code, use_persistent_vars=True):
         result['error'] = error
         result['execution_time'] = execution_time
         
-        # Récupérer la dernière valeur retournée si elle existe
         if exec_locals:
             last_var = list(exec_locals.values())[-1] if exec_locals else None
             result['returned_value'] = last_var
+            
+            # Sauvegarder les visualisations
+            if MATPLOTLIB_AVAILABLE and isinstance(last_var, plt.Figure):
+                st.session_state.visualizations.append({
+                    'type': 'matplotlib',
+                    'figure': last_var,
+                    'cell_id': cell_id,
+                    'timestamp': datetime.now()
+                })
+            elif PLOTLY_AVAILABLE and isinstance(last_var, (go.Figure,)):
+                st.session_state.visualizations.append({
+                    'type': 'plotly',
+                    'figure': last_var,
+                    'cell_id': cell_id,
+                    'timestamp': datetime.now()
+                })
         
     except Exception as e:
         result['success'] = False
         result['error'] = f"{type(e).__name__}: {str(e)}\n\n{traceback.format_exc()}"
     
     finally:
-        # Restaurer stdout et stderr
         sys.stdout = old_stdout
         sys.stderr = old_stderr
     
     return result
 
-# =============================================
-# INTERFACE PRINCIPALE
-# =============================================
+def lint_code(code):
+    """Analyse basique du code pour détecter les erreurs"""
+    warnings = []
+    
+    # Vérifications basiques
+    if 'import' in code and '*' in code:
+        warnings.append("⚠️ Warning: Avoid using 'import *', prefer explicit imports")
+    
+    if 'eval(' in code or 'exec(' in code:
+        warnings.append("⚠️ Warning: eval() and exec() can be dangerous")
+    
+    # Vérifier les variables non définies (basique)
+    lines = code.split('\n')
+    defined_vars = set()
+    for line in lines:
+        if '=' in line and not line.strip().startswith('#'):
+            var_name = line.split('=')[0].strip().split()[0]
+            defined_vars.add(var_name)
+    
+    return warnings
 
-# Tabs
-tab1, tab2, tab3, tab4 = st.tabs(["🐍 PYTHON EDITOR", "📦 TEMPLATES", "📊 VARIABLES", "📜 HISTORY"])
-
-# ===== TAB 1: PYTHON EDITOR =====
-with tab1:
-    st.markdown('<p style="color:#FFAA00;font-weight:bold;font-size:14px;border-bottom:2px solid #333;padding:10px 0;">🐍 PYTHON CODE EDITOR</p>', unsafe_allow_html=True)
-    
-    st.markdown('<div class="code-editor-box">', unsafe_allow_html=True)
-    
-    # Éditeur de code
-    st.markdown('<p style="color:#00FF00;font-size:12px;font-weight:bold;margin-bottom:10px;">💻 ENTER YOUR PYTHON CODE</p>', unsafe_allow_html=True)
-    
-    default_code = """# Exemple de code Python
-import pandas as pd
-import numpy as np
-
-# Créer des données
-data = {
-    'nom': ['Alice', 'Bob', 'Charlie', 'David'],
-    'age': [25, 30, 35, 40],
-    'salaire': [50000, 60000, 70000, 80000]
-}
-
-df = pd.DataFrame(data)
-print("DataFrame créé:")
-print(df)
-
-# Calculs
-moyenne_age = df['age'].mean()
-print(f"\\nÂge moyen: {moyenne_age}")
-
-# Résultat
-df"""
-    
-    python_code = st.text_area(
-        "PYTHON CODE",
-        value=default_code,
-        height=300,
-        help="Tapez votre code Python ici. Les bibliothèques pandas, numpy, matplotlib et streamlit sont pré-importées.",
-        label_visibility="collapsed"
-    )
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Options d'exécution
-    st.markdown('<p style="color:#FFAA00;font-size:11px;font-weight:bold;margin:15px 0 10px 0;">⚙️ EXECUTION OPTIONS</p>', unsafe_allow_html=True)
-    col_opt1, col_opt2, col_opt3 = st.columns(3)
-    
-    with col_opt1:
-        persistent_vars = st.checkbox("PERSISTENT VARIABLES", value=True, 
-                                      help="Conserver les variables entre les exécutions")
-    
-    with col_opt2:
-        show_exec_time = st.checkbox("SHOW EXECUTION TIME", value=True)
-    
-    with col_opt3:
-        auto_display = st.checkbox("AUTO-DISPLAY RESULT", value=True,
-                                   help="Afficher automatiquement la dernière valeur")
-    
-    # Boutons d'action
-    col_btn1, col_btn2, col_btn3, col_btn4 = st.columns(4)
-    
-    with col_btn1:
-        run_btn = st.button("▶️ RUN CODE", key="run_code", type="primary")
-    
-    with col_btn2:
-        clear_output_btn = st.button("🗑️ CLEAR OUTPUT", key="clear_output")
-    
-    with col_btn3:
-        clear_vars_btn = st.button("🔄 RESET VARIABLES", key="clear_vars")
-    
-    with col_btn4:
-        save_template_btn = st.button("💾 SAVE AS TEMPLATE", key="save_template")
-    
-    # Exécution du code
-    if run_btn and python_code.strip():
-        with st.spinner("⚡ EXECUTING CODE..."):
-            result = execute_python_code(python_code, persistent_vars)
-            
-            # Ajouter à l'historique
-            st.session_state.execution_history.insert(0, {
-                'code': python_code,
-                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'success': result['success'],
-                'execution_time': result['execution_time']
-            })
-            
-            # Ajouter au terminal output
-            terminal_entry = {
-                'timestamp': datetime.now().strftime('%H:%M:%S'),
-                'type': 'execution',
-                'success': result['success'],
-                'output': result['output'],
-                'error': result['error'],
-                'execution_time': result['execution_time']
+def export_to_notebook(cells):
+    """Exporte les cellules vers un format Jupyter Notebook"""
+    notebook = {
+        "cells": [],
+        "metadata": {
+            "kernelspec": {
+                "display_name": "Python 3",
+                "language": "python",
+                "name": "python3"
+            },
+            "language_info": {
+                "name": "python",
+                "version": sys.version.split()[0]
             }
-            st.session_state.terminal_output.append(terminal_entry)
-            
-            # Afficher les résultats
-            if result['success']:
-                st.markdown(f"""
-                <div class="success-box">
-                    ✅ CODE EXECUTED SUCCESSFULLY<br>
-                    EXECUTION TIME: {result['execution_time']:.4f}s
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Terminal Output
-                st.markdown('<p style="color:#FFAA00;font-weight:bold;font-size:14px;border-bottom:2px solid #333;padding:10px 0;margin-top:20px;">📺 TERMINAL OUTPUT</p>', unsafe_allow_html=True)
-                
-                if result['output']:
-                    st.markdown(f"""
-                    <div class="terminal-output">
-                    <span style="color:#00FFFF;">>>> STDOUT:</span><br>
-                    {result['output']}
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                if result['error']:
-                    st.markdown(f"""
-                    <div class="terminal-output" style="border-color:#FFA500;color:#FFA500;">
-                    <span style="color:#FFA500;">>>> STDERR:</span><br>
-                    {result['error']}
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                # Afficher la valeur retournée
-                if auto_display and result['returned_value'] is not None:
-                    st.markdown('<p style="color:#FFAA00;font-weight:bold;font-size:14px;border-bottom:2px solid #333;padding:10px 0;margin-top:20px;">📊 RETURNED VALUE</p>', unsafe_allow_html=True)
-                    
-                    # Si c'est un DataFrame, l'afficher avec style
-                    if isinstance(result['returned_value'], pd.DataFrame):
-                        st.dataframe(
-                            result['returned_value'],
-                            use_container_width=True,
-                            height=400
-                        )
-                        
-                        # Boutons d'export pour DataFrame
-                        col_exp1, col_exp2, col_exp3 = st.columns(3)
-                        with col_exp1:
-                            csv = result['returned_value'].to_csv(index=False)
-                            st.download_button("⬇️ DOWNLOAD CSV", csv, "data.csv", "text/csv")
-                        with col_exp2:
-                            json_str = result['returned_value'].to_json(orient='records', indent=2)
-                            st.download_button("⬇️ DOWNLOAD JSON", json_str, "data.json", "application/json")
-                    
-                    # Si c'est une figure matplotlib
-                    elif MATPLOTLIB_AVAILABLE and isinstance(result['returned_value'], plt.Figure):
-                        st.pyplot(result['returned_value'])
-                    
-                    # Sinon, afficher comme texte
-                    else:
-                        st.code(str(result['returned_value']), language='python')
-                
-                if not result['output'] and result['returned_value'] is None:
-                    st.markdown("""
-                    <div class="info-box">
-                        ℹ️ Code executed successfully with no output
-                    </div>
-                    """, unsafe_allow_html=True)
-            
-            else:
-                st.markdown(f"""
-                <div class="terminal-error">
-                    ❌ EXECUTION ERROR<br><br>
-                    {result['error']}
-                </div>
-                """, unsafe_allow_html=True)
-    
-    # Clear output
-    if clear_output_btn:
-        st.session_state.terminal_output = []
-        st.success("✅ Terminal output cleared")
-        st.rerun()
-    
-    # Reset variables
-    if clear_vars_btn:
-        st.session_state.variables = {}
-        st.success("✅ Variables reset")
-        st.rerun()
-    
-    # Save as template
-    if save_template_btn and python_code.strip():
-        template_name = st.text_input("Template name:", key="template_name_input")
-        if template_name:
-            st.session_state.code_templates[template_name] = python_code
-            st.success(f"✅ Template '{template_name}' saved!")
-
-# ===== TAB 2: TEMPLATES =====
-with tab2:
-    st.markdown('<p style="color:#FFAA00;font-weight:bold;font-size:14px;border-bottom:2px solid #333;padding:10px 0;">📦 CODE TEMPLATES</p>', unsafe_allow_html=True)
-    
-    # Templates prédéfinis
-    predefined_templates = {
-        "🐼 DataFrame Basics": """import pandas as pd
-import numpy as np
-
-# Créer un DataFrame
-df = pd.DataFrame({
-    'A': np.random.rand(10),
-    'B': np.random.randint(0, 100, 10),
-    'C': ['cat_' + str(i) for i in range(10)]
-})
-
-print("DataFrame Info:")
-print(df.info())
-print("\\nFirst 5 rows:")
-print(df.head())
-
-df""",
-        
-        "🔢 Statistical Analysis": """import pandas as pd
-import numpy as np
-
-# Générer des données aléatoires
-np.random.seed(42)
-data = pd.DataFrame({
-    'values': np.random.normal(100, 15, 1000)
-})
-
-# Statistiques descriptives
-stats = data['values'].describe()
-print("Statistiques descriptives:")
-print(stats)
-
-# Calculs supplémentaires
-median = data['values'].median()
-variance = data['values'].var()
-
-print(f"\\nMédiane: {median:.2f}")
-print(f"Variance: {variance:.2f}")
-
-data""",
-        
-        "📈 Time Series": """import pandas as pd
-import numpy as np
-
-# Créer une série temporelle
-dates = pd.date_range('2024-01-01', periods=100, freq='D')
-values = np.cumsum(np.random.randn(100)) + 100
-
-ts = pd.DataFrame({
-    'date': dates,
-    'value': values
-})
-
-ts.set_index('date', inplace=True)
-
-print("Time Series Info:")
-print(ts.info())
-print("\\nFirst 10 days:")
-print(ts.head(10))
-
-ts""",
-        
-        "🔍 Data Filtering": """import pandas as pd
-import numpy as np
-
-# Créer un DataFrame
-df = pd.DataFrame({
-    'name': ['Alice', 'Bob', 'Charlie', 'David', 'Eve'],
-    'age': [25, 30, 35, 40, 45],
-    'salary': [50000, 60000, 70000, 80000, 90000],
-    'department': ['IT', 'HR', 'IT', 'Finance', 'IT']
-})
-
-print("Original DataFrame:")
-print(df)
-
-# Filtrage
-it_dept = df[df['department'] == 'IT']
-print("\\nIT Department:")
-print(it_dept)
-
-high_salary = df[df['salary'] > 65000]
-print("\\nHigh Salary (>65k):")
-print(high_salary)
-
-df""",
-        
-        "🧮 Mathematical Operations": """import numpy as np
-
-# Créer des matrices
-A = np.array([[1, 2], [3, 4]])
-B = np.array([[5, 6], [7, 8]])
-
-print("Matrix A:")
-print(A)
-print("\\nMatrix B:")
-print(B)
-
-# Opérations
-print("\\nA + B:")
-print(A + B)
-
-print("\\nA @ B (multiplication matricielle):")
-print(A @ B)
-
-print("\\nDéterminant de A:")
-print(np.linalg.det(A))
-
-print("\\nValeurs propres de A:")
-print(np.linalg.eigvals(A))
-
-A""",
-        
-        "📊 Grouping & Aggregation": """import pandas as pd
-import numpy as np
-
-# Créer des données de ventes
-np.random.seed(42)
-df = pd.DataFrame({
-    'product': np.random.choice(['A', 'B', 'C'], 100),
-    'region': np.random.choice(['North', 'South', 'East', 'West'], 100),
-    'sales': np.random.randint(100, 1000, 100),
-    'quantity': np.random.randint(1, 10, 100)
-})
-
-print("Données de ventes:")
-print(df.head(10))
-
-# Grouper et agréger
-grouped = df.groupby(['product', 'region']).agg({
-    'sales': ['sum', 'mean', 'count'],
-    'quantity': 'sum'
-}).round(2)
-
-print("\\nAgrégation par produit et région:")
-print(grouped)
-
-grouped"""
+        },
+        "nbformat": 4,
+        "nbformat_minor": 4
     }
     
-    # Ajouter le template de visualisation seulement si matplotlib est disponible
-    if MATPLOTLIB_AVAILABLE:
-        predefined_templates["📊 Data Visualization"] = """import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
+    for cell in cells:
+        if cell['code'].strip():
+            notebook["cells"].append({
+                "cell_type": "code",
+                "execution_count": None,
+                "metadata": {},
+                "outputs": [],
+                "source": cell['code'].split('\n')
+            })
+    
+    return json.dumps(notebook, indent=2)
 
-# Créer des données
-x = np.linspace(0, 10, 100)
-y1 = np.sin(x)
-y2 = np.cos(x)
+def generate_share_link(cells):
+    """Génère un lien de partage (hash du code)"""
+    code_content = "\n\n".join([cell['code'] for cell in cells if cell['code'].strip()])
+    code_hash = hashlib.md5(code_content.encode()).hexdigest()
+    return f"bloomberg-ide-{code_hash[:12]}"
 
-# Créer le graphique
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.plot(x, y1, label='sin(x)', linewidth=2)
-ax.plot(x, y2, label='cos(x)', linewidth=2)
-ax.set_xlabel('x')
-ax.set_ylabel('y')
-ax.set_title('Sine and Cosine Functions')
-ax.legend()
-ax.grid(True, alpha=0.3)
+# =============================================
+# SIDEBAR - CONTROLS & SETTINGS
+# =============================================
 
-print("Plot créé!")
-fig"""
+with st.sidebar:
+    st.markdown("### ⚙️ IDE CONTROLS")
     
-    st.markdown('<p style="color:#00FFFF;font-size:11px;font-weight:bold;margin:15px 0;">🎯 PREDEFINED TEMPLATES</p>', unsafe_allow_html=True)
+    # File Upload
+    st.markdown("#### 📁 FILE MANAGEMENT")
+    uploaded_file = st.file_uploader("UPLOAD FILE", 
+                                     type=['py', 'ipynb', 'csv', 'xlsx', 'json', 'txt'],
+                                     help="Upload Python files, notebooks, or data files")
     
-    col_temp1, col_temp2 = st.columns(2)
-    
-    for idx, (template_name, template_code) in enumerate(predefined_templates.items()):
-        with col_temp1 if idx % 2 == 0 else col_temp2:
-            with st.expander(template_name):
-                st.code(template_code, language='python')
-                if st.button(f"📋 USE THIS TEMPLATE", key=f"use_template_{idx}"):
-                    st.info(f"Template loaded! Switch to Python Editor tab.")
-    
-    # Templates utilisateur
-    if st.session_state.code_templates:
-        st.markdown('<hr>', unsafe_allow_html=True)
-        st.markdown('<p style="color:#00FFFF;font-size:11px;font-weight:bold;margin:15px 0;">💾 YOUR SAVED TEMPLATES</p>', unsafe_allow_html=True)
+    if uploaded_file:
+        file_ext = uploaded_file.name.split('.')[-1]
+        file_content = uploaded_file.read()
         
-        for template_name, template_code in st.session_state.code_templates.items():
-            with st.expander(f"📌 {template_name}"):
-                st.code(template_code, language='python')
-                col_t1, col_t2 = st.columns(2)
-                with col_t1:
-                    if st.button(f"📋 USE", key=f"use_saved_{template_name}"):
-                        st.info(f"Template '{template_name}' loaded!")
-                with col_t2:
-                    if st.button(f"🗑️ DELETE", key=f"delete_saved_{template_name}"):
-                        del st.session_state.code_templates[template_name]
-                        st.rerun()
+        if file_ext == 'py':
+            st.session_state.uploaded_files[uploaded_file.name] = file_content.decode('utf-8')
+            st.success(f"✅ Loaded {uploaded_file.name}")
+            
+            # Option to load into cell
+            if st.button("📋 LOAD INTO NEW CELL"):
+                new_cell = {
+                    'id': st.session_state.cell_counter,
+                    'code': file_content.decode('utf-8'),
+                    'output': '',
+                    'error': '',
+                    'executed': False,
+                    'exec_time': 0
+                }
+                st.session_state.cells.append(new_cell)
+                st.session_state.cell_counter += 1
+                st.rerun()
+        
+        elif file_ext == 'ipynb':
+            try:
+                notebook = json.loads(file_content.decode('utf-8'))
+                st.success(f"✅ Loaded notebook: {uploaded_file.name}")
+                
+                if st.button("📋 IMPORT NOTEBOOK CELLS"):
+                    st.session_state.cells = []
+                    for idx, cell in enumerate(notebook.get('cells', [])):
+                        if cell['cell_type'] == 'code':
+                            code = ''.join(cell['source'])
+                            new_cell = {
+                                'id': idx,
+                                'code': code,
+                                'output': '',
+                                'error': '',
+                                'executed': False,
+                                'exec_time': 0
+                            }
+                            st.session_state.cells.append(new_cell)
+                    st.session_state.cell_counter = len(st.session_state.cells)
+                    st.rerun()
+            except:
+                st.error("❌ Invalid notebook format")
+        
+        elif file_ext in ['csv', 'xlsx']:
+            st.session_state.uploaded_files[uploaded_file.name] = file_content
+            st.success(f"✅ Uploaded {uploaded_file.name}")
+            
+            # Auto-generate loading code
+            var_name = uploaded_file.name.replace('.', '_').replace('-', '_')
+            if file_ext == 'csv':
+                load_code = f"""# Load uploaded CSV
+import pandas as pd
+from io import BytesIO
 
-# ===== TAB 3: VARIABLES =====
-with tab3:
-    st.markdown('<p style="color:#FFAA00;font-weight:bold;font-size:14px;border-bottom:2px solid #333;padding:10px 0;">📊 SESSION VARIABLES</p>', unsafe_allow_html=True)
+{var_name} = pd.read_csv(BytesIO(st.session_state.uploaded_files['{uploaded_file.name}']))
+print(f"Loaded {{len({var_name})}} rows")
+{var_name}.head()"""
+            else:
+                load_code = f"""# Load uploaded Excel
+import pandas as pd
+from io import BytesIO
+
+{var_name} = pd.read_excel(BytesIO(st.session_state.uploaded_files['{uploaded_file.name}']))
+print(f"Loaded {{len({var_name})}} rows")
+{var_name}.head()"""
+            
+            if st.button("📊 GENERATE LOAD CODE"):
+                new_cell = {
+                    'id': st.session_state.cell_counter,
+                    'code': load_code,
+                    'output': '',
+                    'error': '',
+                    'executed': False,
+                    'exec_time': 0
+                }
+                st.session_state.cells.append(new_cell)
+                st.session_state.cell_counter += 1
+                st.rerun()
+    
+    # Uploaded files list
+    if st.session_state.uploaded_files:
+        st.markdown("**📦 Uploaded Files:**")
+        for fname in st.session_state.uploaded_files.keys():
+            st.text(f"• {fname}")
+    
+    st.markdown("---")
+    
+    # Export Options
+    st.markdown("#### 💾 EXPORT OPTIONS")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("📓 EXPORT .IPYNB"):
+            notebook_json = export_to_notebook(st.session_state.cells)
+            st.download_button(
+                "⬇️ Download Notebook",
+                notebook_json,
+                "bloomberg_notebook.ipynb",
+                "application/json"
+            )
+    
+    with col2:
+        if st.button("🐍 EXPORT .PY"):
+            py_code = "\n\n# " + "="*50 + "\n\n".join([
+                f"# Cell {cell['id']}\n{cell['code']}" 
+                for cell in st.session_state.cells if cell['code'].strip()
+            ])
+            st.download_button(
+                "⬇️ Download Script",
+                py_code,
+                "bloomberg_script.py",
+                "text/plain"
+            )
+    
+    # Share link
+    if st.button("🔗 GENERATE SHARE LINK"):
+        share_id = generate_share_link(st.session_state.cells)
+        st.code(f"Share ID: {share_id}", language=None)
+        st.info("💡 Save this ID to restore your work later")
+    
+    st.markdown("---")
+    
+    # Package Management
+    st.markdown("#### 📦 PACKAGE MANAGER")
+    
+    package_to_install = st.text_input("Package name:", key="pkg_install")
+    if st.button("📥 INSTALL PACKAGE"):
+        if package_to_install:
+            with st.spinner(f"Installing {package_to_install}..."):
+                success, output = install_package(package_to_install)
+                if success:
+                    st.success(f"✅ {package_to_install} installed!")
+                    st.session_state.installed_packages = get_installed_packages()
+                else:
+                    st.error(f"❌ Installation failed")
+                    st.code(output, language=None)
+    
+    if st.button("🔄 REFRESH PACKAGE LIST"):
+        st.session_state.installed_packages = get_installed_packages()
+        st.success("✅ Package list updated")
+    
+    # Show installed packages
+    with st.expander("📋 INSTALLED PACKAGES"):
+        if not st.session_state.installed_packages:
+            st.session_state.installed_packages = get_installed_packages()
+        
+        search_pkg = st.text_input("🔍 Search packages:", key="search_pkg")
+        packages = st.session_state.installed_packages
+        
+        if search_pkg:
+            packages = [p for p in packages if search_pkg.lower() in p['name'].lower()]
+        
+        for pkg in packages[:20]:  # Limit display
+            st.markdown(f"""
+            <div class="package-item">
+                <span>{pkg['name']}</span>
+                <span style="color:#666;">{pkg['version']}</span>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # Execution Settings
+    st.markdown("#### ⚙️ EXECUTION SETTINGS")
+    
+    st.session_state.execution_timeout = st.slider(
+        "Timeout (seconds)",
+        min_value=5,
+        max_value=120,
+        value=30,
+        step=5
+    )
+    
+    st.session_state.memory_limit = st.slider(
+        "Memory Limit (MB)",
+        min_value=128,
+        max_value=2048,
+        value=512,
+        step=128
+    )
+    
+    auto_save = st.checkbox("Auto-save cells", value=True)
+    show_line_numbers = st.checkbox("Show line numbers", value=True)
+    
+    st.markdown("---")
+    
+    # Variable Inspector
+    st.markdown("#### 🔍 VARIABLE INSPECTOR")
     
     if st.session_state.variables:
-        st.markdown(f'<p style="color:#00FFFF;font-size:11px;">📦 Total variables: <span style="color:#00FF00;font-weight:bold;">{len(st.session_state.variables)}</span></p>', unsafe_allow_html=True)
+        # Add to watch list
+        var_to_watch = st.selectbox(
+            "Add to watch:",
+            [""] + list(st.session_state.variables.keys())
+        )
         
-        for var_name, var_value in st.session_state.variables.items():
-            with st.expander(f"🔹 {var_name} ({type(var_value).__name__})"):
-                try:
-                    # Afficher différemment selon le type
-                    if isinstance(var_value, pd.DataFrame):
-                        st.dataframe(var_value, use_container_width=True)
-                    elif isinstance(var_value, (list, dict, tuple)):
-                        st.json(var_value if isinstance(var_value, dict) else {str(i): v for i, v in enumerate(var_value)})
-                    else:
-                        st.code(str(var_value), language='python')
-                except:
-                    st.text(f"Cannot display: {type(var_value)}")
+        if var_to_watch and st.button("👁️ WATCH VARIABLE"):
+            if var_to_watch not in st.session_state.watch_variables:
+                st.session_state.watch_variables.append(var_to_watch)
+                st.success(f"✅ Watching {var_to_watch}")
         
-        if st.button("🗑️ CLEAR ALL VARIABLES"):
-            st.session_state.variables = {}
-            st.success("✅ All variables cleared")
-            st.rerun()
+        # Watch list
+        if st.session_state.watch_variables:
+            st.markdown("**👁️ WATCHED VARIABLES:**")
+            for var_name in st.session_state.watch_variables:
+                if var_name in st.session_state.variables:
+                    var_value = st.session_state.variables[var_name]
+                    var_info = get_variable_info(var_value)
+                    
+                    with st.expander(f"🔹 {var_name}"):
+                        st.text(f"Type: {var_info['type']}")
+                        st.text(f"Size: {var_info['size']} bytes")
+                        if 'shape' in var_info:
+                            st.text(f"Shape: {var_info['shape']}")
+                        if 'length' in var_info:
+                            st.text(f"Length: {var_info['length']}")
+                        st.code(var_info['value'], language='python')
+                        
+                        if st.button(f"🗑️ Remove watch", key=f"unwatch_{var_name}"):
+                            st.session_state.watch_variables.remove(var_name)
+                            st.rerun()
+        
+        # All variables
+        with st.expander(f"📊 ALL VARIABLES ({len(st.session_state.variables)})"):
+            for var_name, var_value in st.session_state.variables.items():
+                var_info = get_variable_info(var_value)
+                st.markdown(f"**{var_name}** ({var_info['type']})")
+                st.text(f"Size: {var_info['size']} bytes")
+                if 'shape' in var_info:
+                    st.text(f"Shape: {var_info['shape']}")
     else:
-        st.markdown("""
-        <div class="info-box">
-            ℹ️ No variables in session yet.<br>
-            Run code with "PERSISTENT VARIABLES" option enabled to store variables.
-        </div>
-        """, unsafe_allow_html=True)
-
-# ===== TAB 4: HISTORY =====
-with tab4:
-    st.markdown('<p style="color:#FFAA00;font-weight:bold;font-size:14px;border-bottom:2px solid #333;padding:10px 0;">📜 EXECUTION HISTORY</p>', unsafe_allow_html=True)
+        st.info("No variables defined yet")
     
-    if st.session_state.execution_history:
-        st.markdown(f'<p style="color:#00FFFF;font-size:11px;">📊 Total executions: <span style="color:#00FF00;font-weight:bold;">{len(st.session_state.execution_history)}</span></p>', unsafe_allow_html=True)
+    if st.button("🗑️ CLEAR ALL VARIABLES"):
+        st.session_state.variables = {}
+        st.session_state.watch_variables = []
+        st.success("✅ Variables cleared")
+        st.rerun()
+    
+    st.markdown("---")
+    
+    # Visualization Gallery
+    st.markdown("#### 🎨 VISUALIZATION GALLERY")
+    
+    if st.session_state.visualizations:
+        st.text(f"📊 {len(st.session_state.visualizations)} visualizations")
         
-        for idx, record in enumerate(st.session_state.execution_history):
-            status_icon = "✅" if record['success'] else "❌"
-            status_color = "#00FF00" if record['success'] else "#FF0000"
-            
-            with st.expander(f"{status_icon} Execution #{idx+1} - {record['timestamp']} ({record['execution_time']:.4f}s)"):
-                st.code(record['code'], language='python')
-                st.markdown(f'<p style="color:{status_color};font-weight:bold;">Status: {"SUCCESS" if record["success"] else "FAILED"}</p>', unsafe_allow_html=True)
-                st.text(f"Execution time: {record['execution_time']:.4f}s")
+        for idx, viz in enumerate(st.session_state.visualizations[-5:]):  # Last 5
+            with st.expander(f"📈 Viz {idx+1} (Cell {viz['cell_id']})"):
+                st.text(f"Type: {viz['type']}")
+                st.text(f"Time: {viz['timestamp'].strftime('%H:%M:%S')}")
                 
-                if st.button(f"🔄 RE-RUN", key=f"rerun_{idx}"):
-                    st.info("Code copied! Go to Python Editor to execute.")
+                if viz['type'] == 'matplotlib' and MATPLOTLIB_AVAILABLE:
+                    st.pyplot(viz['figure'])
+                elif viz['type'] == 'plotly' and PLOTLY_AVAILABLE:
+                    st.plotly_chart(viz['figure'], use_container_width=True)
         
-        if st.button("🗑️ CLEAR HISTORY"):
-            st.session_state.execution_history = []
+        if st.button("🗑️ CLEAR GALLERY"):
+            st.session_state.visualizations = []
             st.rerun()
     else:
-        st.markdown("""
-        <div class="info-box">
-            ℹ️ No execution history yet.<br>
-            Start by running some Python code in the editor.
-        </div>
-        """, unsafe_allow_html=True)
-
-st.markdown('<hr>', unsafe_allow_html=True)
+        st.info("No visualizations yet")
 
 # =============================================
-# DOCUMENTATION
+# MAIN AREA - JUPYTER-STYLE CELLS
 # =============================================
-with st.expander("📖 DOCUMENTATION & HELP"):
+
+st.markdown('<p style="color:#FFAA00;font-weight:bold;font-size:14px;border-bottom:2px solid #333;padding:10px 0;">🐍 PYTHON IDE - JUPYTER-STYLE CELLS</p>', unsafe_allow_html=True)
+
+# Library availability warnings
+warnings = []
+if not MATPLOTLIB_AVAILABLE:
+    warnings.append("⚠️ matplotlib not available")
+if not PLOTLY_AVAILABLE:
+    warnings.append("⚠️ plotly not available")
+if not SEABORN_AVAILABLE:
+    warnings.append("⚠️ seaborn not available")
+
+if warnings:
+    st.markdown(f"""
+    <div class="terminal-warning">
+        {' • '.join(warnings)}<br>
+        Install with: pip install matplotlib plotly seaborn
+    </div>
+    """, unsafe_allow_html=True)
+
+# Cell controls
+col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
+
+with col1:
+    if st.button("➕ ADD CELL"):
+        new_cell = {
+            'id': st.session_state.cell_counter,
+            'code': '',
+            'output': '',
+            'error': '',
+            'executed': False,
+            'exec_time': 0
+        }
+        st.session_state.cells.append(new_cell)
+        st.session_state.cell_counter += 1
+        st.rerun()
+
+with col2:
+    if st.button("▶️ RUN ALL CELLS"):
+        for cell in st.session_state.cells:
+            if cell['code'].strip():
+                result = execute_cell_code(cell['code'], cell['id'])
+                cell['output'] = result['output']
+                cell['error'] = result['error']
+                cell['executed'] = True
+                cell['exec_time'] = result['execution_time']
+                cell['returned_value'] = result.get('returned_value')
+        st.rerun()
+
+with col3:
+    if st.button("🗑️ CLEAR ALL OUTPUTS"):
+        for cell in st.session_state.cells:
+            cell['output'] = ''
+            cell['error'] = ''
+            cell['executed'] = False
+            cell['returned_value'] = None
+        st.rerun()
+
+with col4:
+    if st.button("🔄 RESET IDE"):
+        st.session_state.cells = [{'id': 0, 'code': '', 'output': '', 'error': '', 'executed': False, 'exec_time': 0}]
+        st.session_state.cell_counter = 1
+        st.session_state.variables = {}
+        st.session_state.visualizations = []
+        st.rerun()
+
+st.markdown("---")
+
+# Render cells
+for idx, cell in enumerate(st.session_state.cells):
+    st.markdown(f'<div class="cell-container">', unsafe_allow_html=True)
+    
+    # Cell header
+    col_h1, col_h2, col_h3, col_h4, col_h5 = st.columns([1, 1, 1, 1, 2])
+    
+    with col_h1:
+        st.markdown(f"**Cell [{cell['id']}]**")
+    
+    with col_h2:
+        if st.button("▶️", key=f"run_{cell['id']}", help="Run this cell"):
+            result = execute_cell_code(cell['code'], cell['id'])
+            cell['output'] = result['output']
+            cell['error'] = result['error']
+            cell['executed'] = True
+            cell['exec_time'] = result['execution_time']
+            cell['returned_value'] = result.get('returned_value')
+            st.rerun()
+    
+    with col_h3:
+        if st.button("🗑️", key=f"del_{cell['id']}", help="Delete this cell"):
+            st.session_state.cells.pop(idx)
+            st.rerun()
+    
+    with col_h4:
+        if idx > 0 and st.button("⬆️", key=f"up_{cell['id']}", help="Move up"):
+            st.session_state.cells[idx], st.session_state.cells[idx-1] = \
+                st.session_state.cells[idx-1], st.session_state.cells[idx]
+            st.rerun()
+    
+    with col_h5:
+        if cell['executed']:
+            st.markdown(f"<small style='color:#00FF00;'>✅ Executed in {cell['exec_time']:.3f}s</small>", 
+                       unsafe_allow_html=True)
+    
+    # Code editor
+    cell['code'] = st.text_area(
+        f"Code {cell['id']}",
+        value=cell['code'],
+        height=150,
+        key=f"code_{cell['id']}",
+        label_visibility="collapsed",
+        placeholder="# Enter Python code here...\n# Shift+Enter to run (in real Jupyter)"
+    )
+    
+    # Lint warnings
+    if cell['code'].strip():
+        warnings = lint_code(cell['code'])
+        for warning in warnings:
+            st.markdown(f'<div class="terminal-warning">{warning}</div>', unsafe_allow_html=True)
+    
+    # Output
+    if cell['executed']:
+        if cell['error']:
+            st.markdown(f"""
+            <div class="terminal-error">
+                ❌ ERROR:<br>
+                {cell['error']}
+            </div>
+            """, unsafe_allow_html=True)
+        
+        if cell['output']:
+            st.markdown(f"""
+            <div class="terminal-output">
+                <span style="color:#00FFFF;">>>> OUTPUT:</span><br>
+                {cell['output']}
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Display returned value
+        if 'returned_value' in cell and cell['returned_value'] is not None:
+            returned_val = cell['returned_value']
+            
+            if isinstance(returned_val, pd.DataFrame):
+                st.dataframe(returned_val, use_container_width=True, height=300)
+                
+                # Export options
+                col_e1, col_e2 = st.columns(2)
+                with col_e1:
+                    csv = returned_val.to_csv(index=False)
+                    st.download_button(
+                        "⬇️ CSV",
+                        csv,
+                        f"cell_{cell['id']}_output.csv",
+                        key=f"csv_{cell['id']}"
+                    )
+                with col_e2:
+                    json_str = returned_val.to_json(orient='records', indent=2)
+                    st.download_button(
+                        "⬇️ JSON",
+                        json_str,
+                        f"cell_{cell['id']}_output.json",
+                        key=f"json_{cell['id']}"
+                    )
+            
+            elif MATPLOTLIB_AVAILABLE and isinstance(returned_val, plt.Figure):
+                st.pyplot(returned_val)
+            
+            elif PLOTLY_AVAILABLE and isinstance(returned_val, go.Figure):
+                st.plotly_chart(returned_val, use_container_width=True)
+            
+            else:
+                st.code(str(returned_val), language='python')
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+
+# =============================================
+# AI ASSISTANT (Placeholder)
+# =============================================
+
+with st.expander("🤖 AI CODING ASSISTANT (EXPERIMENTAL)"):
+    st.markdown("""
+    <div class="info-box">
+        🚧 AI Assistant features coming soon:<br><br>
+        
+        • <b>Code Completion</b>: Smart autocomplete powered by AI<br>
+        • <b>Error Explanation</b>: Understand what went wrong<br>
+        • <b>Code Generation</b>: Describe what you want in plain English<br>
+        • <b>Optimization</b>: Get suggestions to improve your code<br>
+        • <b>Documentation</b>: Auto-generate docstrings and comments<br><br>
+        
+        💡 <i>To enable: Connect your OpenAI/Anthropic API key in settings</i>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    ai_prompt = st.text_area("Describe what you want to code:", 
+                            placeholder="e.g., Create a function that calculates the Fibonacci sequence")
+    
+    if st.button("✨ GENERATE CODE"):
+        st.info("🚧 AI features require API key configuration")
+
+# =============================================
+# KEYBOARD SHORTCUTS INFO
+# =============================================
+
+with st.expander("⌨️ KEYBOARD SHORTCUTS & TIPS"):
     st.markdown("""
     <div style="color:#FFAA00;">
     
-    <p style="color:#00FFFF;font-weight:bold;font-size:13px;margin-top:10px;">🐍 Python Interactive Terminal</p>
+    <p style="color:#00FFFF;font-weight:bold;">📋 Jupyter-Style Workflow</p>
     
-    Cette interface vous permet d'exécuter du code Python directement dans votre navigateur avec un terminal interactif.
+    • **Add Cell**: Click "➕ ADD CELL" button<br>
+    • **Run Cell**: Click "▶️" next to each cell<br>
+    • **Run All**: Click "▶️ RUN ALL CELLS"<br>
+    • **Move Cells**: Use ⬆️ buttons to reorder<br>
+    • **Delete Cell**: Click 🗑️ next to cell<br><br>
     
-    <p style="color:#00FFFF;font-weight:bold;font-size:13px;margin-top:20px;">📚 Bibliothèques Pré-importées</p>
+    <p style="color:#00FFFF;font-weight:bold;">💾 File Operations</p>
     
-    Les bibliothèques suivantes sont automatiquement disponibles:
-    - **pandas** (as pd): Manipulation de données
-    - **numpy** (as np): Calculs numériques
-    - **json**: Manipulation JSON
-    - **streamlit** (as st): Interface Streamlit
-    - **matplotlib.pyplot** (as plt): Visualisation de données (si installé)
+    • **Upload .py**: Sidebar → Upload File → Load into cell<br>
+    • **Upload .ipynb**: Sidebar → Upload → Import all cells<br>
+    • **Upload Data**: CSV/Excel → Auto-generate loading code<br>
+    • **Export**: Sidebar → Export to .ipynb or .py<br><br>
     
-    <p style="color:#00FFFF;font-weight:bold;font-size:13px;margin-top:20px;">⚙️ Fonctionnalités</p>
+    <p style="color:#00FFFF;font-weight:bold;">🔍 Debugging</p>
     
-    - **Persistent Variables**: Les variables sont conservées entre les exécutions
-    - **Terminal Output**: Capture de stdout et stderr
-    - **Auto-Display**: Affichage automatique de la dernière valeur retournée
-    - **Execution Time**: Mesure du temps d'exécution
-    - **Code Templates**: Bibliothèque de templates pré-définis
-    - **History**: Historique complet des exécutions
+    • **Variable Inspector**: Sidebar shows all variables<br>
+    • **Watch Variables**: Add variables to watch list<br>
+    • **Error Traces**: Full tracebacks displayed<br>
+    • **Lint Warnings**: Real-time code quality checks<br><br>
     
-    <p style="color:#00FFFF;font-weight:bold;font-size:13px;margin-top:20px;">💡 Exemples d'utilisation</p>
+    <p style="color:#00FFFF;font-weight:bold;">📦 Package Management</p>
     
-    ```python
-    # Exemple 1: Créer et manipuler un DataFrame
-    df = pd.DataFrame({
-        'A': [1, 2, 3],
-        'B': [4, 5, 6]
-    })
-    print(df)
-    df  # Affichage automatique
-    ```
+    • **Install**: Sidebar → Package Manager → Enter name<br>
+    • **View Installed**: Sidebar → Installed Packages<br>
+    • **Search**: Use search box to filter packages<br><br>
     
-    ```python
-    # Exemple 2: Visualisation
-    fig, ax = plt.subplots()
-    ax.plot([1, 2, 3], [1, 4, 9])
-    fig  # Affichage automatique du graphique
-    ```
+    <p style="color:#00FFFF;font-weight:bold;">🎨 Visualizations</p>
     
-    ```python
-    # Exemple 3: Variables persistantes
-    # Exécution 1:
-    x = 10
+    • **Matplotlib**: Auto-displayed inline<br>
+    • **Plotly**: Interactive charts supported<br>
+    • **Gallery**: Sidebar → Visualization Gallery<br>
+    • **Export**: Download charts as PNG/SVG<br><br>
     
-    # Exécution 2 (dans un autre run):
-    y = x * 2  # x est toujours disponible!
-    print(y)  # Affiche 20
-    ```
+    <p style="color:#00FFFF;font-weight:bold;">⚡ Pro Tips</p>
     
-    <p style="color:#00FFFF;font-weight:bold;font-size:13px;margin-top:20px;">🎯 Conseils</p>
-    
-    - Utilisez `print()` pour afficher des valeurs intermédiaires
-    - La dernière ligne sans assignation sera affichée automatiquement
-    - Les DataFrames et figures matplotlib ont un affichage spécial
-    - Consultez l'onglet Variables pour voir toutes les variables actives
-    - Sauvegardez vos codes fréquents comme templates
-    
-    <p style="color:#00FFFF;font-weight:bold;font-size:13px;margin-top:20px;">⚠️ Limitations</p>
-    
-    - Pas d'accès au système de fichiers local
-    - Pas d'installation de packages (utilisez les packages pré-installés)
-    - Les variables ne persistent pas entre les sessions (refresh de page)
-    - Timeout d'exécution selon les limites Streamlit
+    • Variables persist across all cells<br>
+    • Use `print()` for debugging output<br>
+    • Last line auto-displays if not assigned<br>
+    • DataFrames get special rendering<br>
+    • Upload data files for instant analysis<br>
+    • Export your work as notebooks<br>
     
     </div>
     """, unsafe_allow_html=True)
@@ -939,7 +1061,8 @@ with st.expander("📖 DOCUMENTATION & HELP"):
 st.markdown('<hr>', unsafe_allow_html=True)
 st.markdown(f"""
 <div style='text-align: center; color: #666; font-size: 9px; font-family: "Courier New", monospace; padding: 10px;'>
-    © 2025 BLOOMBERG ENS® | PYTHON INTERACTIVE TERMINAL | PYTHON {sys.version.split()[0]}<br>
-    SECURE EXECUTION • SANDBOXED ENVIRONMENT • LAST UPDATE: {datetime.now().strftime('%H:%M:%S')}
+    © 2025 BLOOMBERG ENS® | ADVANCED PYTHON IDE | MULTI-CELL EXECUTION<br>
+    JUPYTER-STYLE INTERFACE • PACKAGE MANAGER • VARIABLE INSPECTOR • AI-READY<br>
+    CELLS: {len(st.session_state.cells)} • VARIABLES: {len(st.session_state.variables)} • VISUALIZATIONS: {len(st.session_state.visualizations)}
 </div>
 """, unsafe_allow_html=True)
