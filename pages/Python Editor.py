@@ -38,6 +38,13 @@ except ImportError:
     sns = None
     SEABORN_AVAILABLE = False
 
+try:
+    from groq import Groq
+    GROQ_AVAILABLE = True
+except ImportError:
+    Groq = None
+    GROQ_AVAILABLE = False
+
 # =============================================
 # PAGE CONFIG
 # =============================================
@@ -295,12 +302,13 @@ st.markdown("""
 # HEADER
 # =============================================
 current_time = datetime.now().strftime("%H:%M:%S")
+ai_status = "🤖 AI: ON" if st.session_state.groq_client else "🤖 AI: OFF"
 st.markdown(f"""
 <div style="background:#FFAA00;padding:8px 20px;color:#000;font-weight:bold;font-size:14px;border-bottom:2px solid #FFAA00;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
     <div style="display:flex;align-items:center;gap:15px;">
         <div>⬛ BLOOMBERG ENS® TERMINAL - ADVANCED PYTHON IDE</div>
     </div>
-    <div>{current_time} UTC • PYTHON {sys.version.split()[0]}</div>
+    <div>{current_time} UTC • PYTHON {sys.version.split()[0]} • {ai_status}</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -327,6 +335,16 @@ if 'visualizations' not in st.session_state:
     st.session_state.visualizations = []
 if 'watch_variables' not in st.session_state:
     st.session_state.watch_variables = []
+if 'groq_client' not in st.session_state:
+    st.session_state.groq_client = None
+    # Initialiser Groq si disponible
+    if GROQ_AVAILABLE:
+        try:
+            groq_api_key = st.secrets.get("GROQ_API_KEY", None)
+            if groq_api_key:
+                st.session_state.groq_client = Groq(api_key=groq_api_key)
+        except:
+            pass
 
 # =============================================
 # UTILITY FUNCTIONS
@@ -516,6 +534,117 @@ def generate_share_link(cells):
     code_content = "\n\n".join([cell['code'] for cell in cells if cell['code'].strip()])
     code_hash = hashlib.md5(code_content.encode()).hexdigest()
     return f"bloomberg-ide-{code_hash[:12]}"
+
+def generate_code_with_ai(prompt, context=""):
+    """Génère du code Python avec Groq AI"""
+    if not st.session_state.groq_client:
+        return None, "Groq API not configured"
+    
+    try:
+        system_prompt = """You are an expert Python programmer assistant. Generate clean, efficient, and well-documented Python code based on user requests.
+
+Rules:
+- Generate ONLY executable Python code
+- Include comments to explain the logic
+- Use best practices and modern Python syntax
+- Import necessary libraries at the top
+- Handle edge cases and errors
+- Make code readable and maintainable
+- If asked for data analysis, use pandas/numpy
+- If asked for visualization, use matplotlib/plotly/seaborn
+- Return ONLY the code, no explanations before or after"""
+
+        if context:
+            system_prompt += f"\n\nContext - Current variables available:\n{context}"
+        
+        response = st.session_state.groq_client.chat.completions.create(
+            model="mixtral-8x7b-32768",  # ou "llama3-70b-8192"
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            max_tokens=2000
+        )
+        
+        generated_code = response.choices[0].message.content
+        
+        # Nettoyer le code (retirer les backticks si présents)
+        generated_code = generated_code.replace("```python", "").replace("```", "").strip()
+        
+        return generated_code, None
+    
+    except Exception as e:
+        return None, f"Error: {str(e)}"
+
+def explain_code_with_ai(code):
+    """Explique du code Python avec Groq AI"""
+    if not st.session_state.groq_client:
+        return "Groq API not configured"
+    
+    try:
+        response = st.session_state.groq_client.chat.completions.create(
+            model="mixtral-8x7b-32768",
+            messages=[
+                {"role": "system", "content": "You are a Python code explainer. Explain the given code in clear, simple terms. Break down what each part does."},
+                {"role": "user", "content": f"Explain this Python code:\n\n{code}"}
+            ],
+            temperature=0.5,
+            max_tokens=1000
+        )
+        
+        return response.choices[0].message.content
+    
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+def fix_code_with_ai(code, error):
+    """Corrige du code Python avec Groq AI"""
+    if not st.session_state.groq_client:
+        return None, "Groq API not configured"
+    
+    try:
+        response = st.session_state.groq_client.chat.completions.create(
+            model="mixtral-8x7b-32768",
+            messages=[
+                {"role": "system", "content": "You are a Python debugging expert. Fix the given code based on the error message. Return ONLY the corrected code, no explanations."},
+                {"role": "user", "content": f"Fix this code:\n\n{code}\n\nError:\n{error}"}
+            ],
+            temperature=0.3,
+            max_tokens=2000
+        )
+        
+        fixed_code = response.choices[0].message.content
+        fixed_code = fixed_code.replace("```python", "").replace("```", "").strip()
+        
+        return fixed_code, None
+    
+    except Exception as e:
+        return None, f"Error: {str(e)}"
+
+def optimize_code_with_ai(code):
+    """Optimise du code Python avec Groq AI"""
+    if not st.session_state.groq_client:
+        return None, "Groq API not configured"
+    
+    try:
+        response = st.session_state.groq_client.chat.completions.create(
+            model="mixtral-8x7b-32768",
+            messages=[
+                {"role": "system", "content": "You are a Python optimization expert. Improve the given code for better performance, readability, and best practices. Return ONLY the optimized code."},
+                {"role": "user", "content": f"Optimize this code:\n\n{code}"}
+            ],
+            temperature=0.3,
+            max_tokens=2000
+        )
+        
+        optimized_code = response.choices[0].message.content
+        optimized_code = optimized_code.replace("```python", "").replace("```", "").strip()
+        
+        return optimized_code, None
+    
+    except Exception as e:
+        return None, f"Error: {str(e)}"
 
 # =============================================
 # SIDEBAR - CONTROLS & SETTINGS
@@ -810,12 +939,16 @@ if not PLOTLY_AVAILABLE:
     warnings.append("⚠️ plotly not available")
 if not SEABORN_AVAILABLE:
     warnings.append("⚠️ seaborn not available")
+if not GROQ_AVAILABLE:
+    warnings.append("⚠️ groq not available (AI features disabled)")
+elif not st.session_state.groq_client:
+    warnings.append("⚠️ Groq API key not configured (AI features disabled)")
 
 if warnings:
     st.markdown(f"""
     <div class="terminal-warning">
         {' • '.join(warnings)}<br>
-        Install with: pip install matplotlib plotly seaborn
+        Install with: pip install matplotlib plotly seaborn groq
     </div>
     """, unsafe_allow_html=True)
 
@@ -976,29 +1109,242 @@ for idx, cell in enumerate(st.session_state.cells):
     st.markdown("<br>", unsafe_allow_html=True)
 
 # =============================================
-# AI ASSISTANT (Placeholder)
+# AI ASSISTANT (Groq Integration)
 # =============================================
 
-with st.expander("🤖 AI CODING ASSISTANT (EXPERIMENTAL)"):
+st.markdown('<p style="color:#FFAA00;font-weight:bold;font-size:14px;border-bottom:2px solid #333;padding:10px 0;margin-top:20px;">🤖 AI CODING ASSISTANT</p>', unsafe_allow_html=True)
+
+if st.session_state.groq_client:
     st.markdown("""
-    <div class="info-box">
-        🚧 AI Assistant features coming soon:<br><br>
-        
-        • <b>Code Completion</b>: Smart autocomplete powered by AI<br>
-        • <b>Error Explanation</b>: Understand what went wrong<br>
-        • <b>Code Generation</b>: Describe what you want in plain English<br>
-        • <b>Optimization</b>: Get suggestions to improve your code<br>
-        • <b>Documentation</b>: Auto-generate docstrings and comments<br><br>
-        
-        💡 <i>To enable: Connect your OpenAI/Anthropic API key in settings</i>
+    <div class="success-box">
+        ✅ Groq API Connected - AI Features Available
     </div>
     """, unsafe_allow_html=True)
     
-    ai_prompt = st.text_area("Describe what you want to code:", 
-                            placeholder="e.g., Create a function that calculates the Fibonacci sequence")
+    # Tabs for different AI features
+    ai_tab1, ai_tab2, ai_tab3, ai_tab4 = st.tabs(["✨ GENERATE", "📖 EXPLAIN", "🔧 FIX", "⚡ OPTIMIZE"])
     
-    if st.button("✨ GENERATE CODE"):
-        st.info("🚧 AI features require API key configuration")
+    # TAB 1: Generate Code
+    with ai_tab1:
+        st.markdown("### ✨ Generate Code from Description")
+        
+        # Context about variables
+        context_info = ""
+        if st.session_state.variables:
+            var_list = ", ".join([f"{name} ({type(val).__name__})" for name, val in st.session_state.variables.items()])
+            context_info = f"Available variables: {var_list}"
+            st.info(f"💡 {context_info}")
+        
+        ai_prompt = st.text_area(
+            "Describe what you want to code:",
+            placeholder="e.g., Create a function that calculates the Fibonacci sequence up to n terms",
+            height=100,
+            key="ai_generate_prompt"
+        )
+        
+        col_gen1, col_gen2 = st.columns([2, 1])
+        
+        with col_gen1:
+            if st.button("✨ GENERATE CODE", key="generate_code_btn", type="primary"):
+                if ai_prompt.strip():
+                    with st.spinner("🤖 Generating code with Groq AI..."):
+                        generated_code, error = generate_code_with_ai(ai_prompt, context_info)
+                        
+                        if generated_code:
+                            st.success("✅ Code generated successfully!")
+                            st.code(generated_code, language='python')
+                            
+                            if st.button("📋 ADD TO NEW CELL", key="add_generated"):
+                                new_cell = {
+                                    'id': st.session_state.cell_counter,
+                                    'code': generated_code,
+                                    'output': '',
+                                    'error': '',
+                                    'executed': False,
+                                    'exec_time': 0
+                                }
+                                st.session_state.cells.append(new_cell)
+                                st.session_state.cell_counter += 1
+                                st.success("✅ Code added to new cell!")
+                                st.rerun()
+                        else:
+                            st.error(f"❌ {error}")
+                else:
+                    st.warning("⚠️ Please enter a description")
+        
+        with col_gen2:
+            use_context = st.checkbox("Use current variables", value=True, key="use_context")
+    
+    # TAB 2: Explain Code
+    with ai_tab2:
+        st.markdown("### 📖 Explain Code")
+        
+        # Select cell to explain
+        if st.session_state.cells:
+            cell_options = {f"Cell [{cell['id']}]": cell for cell in st.session_state.cells if cell['code'].strip()}
+            
+            if cell_options:
+                selected_cell_label = st.selectbox("Select cell to explain:", list(cell_options.keys()))
+                selected_cell = cell_options[selected_cell_label]
+                
+                st.code(selected_cell['code'], language='python')
+                
+                if st.button("📖 EXPLAIN THIS CODE", key="explain_btn", type="primary"):
+                    with st.spinner("🤖 Analyzing code..."):
+                        explanation = explain_code_with_ai(selected_cell['code'])
+                        
+                        st.markdown(f"""
+                        <div class="info-box">
+                            <b>🤖 AI Explanation:</b><br><br>
+                            {explanation}
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.info("ℹ️ No code to explain. Add some code first!")
+        else:
+            st.info("ℹ️ No cells available")
+    
+    # TAB 3: Fix Code
+    with ai_tab3:
+        st.markdown("### 🔧 Fix Code Errors")
+        
+        # Select cell with error
+        error_cells = {f"Cell [{cell['id']}]": cell for cell in st.session_state.cells 
+                      if cell.get('error') and cell['code'].strip()}
+        
+        if error_cells:
+            selected_error_label = st.selectbox("Select cell with error:", list(error_cells.keys()))
+            selected_error_cell = error_cells[selected_error_label]
+            
+            st.markdown("**Original Code:**")
+            st.code(selected_error_cell['code'], language='python')
+            
+            st.markdown("**Error:**")
+            st.markdown(f"""
+            <div class="terminal-error">
+                {selected_error_cell['error']}
+            </div>
+            """, unsafe_allow_html=True)
+            
+            if st.button("🔧 FIX THIS ERROR", key="fix_btn", type="primary"):
+                with st.spinner("🤖 Fixing code..."):
+                    fixed_code, error = fix_code_with_ai(
+                        selected_error_cell['code'], 
+                        selected_error_cell['error']
+                    )
+                    
+                    if fixed_code:
+                        st.success("✅ Code fixed!")
+                        st.markdown("**Fixed Code:**")
+                        st.code(fixed_code, language='python')
+                        
+                        col_fix1, col_fix2 = st.columns(2)
+                        
+                        with col_fix1:
+                            if st.button("✅ REPLACE IN CELL", key="replace_fixed"):
+                                selected_error_cell['code'] = fixed_code
+                                selected_error_cell['error'] = ''
+                                selected_error_cell['executed'] = False
+                                st.success("✅ Code replaced in cell!")
+                                st.rerun()
+                        
+                        with col_fix2:
+                            if st.button("➕ ADD AS NEW CELL", key="add_fixed"):
+                                new_cell = {
+                                    'id': st.session_state.cell_counter,
+                                    'code': fixed_code,
+                                    'output': '',
+                                    'error': '',
+                                    'executed': False,
+                                    'exec_time': 0
+                                }
+                                st.session_state.cells.append(new_cell)
+                                st.session_state.cell_counter += 1
+                                st.success("✅ Fixed code added to new cell!")
+                                st.rerun()
+                    else:
+                        st.error(f"❌ {error}")
+        else:
+            st.info("ℹ️ No errors to fix. Great job! 🎉")
+    
+    # TAB 4: Optimize Code
+    with ai_tab4:
+        st.markdown("### ⚡ Optimize Code")
+        
+        if st.session_state.cells:
+            cell_opt_options = {f"Cell [{cell['id']}]": cell for cell in st.session_state.cells if cell['code'].strip()}
+            
+            if cell_opt_options:
+                selected_opt_label = st.selectbox("Select cell to optimize:", list(cell_opt_options.keys()))
+                selected_opt_cell = cell_opt_options[selected_opt_label]
+                
+                st.markdown("**Original Code:**")
+                st.code(selected_opt_cell['code'], language='python')
+                
+                if st.button("⚡ OPTIMIZE THIS CODE", key="optimize_btn", type="primary"):
+                    with st.spinner("🤖 Optimizing code..."):
+                        optimized_code, error = optimize_code_with_ai(selected_opt_cell['code'])
+                        
+                        if optimized_code:
+                            st.success("✅ Code optimized!")
+                            st.markdown("**Optimized Code:**")
+                            st.code(optimized_code, language='python')
+                            
+                            col_opt1, col_opt2 = st.columns(2)
+                            
+                            with col_opt1:
+                                if st.button("✅ REPLACE IN CELL", key="replace_optimized"):
+                                    selected_opt_cell['code'] = optimized_code
+                                    selected_opt_cell['executed'] = False
+                                    st.success("✅ Code replaced in cell!")
+                                    st.rerun()
+                            
+                            with col_opt2:
+                                if st.button("➕ ADD AS NEW CELL", key="add_optimized"):
+                                    new_cell = {
+                                        'id': st.session_state.cell_counter,
+                                        'code': optimized_code,
+                                        'output': '',
+                                        'error': '',
+                                        'executed': False,
+                                        'exec_time': 0
+                                    }
+                                    st.session_state.cells.append(new_cell)
+                                    st.session_state.cell_counter += 1
+                                    st.success("✅ Optimized code added to new cell!")
+                                    st.rerun()
+                        else:
+                            st.error(f"❌ {error}")
+            else:
+                st.info("ℹ️ No code to optimize. Add some code first!")
+        else:
+            st.info("ℹ️ No cells available")
+
+else:
+    st.markdown("""
+    <div class="terminal-warning">
+        ⚠️ Groq API Not Configured<br><br>
+        
+        <b>To enable AI features:</b><br>
+        1. Get a free API key from <a href="https://console.groq.com" target="_blank" style="color:#00FFFF;">console.groq.com</a><br>
+        2. Add to Streamlit Secrets: GROQ_API_KEY = "your_key_here"<br>
+        3. Install groq: pip install groq<br><br>
+        
+        <b>AI Features Available:</b><br>
+        • Code generation from natural language<br>
+        • Code explanation and documentation<br>
+        • Automatic error fixing<br>
+        • Code optimization suggestions<br>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if not GROQ_AVAILABLE:
+        st.markdown("""
+        <div class="terminal-error">
+            ❌ Groq package not installed<br>
+            Run: pip install groq
+        </div>
+        """, unsafe_allow_html=True)
 
 # =============================================
 # KEYBOARD SHORTCUTS INFO
