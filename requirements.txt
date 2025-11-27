@@ -22,3 +22,16 @@ openpyxl
 streamlit-autorefresh
 beautifulsoup4
 openbb
+# Requirements pour Python Terminal Bloomberg
+# Dépendances de base (requises)
+streamlit>=1.28.0
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Dépendances optionnelles (pour les visualisations)
+matplotlib>=3.7.0
+
+# Autres bibliothèques utiles
+plotly>=5.18.0
+seaborn>=0.13.0
+scikit-learn>=1.3.0
