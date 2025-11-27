@@ -1972,62 +1972,52 @@ with tab3:
 with pairs_tab1:
     st.markdown("#### 🔬 COINTEGRATION ANALYSIS")
     
-    # Configuration Supabase
-    st.markdown("""
-    <div style="background-color: #0a0a0a; border-left: 3px solid #00FFFF; padding: 10px; margin: 10px 0;">
-        <p style="margin: 0; font-size: 10px; color: #00FFFF; font-weight: bold;">
-        🔗 DATABASE CONNECTION
-        </p>
-        <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
-        Connect to your Supabase database to access stock price data.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Connexion à Supabase
-    with st.expander("⚙️ SUPABASE CONFIGURATION", expanded=False):
-        col_db1, col_db2 = st.columns(2)
-        
-        with col_db1:
-            supabase_url = st.text_input(
-                "SUPABASE URL",
-                value=st.session_state.get('supabase_url', ''),
-                type="password",
-                key="supabase_url_input",
-                help="Your Supabase project URL"
-            )
-        
-        with col_db2:
-            supabase_key = st.text_input(
-                "SUPABASE KEY",
-                value=st.session_state.get('supabase_key', ''),
-                type="password",
-                key="supabase_key_input",
-                help="Your Supabase anon/service key"
-            )
-        
-        if st.button("💾 SAVE CONNECTION", use_container_width=True, key="save_supabase"):
-            if supabase_url and supabase_key:
-                st.session_state['supabase_url'] = supabase_url
-                st.session_state['supabase_key'] = supabase_key
-                st.success("✅ Connection saved!")
-            else:
-                st.warning("⚠️ Please provide both URL and key")
-    
-    # Fonction pour se connecter à Supabase
+    # Fonction pour se connecter à Supabase en utilisant les secrets
     @st.cache_resource
     def get_supabase_client():
-        if 'supabase_url' not in st.session_state or 'supabase_key' not in st.session_state:
-            return None
         try:
             from supabase import create_client, Client
-            url = st.session_state['supabase_url']
-            key = st.session_state['supabase_key']
+            
+            # Récupérer les credentials depuis les secrets Streamlit
+            url = st.secrets["SUPABASE_URL"]
+            key = st.secrets["SUPABASE_KEY"]
+            
             supabase: Client = create_client(url, key)
             return supabase
+        except KeyError as e:
+            st.error(f"❌ Missing Supabase credentials in secrets: {e}")
+            st.info("Please add SUPABASE_URL and SUPABASE_KEY to your Streamlit secrets")
+            return None
         except Exception as e:
             st.error(f"❌ Error connecting to Supabase: {e}")
             return None
+    
+    # Vérifier la connexion et afficher le statut
+    supabase_client = get_supabase_client()
+    
+    if supabase_client:
+        st.markdown("""
+        <div style="background-color: #0a1a0a; border-left: 3px solid #00FF00; padding: 10px; margin: 10px 0;">
+            <p style="margin: 0; font-size: 10px; color: #00FF00; font-weight: bold;">
+            ✅ CONNECTED TO SUPABASE
+            </p>
+            <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
+            Ready to access stock price data from your database.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div style="background-color: #1a0a0a; border-left: 3px solid #FF0000; padding: 10px; margin: 10px 0;">
+            <p style="margin: 0; font-size: 10px; color: #FF0000; font-weight: bold;">
+            ❌ SUPABASE CONNECTION FAILED
+            </p>
+            <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
+            Please check your Streamlit secrets configuration.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.stop()
     
     # Fonction pour lister les tables disponibles
     @st.cache_data(ttl=300)
@@ -2037,16 +2027,6 @@ with pairs_tab1:
             return []
         
         try:
-            # Récupérer la liste des tables depuis information_schema
-            # Note: cette approche peut nécessiter des permissions spéciales
-            # Alternative: avoir une table de métadonnées listant les tables de prix
-            
-            # Pour l'instant, on va demander à l'utilisateur de lister manuellement
-            # ou on peut scanner les tables en essayant de les lire
-            
-            # Méthode simple: essayer de lire quelques enregistrements
-            # Vous devrez adapter selon votre structure de base
-            
             # Supposons que vous avez une table "stock_tables" qui liste toutes vos tables de prix
             response = supabase.table('stock_tables').select('*').execute()
             
@@ -2055,7 +2035,8 @@ with pairs_tab1:
             else:
                 return []
         except Exception as e:
-            st.warning(f"Cannot auto-detect tables. Please enter manually. Error: {e}")
+            # Si la table stock_tables n'existe pas, retourner une liste vide
+            # L'utilisateur devra entrer manuellement les noms de tables
             return []
     
     # Fonction pour charger les données d'une table
@@ -2265,9 +2246,7 @@ with pairs_tab1:
     
     # Bouton pour lancer le test
     if st.button("🔬 RUN COINTEGRATION TEST", use_container_width=True, key="run_coint_supabase"):
-        if not get_supabase_client():
-            st.error("❌ Please configure Supabase connection first!")
-        elif table1 and table2:
+        if table1 and table2:
             with st.spinner(f"Analyzing cointegration between {table1} and {table2}..."):
                 try:
                     # Télécharger les données
@@ -2278,12 +2257,13 @@ with pairs_tab1:
                     
                     if df1.empty or df2.empty:
                         st.error(f"❌ Could not load data from {table1} or {table2}")
+                        st.info("💡 Make sure the table names are correct and contain data")
                     else:
                         # Vérifier que la colonne de prix existe
                         if price_column not in df1.columns or price_column not in df2.columns:
                             st.error(f"❌ Column '{price_column}' not found in one or both tables")
-                            st.info(f"Available columns in {table1}: {', '.join(df1.columns)}")
-                            st.info(f"Available columns in {table2}: {', '.join(df2.columns)}")
+                            st.info(f"📊 Available columns in {table1}: {', '.join(df1.columns)}")
+                            st.info(f"📊 Available columns in {table2}: {', '.join(df2.columns)}")
                         else:
                             # Nettoyer les données
                             df1_clean = nettoyer_donnees(df1[[price_column]], price_column)
@@ -2570,7 +2550,6 @@ with pairs_tab1:
                     st.code(traceback.format_exc())
         else:
             st.warning("⚠️ Please enter both table names")
-
     
     # ===== PAIRS TAB 2: BACKTEST =====
     with pairs_tab2:
