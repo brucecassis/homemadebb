@@ -550,48 +550,32 @@ UPDATE products SET price = 99.99 WHERE id = 1;""",
                         # Exécution de la vraie requête Supabase via API REST
                         if st.session_state.supabase_client:
                             try:
-                                # Headers pour l'API Supabase
-                                headers = {
-                                    "apikey": supabase_key,
-                                    "Authorization": f"Bearer {supabase_key}",
-                                    "Content-Type": "application/json",
-                                    "Prefer": "return=representation"
-                                }
+                                import psycopg2
+        
+                                # Récupérer la DB URL depuis les secrets
+                                db_url = st.secrets.get("SUPABASE_DB_URL", None)
                                 
-                                # Essayer d'exécuter via l'endpoint SQL (si disponible)
-                                # Note: Ceci peut ne pas fonctionner, PostgREST ne supporte pas le SQL arbitraire
-                                sql_endpoint = f"{supabase_url}/rest/v1/rpc/query"
-                                
-                                response = requests.post(
-                                    sql_endpoint,
-                                    headers=headers,
-                                    json={"query": sql_query},
-                                    timeout=30
-                                )
-                                
-                                if response.status_code == 200:
-                                    data = response.json()
-                                    result_df = pd.DataFrame(data)
+                                if db_url:
+                                    # Connexion PostgreSQL directe
+                                    conn = psycopg2.connect(db_url)
+                                    cursor = conn.cursor()
+                                    cursor.execute(sql_query)
+                                    
+                                    # Récupérer les résultats
+                                    results = cursor.fetchall()
+                                    columns = [desc[0] for desc in cursor.description]
+                                    result_df = pd.DataFrame(results, columns=columns)
+                                    
+                                    cursor.close()
+                                    conn.close()
                                 else:
-                                    # Fallback sur l'ancien système pour les requêtes simples
-                                    if 'SELECT' in sql_query.upper() and 'FROM' in sql_query.upper():
-                                        import re
-                                        match = re.search(r'FROM\s+(\w+)', sql_query, re.IGNORECASE)
-                                        if match:
-                                            table_name = match.group(1)
-                                            response = st.session_state.supabase_client.table(table_name).select("*").limit(limit_results).execute()
-                                            result_df = pd.DataFrame(response.data)
-                                        else:
-                                            st.error(f"❌ API Error: {response.status_code} - {response.text}")
-                                            result_df = None
-                                    else:
-                                        st.error(f"❌ L'API REST ne supporte pas cette requête. Code: {response.status_code}")
-                                        result_df = None
+                                    st.error("❌ SUPABASE_DB_URL manquant dans les secrets")
+                                    result_df = None
                             
                             except Exception as e:
-                                st.error(f"❌ Erreur d'exécution: {str(e)}")
+                                st.error(f"❌ Erreur PostgreSQL: {str(e)}")
                                 result_df = None
-                        
+                                                
                         else:
                             # Mode démo - données fictives
                             if 'SELECT' in sql_query.upper():
