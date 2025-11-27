@@ -128,34 +128,39 @@ st.markdown("""
         border-left: 4px solid #FFAA00;
     }
 
-     /* CACHER LE TEXTE "keyboard_double_arrow_right" */
+     /* CACHER COMPLÈTEMENT LE TEXTE keyboard_double_arrow_right */
+    [data-testid="stExpander"] details summary span[data-testid="stExpanderToggleIcon"] {
+        display: none !important;
+    }
+    
+    /* Cacher aussi le texte directement */
+    [data-testid="stExpander"] details summary > div > span {
+        font-size: 0 !important;
+    }
+    
+    /* Garder uniquement le titre visible */
+    [data-testid="stExpander"] details summary p {
+        font-size: 11px !important;
+        color: #FFAA00 !important;
+    }
+    
+    /* Ajouter la flèche personnalisée */
     [data-testid="stExpander"] details summary::before {
         content: "▼ " !important;
-        font-size: 14px;
+        color: #FFAA00 !important;
+        font-size: 14px !important;
+        margin-right: 8px;
     }
     
     [data-testid="stExpander"] details[open] summary::before {
         content: "▲ " !important;
-        font-size: 14px;
     }
     
-    /* Alternative: Cacher complètement l'icône */
-    [data-testid="stExpander"] svg {
-        display: none !important;
-    }
-    
-    /* Pour les selectbox */
-    .stSelectbox [data-baseweb="select"] svg {
-        display: none !important;
-    }
-    
-    /* Remplacer par une flèche custom */
-    .stSelectbox [data-baseweb="select"]::after {
-        content: "▼";
-        position: absolute;
-        right: 10px;
-        color: #FFAA00;
-        pointer-events: none;
+    /* Si ça ne marche toujours pas, forcer avec visibility */
+    [data-testid="stExpanderToggleIcon"] {
+        visibility: hidden !important;
+        width: 0 !important;
+        height: 0 !important;
     }
 </style>
 """, unsafe_allow_html=True)
