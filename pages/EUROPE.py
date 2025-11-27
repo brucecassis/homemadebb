@@ -681,10 +681,13 @@ def render_country_tab(country_key, config):
     # Key Indicators
     st.markdown(f"#### 📊 KEY {config['name'].upper()} INDICATORS (DEMO)")
     
-    cols = st.columns(4)
-    for idx, (label, (value, delta, caption)) in enumerate(config['indicators'].items()):
-        with cols[idx]:
-            st.metric(label.upper().replace('_', ' '), value, delta, help=caption)
+    if 'indicators' in config and config['indicators']:
+        cols = st.columns(min(4, len(config['indicators'])))
+        for idx, (label, (value, delta, caption)) in enumerate(config['indicators'].items()):
+            with cols[idx % 4]:
+                st.metric(label.upper().replace('_', ' '), value, delta, help=caption)
+    else:
+        st.info("Indicators data not available for this country")
     
     st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
     
@@ -726,34 +729,36 @@ def render_country_tab(country_key, config):
     """, unsafe_allow_html=True)
     
     # Sectoral Data
-    st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-    st.markdown(f"#### 🏭 {config['name'].upper()} SECTORAL INDICATORS")
-    
-    sector_df = pd.DataFrame(config['sectors']).T.reset_index()
-    sector_df.columns = ['Sector'] + list(config['sectors'][list(config['sectors'].keys())[0]].keys())
-    st.dataframe(sector_df, use_container_width=True, hide_index=True)
+    if 'sectors' in config:
+        st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+        st.markdown(f"#### 🏭 {config['name'].upper()} SECTORAL INDICATORS")
+        
+        sector_df = pd.DataFrame(config['sectors']).T.reset_index()
+        sector_df.columns = ['Sector'] + list(config['sectors'][list(config['sectors'].keys())[0]].keys())
+        st.dataframe(sector_df, use_container_width=True, hide_index=True)
     
     # Market Data
-    st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
-    st.markdown(f"#### 📈 {config['name'].upper()} MARKET INDICATORS")
-    
-    col_m1, col_m2 = st.columns(2)
-    
-    with col_m1:
-        st.metric(
-            config['stock_index']['name'], 
-            config['stock_index']['value'], 
-            config['stock_index']['change']
-        )
-        st.caption(f"Stock Index (Symbol: {config['stock_index']['symbol']})")
-    
-    with col_m2:
-        st.metric(
-            config['bond_10y']['name'], 
-            config['bond_10y']['value'], 
-            config['bond_10y']['change']
-        )
-        st.caption("Government Bond 10-Year Yield")
+    if 'stock_index' in config and 'bond_10y' in config:
+        st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+        st.markdown(f"#### 📈 {config['name'].upper()} MARKET INDICATORS")
+        
+        col_m1, col_m2 = st.columns(2)
+        
+        with col_m1:
+            st.metric(
+                config['stock_index']['name'], 
+                config['stock_index']['value'], 
+                config['stock_index']['change']
+            )
+            st.caption(f"Stock Index (Symbol: {config['stock_index']['symbol']})")
+        
+        with col_m2:
+            st.metric(
+                config['bond_10y']['name'], 
+                config['bond_10y']['value'], 
+                config['bond_10y']['change']
+            )
+            st.caption("Government Bond 10-Year Yield")
     
     # Special indicators if available
     if 'special_indicators' in config:
