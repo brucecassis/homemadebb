@@ -1,5 +1,5 @@
 # pages/CHATBOT.py
-# Style Bloomberg Terminal - Support complet multimodal
+# Style Bloomberg Terminal - Support complet multimodal avec contexte de conversation
 
 import streamlit as st
 from groq import Groq
@@ -179,9 +179,13 @@ if "groq_client" not in st.session_state:
 
 client = st.session_state.groq_client
 
-# Historique
+# Historique des messages (pour l'affichage)
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
+# NOUVEAU: Historique pour l'API (avec contexte complet)
+if "api_messages" not in st.session_state:
+    st.session_state.api_messages = []
 
 # =============================================
 # FONCTIONS D'EXTRACTION DE TEXTE
@@ -217,6 +221,20 @@ def extract_text_from_excel(file_bytes, filename):
     except Exception as e:
         return f"Erreur lecture Excel : {str(e)}"
 
+def extract_text_from_csv(file_bytes):
+    """Extrait le texte d'un fichier CSV"""
+    try:
+        # Essayer différents encodages
+        for encoding in ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252']:
+            try:
+                df = pd.read_csv(BytesIO(file_bytes), encoding=encoding)
+                return df.to_string()
+            except:
+                continue
+        return "Erreur: Impossible de lire le CSV avec les encodages standards"
+    except Exception as e:
+        return f"Erreur lecture CSV : {str(e)}"
+
 def extract_text_from_txt(file_bytes):
     """Extrait le texte d'un fichier texte"""
     try:
@@ -236,7 +254,7 @@ st.markdown("""
         AI ASSISTANT MULTIMODAL
     </div>
     <div style="color:#FFF;font-size:12px;line-height:1.6;">
-        Analyse d'images, documents (PDF, Word, Excel) et conversations en langage naturel
+        Analyse d'images, documents (PDF, Word, Excel, CSV) et conversations contextuelles
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -258,14 +276,15 @@ col_file, col_clear = st.columns([8, 2])
 with col_file:
     uploaded_file = st.file_uploader(
         "📎 JOINDRE UN FICHIER",
-        type=["png", "jpg", "jpeg", "webp", "pdf", "docx", "doc", "xlsx", "xls", "txt"],
+        type=["png", "jpg", "jpeg", "webp", "pdf", "docx", "doc", "xlsx", "xls", "csv", "txt"],
         key="file_upload",
-        help="Images, PDF, Word, Excel, TXT supportés"
+        help="Images, PDF, Word, Excel, CSV, TXT supportés"
     )
 
 with col_clear:
     if st.button("🗑️ EFFACER", type="secondary", use_container_width=True):
         st.session_state.messages = []
+        st.session_state.api_messages = []  # NOUVEAU: Effacer aussi l'historique API
         st.rerun()
 
 # Input de chat
@@ -309,6 +328,11 @@ if prompt or uploaded_file:
             extracted_text = extract_text_from_excel(file_bytes, filename)
             user_content[0]["text"] = f"{user_text}\n\n[Contenu Excel]\n{extracted_text[:8000]}"
 
+        # CSV (NOUVEAU)
+        elif filename.endswith('.csv'):
+            extracted_text = extract_text_from_csv(file_bytes)
+            user_content[0]["text"] = f"{user_text}\n\n[Contenu CSV]\n{extracted_text[:8000]}"
+
         # TXT
         elif filename.endswith('.txt'):
             extracted_text = extract_text_from_txt(file_bytes)
@@ -323,11 +347,17 @@ if prompt or uploaded_file:
             else:
                 st.info(f"📄 Document joint : {uploaded_file.name}")
 
-    # Ajout à l'historique
+    # Ajout à l'historique d'affichage
     st.session_state.messages.append({
         "role": "user",
         "content": user_text,
         "image": image_display
+    })
+
+    # NOUVEAU: Ajout à l'historique API
+    st.session_state.api_messages.append({
+        "role": "user",
+        "content": user_content
     })
 
     # Réponse Groq
@@ -338,12 +368,16 @@ if prompt or uploaded_file:
                 # Choix du modèle selon le type de contenu
                 if use_vision:
                     model_name = "meta-llama/llama-4-scout-17b-16e-instruct"
+                    # Pour vision, on envoie seulement le message actuel (limitation du modèle)
+                    messages_to_send = [{"role": "user", "content": user_content}]
                 else:
                     model_name = "llama-3.3-70b-versatile"
+                    # NOUVEAU: Pour les modèles texte, on envoie tout l'historique
+                    messages_to_send = st.session_state.api_messages
 
                 response = client.chat.completions.create(
                     model=model_name,
-                    messages=[{"role": "user", "content": user_content}],
+                    messages=messages_to_send,
                     temperature=0.7,
                     max_tokens=2000
                 )
@@ -353,8 +387,14 @@ if prompt or uploaded_file:
                 answer = f"❌ ERREUR GROQ : {str(e)}"
                 st.error(answer)
 
-    # Sauvegarde réponse
+    # Sauvegarde réponse dans l'historique d'affichage
     st.session_state.messages.append({
+        "role": "assistant",
+        "content": answer
+    })
+
+    # NOUVEAU: Sauvegarde réponse dans l'historique API
+    st.session_state.api_messages.append({
         "role": "assistant",
         "content": answer
     })
@@ -365,9 +405,9 @@ if prompt or uploaded_file:
 st.markdown("""
 <div style="margin-top:40px;padding-top:20px;border-top:1px solid #333;">
     <div style="color:#666;font-size:11px;text-align:center;line-height:1.6;">
-        <div>BLOOMBERG ENS® v4.0 - Système IA opérationnel</div>
+        <div>BLOOMBERG ENS® v4.1 - Système IA opérationnel avec contexte conversationnel</div>
         <div>Groq API • Llama 4 Scout Vision + Llama 3.3 70B</div>
-        <div>Analyse images, PDF, Word, Excel, TXT • Réponses < 1s</div>
+        <div>Analyse images, PDF, Word, Excel, CSV, TXT • Réponses < 1s</div>
         <div>Données de marché disponibles • Connexion établie - Paris, France</div>
     </div>
 </div>
