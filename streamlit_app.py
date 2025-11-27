@@ -9,10 +9,10 @@ import requests
 # =============================================
 # AUTO-REFRESH TOUTES LES 3 SECONDES
 # =============================================
-from streamlit_autorefresh import st_autorefresh
+#from streamlit_autorefresh import st_autorefresh
 
 #Rafraîchissement automatique toutes les 3000ms (3 secondes)
-count = st_autorefresh(interval=3000, limit=None, key="market_refresh")
+#count = st_autorefresh(interval=3000, limit=None, key="market_refresh")
 
 # =============================================
 # PAGE CONFIG
