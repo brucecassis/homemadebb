@@ -558,7 +558,7 @@ Rules:
             system_prompt += f"\n\nContext - Current variables available:\n{context}"
         
         response = st.session_state.groq_client.chat.completions.create(
-            model="mixtral-8x7b-32768",  # ou "llama3-70b-8192"
+            model="llama3-70b-8192",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
