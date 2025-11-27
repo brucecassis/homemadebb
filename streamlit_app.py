@@ -127,6 +127,36 @@ st.markdown("""
         margin: 10px 0;
         border-left: 4px solid #FFAA00;
     }
+
+     /* CACHER LE TEXTE "keyboard_double_arrow_right" */
+    [data-testid="stExpander"] details summary::before {
+        content: "▼ " !important;
+        font-size: 14px;
+    }
+    
+    [data-testid="stExpander"] details[open] summary::before {
+        content: "▲ " !important;
+        font-size: 14px;
+    }
+    
+    /* Alternative: Cacher complètement l'icône */
+    [data-testid="stExpander"] svg {
+        display: none !important;
+    }
+    
+    /* Pour les selectbox */
+    .stSelectbox [data-baseweb="select"] svg {
+        display: none !important;
+    }
+    
+    /* Remplacer par une flèche custom */
+    .stSelectbox [data-baseweb="select"]::after {
+        content: "▼";
+        position: absolute;
+        right: 10px;
+        color: #FFAA00;
+        pointer-events: none;
+    }
 </style>
 """, unsafe_allow_html=True)
 
