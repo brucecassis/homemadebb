@@ -370,31 +370,40 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # =============================================
-# CONFIGURATION SUPABASE
+# CONFIGURATION SUPABASE (AUTO depuis secrets)
 # =============================================
 st.markdown('<p style="color:#FFAA00;font-weight:bold;font-size:14px;border-bottom:2px solid #333;padding:10px 0;">🔧 SUPABASE CONFIGURATION</p>', unsafe_allow_html=True)
 
-col_config1, col_config2 = st.columns(2)
+# Récupérer les credentials depuis les secrets Streamlit
+try:
+    supabase_url = st.secrets["SUPABASE_URL"]
+    supabase_key = st.secrets["SUPABASE_KEY"]
+    credentials_found = True
+except Exception as e:
+    supabase_url = None
+    supabase_key = None
+    credentials_found = False
+    st.error("❌ Credentials Supabase non trouvés dans les secrets Streamlit")
 
-with col_config1:
-    st.markdown('<p style="color:#FFAA00;font-size:11px;font-weight:bold;margin-bottom:5px;">SUPABASE URL</p>', unsafe_allow_html=True)
-    supabase_url = st.text_input(
-        "SUPABASE URL",
-        placeholder="https://xxxxxxxxxxxxx.supabase.co",
-        type="default",
-        help="Votre URL de projet Supabase",
-        label_visibility="collapsed"
-    )
-
-with col_config2:
-    st.markdown('<p style="color:#FFAA00;font-size:11px;font-weight:bold;margin-bottom:5px;">SUPABASE ANON KEY</p>', unsafe_allow_html=True)
-    supabase_key = st.text_input(
-        "SUPABASE ANON KEY",
-        placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-        type="password",
-        help="Votre clé API Supabase (anon/public)",
-        label_visibility="collapsed"
-    )
+# Afficher les infos de connexion (masquées)
+if credentials_found:
+    col_info1, col_info2 = st.columns(2)
+    
+    with col_info1:
+        st.markdown(f"""
+        <div style="background:#111;border:1px solid #333;padding:10px;margin:5px 0;">
+            <p style="color:#666;font-size:10px;margin:0;">SUPABASE URL:</p>
+            <p style="color:#00FF00;font-size:11px;margin:5px 0;">{supabase_url[:30]}...</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_info2:
+        st.markdown(f"""
+        <div style="background:#111;border:1px solid #333;padding:10px;margin:5px 0;">
+            <p style="color:#666;font-size:10px;margin:0;">SUPABASE KEY:</p>
+            <p style="color:#00FF00;font-size:11px;margin:5px 0;">{'*' * 40}</p>
+        </div>
+        """, unsafe_allow_html=True)
 
 # Initialiser la session state pour stocker la connexion
 if 'supabase_client' not in st.session_state:
@@ -404,25 +413,38 @@ if 'connected' not in st.session_state:
 if 'query_history' not in st.session_state:
     st.session_state.query_history = []
 
-# Bouton de connexion
+# Connexion automatique au chargement de la page
+if credentials_found and not st.session_state.connected:
+    try:
+        # Import et connexion Supabase
+        from supabase import create_client
+        st.session_state.supabase_client = create_client(supabase_url, supabase_key)
+        st.session_state.connected = True
+    except ImportError:
+        st.warning("⚠️ Package 'supabase' non installé. Exécutez: pip install supabase")
+        # Mode démo sans vraie connexion
+        st.session_state.connected = True
+    except Exception as e:
+        st.error(f"❌ ERREUR DE CONNEXION AUTO: {str(e)}")
+
+# Boutons de contrôle
 col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 4])
 
 with col_btn1:
-    if st.button("🔌 CONNECT", key="connect_btn"):
-        if supabase_url and supabase_key:
+    if st.button("🔄 RECONNECT", key="reconnect_btn"):
+        if credentials_found:
             try:
-                # Décommenter quand supabase est installé:
-                # from supabase import create_client
-                # st.session_state.supabase_client = create_client(supabase_url, supabase_key)
-                # st.session_state.connected = True
-                
-                # Pour la démo (sans vrai client Supabase):
+                from supabase import create_client
+                st.session_state.supabase_client = create_client(supabase_url, supabase_key)
                 st.session_state.connected = True
-                st.success("✅ CONNEXION ÉTABLIE")
+                st.success("✅ RECONNEXION ÉTABLIE")
+            except ImportError:
+                st.warning("⚠️ Package 'supabase' non installé. Exécutez: pip install supabase")
+                st.session_state.connected = True
             except Exception as e:
                 st.error(f"❌ ERREUR DE CONNEXION: {str(e)}")
         else:
-            st.warning("⚠️ Veuillez remplir tous les champs")
+            st.warning("⚠️ Credentials manquants dans les secrets")
 
 with col_btn2:
     if st.button("🔌 DISCONNECT", key="disconnect_btn"):
@@ -436,7 +458,7 @@ status_text = "CONNECTED" if st.session_state.connected else "DISCONNECTED"
 
 st.markdown(f"""
 <div style="background:#111;border:2px solid {status_color};padding:10px;margin:15px 0;text-align:center;color:{status_color};font-weight:bold;">
-    STATUS: {status_text}
+    STATUS: {status_text} • AUTO-CONFIGURED FROM SECRETS
 </div>
 """, unsafe_allow_html=True)
 
@@ -524,77 +546,104 @@ UPDATE products SET price = 99.99 WHERE id = 1;""",
                         import time
                         start_time = time.time()
                         
-                        # EXEMPLE DE DONNÉES SIMULÉES
-                        # Dans la vraie version, utiliser:
-                        # result = st.session_state.supabase_client.rpc('execute_sql', {'query': sql_query})
-                        
-                        # Données fictives pour démo
-                        if 'SELECT' in sql_query.upper():
-                            result_df = pd.DataFrame({
-                                'id': [1, 2, 3, 4, 5],
-                                'name': ['Alice', 'Bob', 'Charlie', 'David', 'Eve'],
-                                'email': ['alice@example.com', 'bob@example.com', 'charlie@example.com', 
-                                         'david@example.com', 'eve@example.com'],
-                                'created_at': pd.date_range('2024-01-01', periods=5, freq='D'),
-                                'status': ['active', 'active', 'inactive', 'active', 'pending']
-                            })
+                        # Exécution de la vraie requête Supabase
+                        if st.session_state.supabase_client:
+                            try:
+                                # Utiliser la fonction RPC de Supabase pour exécuter du SQL brut
+                                # Note: Vous devez créer une fonction dans Supabase pour exécuter du SQL
+                                # Alternativement, utiliser les méthodes ORM de Supabase
+                                
+                                # Pour SELECT simple, essayer de parser et utiliser l'ORM
+                                if 'SELECT' in sql_query.upper() and 'FROM' in sql_query.upper():
+                                    # Extraction basique du nom de table (peut être amélioré)
+                                    import re
+                                    match = re.search(r'FROM\s+(\w+)', sql_query, re.IGNORECASE)
+                                    if match:
+                                        table_name = match.group(1)
+                                        # Requête simple via Supabase
+                                        response = st.session_state.supabase_client.table(table_name).select("*").limit(limit_results).execute()
+                                        result_df = pd.DataFrame(response.data)
+                                    else:
+                                        st.error("❌ Impossible de parser la requête. Utilisez une requête SELECT simple.")
+                                        result_df = None
+                                else:
+                                    st.info("ℹ️ Les requêtes INSERT/UPDATE/DELETE nécessitent une configuration RPC côté Supabase.")
+                                    result_df = pd.DataFrame({'message': ['Requête non supportée en direct. Utilisez le SQL Editor de Supabase.']})
+                            
+                            except Exception as e:
+                                st.error(f"❌ Erreur Supabase: {str(e)}")
+                                result_df = None
                         else:
-                            result_df = pd.DataFrame({'result': ['Query executed successfully']})
+                            # Mode démo - données fictives
+                            if 'SELECT' in sql_query.upper():
+                                result_df = pd.DataFrame({
+                                    'id': [1, 2, 3, 4, 5],
+                                    'name': ['Alice', 'Bob', 'Charlie', 'David', 'Eve'],
+                                    'email': ['alice@example.com', 'bob@example.com', 'charlie@example.com', 
+                                             'david@example.com', 'eve@example.com'],
+                                    'created_at': pd.date_range('2024-01-01', periods=5, freq='D'),
+                                    'status': ['active', 'active', 'inactive', 'active', 'pending']
+                                })
+                            else:
+                                result_df = pd.DataFrame({'result': ['Query executed successfully (DEMO MODE)']})
                         
                         execution_time = time.time() - start_time
                         
-                        # Ajouter à l'historique
-                        st.session_state.query_history.insert(0, {
-                            'query': sql_query,
-                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                            'rows': len(result_df),
-                            'execution_time': f"{execution_time:.3f}s"
-                        })
-                        
-                        st.markdown(f"""
-                        <div class="success-box">
-                            ✅ QUERY EXECUTED SUCCESSFULLY<br>
-                            ROWS RETURNED: {len(result_df)}<br>
-                            EXECUTION TIME: {execution_time:.3f}s
-                        </div>
-                        """, unsafe_allow_html=True)
-                        
-                        # Afficher les résultats
-                        st.markdown('<p style="color:#FFAA00;font-weight:bold;font-size:14px;border-bottom:2px solid #333;padding:10px 0;">📊 QUERY RESULTS</p>', unsafe_allow_html=True)
-                        st.dataframe(
-                            result_df.head(limit_results),
-                            use_container_width=True,
-                            height=400
-                        )
-                        
-                        # Options d'export
-                        st.markdown('<p style="color:#FFAA00;font-weight:bold;font-size:14px;border-bottom:2px solid #333;padding:10px 0;margin-top:20px;">💾 EXPORT OPTIONS</p>', unsafe_allow_html=True)
-                        col_exp1, col_exp2, col_exp3 = st.columns(3)
-                        
-                        with col_exp1:
-                            csv = result_df.to_csv(index=False)
-                            st.download_button(
-                                "⬇️ DOWNLOAD CSV",
-                                csv,
-                                "query_results.csv",
-                                "text/csv"
+                        if result_df is not None and len(result_df) > 0:
+                            # Ajouter à l'historique
+                            st.session_state.query_history.insert(0, {
+                                'query': sql_query,
+                                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                'rows': len(result_df),
+                                'execution_time': f"{execution_time:.3f}s"
+                            })
+                            
+                            st.markdown(f"""
+                            <div class="success-box">
+                                ✅ QUERY EXECUTED SUCCESSFULLY<br>
+                                ROWS RETURNED: {len(result_df)}<br>
+                                EXECUTION TIME: {execution_time:.3f}s
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Afficher les résultats
+                            st.markdown('<p style="color:#FFAA00;font-weight:bold;font-size:14px;border-bottom:2px solid #333;padding:10px 0;">📊 QUERY RESULTS</p>', unsafe_allow_html=True)
+                            st.dataframe(
+                                result_df.head(limit_results),
+                                use_container_width=True,
+                                height=400
                             )
-                        
-                        with col_exp2:
-                            json_str = result_df.to_json(orient='records', indent=2)
-                            st.download_button(
-                                "⬇️ DOWNLOAD JSON",
-                                json_str,
-                                "query_results.json",
-                                "application/json"
-                            )
-                        
-                        with col_exp3:
-                            excel_buffer = pd.ExcelWriter('temp.xlsx', engine='xlsxwriter')
-                            result_df.to_excel(excel_buffer, index=False, sheet_name='Results')
-                            excel_buffer.close()
-                            # Note: Pour un vrai téléchargement Excel, il faudrait gérer le buffer correctement
-                            st.button("⬇️ DOWNLOAD EXCEL (coming soon)")
+                            
+                            # Options d'export
+                            st.markdown('<p style="color:#FFAA00;font-weight:bold;font-size:14px;border-bottom:2px solid #333;padding:10px 0;margin-top:20px;">💾 EXPORT OPTIONS</p>', unsafe_allow_html=True)
+                            col_exp1, col_exp2, col_exp3 = st.columns(3)
+                            
+                            with col_exp1:
+                                csv = result_df.to_csv(index=False)
+                                st.download_button(
+                                    "⬇️ DOWNLOAD CSV",
+                                    csv,
+                                    "query_results.csv",
+                                    "text/csv"
+                                )
+                            
+                            with col_exp2:
+                                json_str = result_df.to_json(orient='records', indent=2)
+                                st.download_button(
+                                    "⬇️ DOWNLOAD JSON",
+                                    json_str,
+                                    "query_results.json",
+                                    "application/json"
+                                )
+                            
+                            with col_exp3:
+                                excel_buffer = pd.ExcelWriter('temp.xlsx', engine='xlsxwriter')
+                                result_df.to_excel(excel_buffer, index=False, sheet_name='Results')
+                                excel_buffer.close()
+                                # Note: Pour un vrai téléchargement Excel, il faudrait gérer le buffer correctement
+                                st.button("⬇️ DOWNLOAD EXCEL (coming soon)")
+                        else:
+                            st.warning("⚠️ Aucun résultat retourné")
                         
                     except Exception as e:
                         st.markdown(f"""
@@ -703,15 +752,24 @@ FROM transactions;"""
 else:
     st.markdown("""
     <div class="info-box">
-        ⚠️ VEUILLEZ VOUS CONNECTER À SUPABASE<br><br>
+        ⚠️ CONNEXION SUPABASE NON DISPONIBLE<br><br>
         
-        <b>INSTRUCTIONS:</b><br>
-        1. Entrez votre URL Supabase (Project Settings → API → Project URL)<br>
-        2. Entrez votre clé API Supabase (Project Settings → API → anon/public key)<br>
-        3. Cliquez sur CONNECT<br><br>
+        <b>VÉRIFIEZ VOS SECRETS STREAMLIT:</b><br>
+        1. Allez dans Settings → Secrets de votre app Streamlit<br>
+        2. Ajoutez les secrets suivants:<br><br>
+        
+        <code style="color:#00FF00;">
+        SUPABASE_URL = "https://xxxxxxxxxxxxx.supabase.co"<br>
+        SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        </code><br><br>
+        
+        <b>OÙ TROUVER VOS CREDENTIALS ?</b><br>
+        - Allez sur votre projet Supabase: https://app.supabase.com<br>
+        - Project Settings → API<br>
+        - Copiez: Project URL et anon/public key<br><br>
         
         <b>INSTALLATION REQUISE:</b><br>
-        <code>pip install supabase</code>
+        <code style="color:#00FF00;">pip install supabase</code>
     </div>
     """, unsafe_allow_html=True)
 
@@ -726,13 +784,29 @@ with st.expander("📖 DOCUMENTATION & HELP"):
     
     <p style="color:#00FFFF;font-weight:bold;font-size:13px;margin-top:10px;">🔧 Configuration Supabase</p>
     
+    **Configuration automatique via Streamlit Secrets**
+    
+    Cette page récupère automatiquement vos credentials Supabase depuis les Secrets Streamlit.
+    
+    **Comment configurer les secrets ?**
+    1. Allez dans votre app Streamlit Cloud
+    2. Settings → Secrets
+    3. Ajoutez:
+    ```toml
+    SUPABASE_URL = "https://xxxxxxxxxxxxx.supabase.co"
+    SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    ```
+    
+    **Pour le développement local:**
+    Créez un fichier `.streamlit/secrets.toml` à la racine de votre projet avec les mêmes clés.
+    
     **Où trouver vos credentials ?**
     1. Allez sur votre projet Supabase: https://app.supabase.com
     2. Project Settings → API
     3. Copiez:
-       - Project URL
-       - anon/public key (pour les requêtes publiques)
-       - service_role key (pour les opérations admin - attention, ne jamais exposer en frontend!)
+       - Project URL → SUPABASE_URL
+       - anon/public key → SUPABASE_KEY
+       - ⚠️ Ne jamais utiliser la service_role key côté client!
     
     <p style="color:#00FFFF;font-weight:bold;font-size:13px;margin-top:20px;">📝 Sécurité</p>
     
