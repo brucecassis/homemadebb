@@ -62,6 +62,32 @@ st.markdown("""
         color: #FFAA00;
         font-size: 12px;
     }
+
+        /* STABILISER LA PAGE - Empêcher les sauts */
+    .main .block-container {
+        min-height: 100vh !important;
+    }
+    
+    /* Fixer la hauteur des metrics pour éviter les sauts */
+    [data-testid="stMetric"] {
+        min-height: 80px !important;
+    }
+    
+    /* Stabiliser les graphiques */
+    .js-plotly-plot {
+        min-height: 500px !important;
+    }
+    
+    /* Empêcher le scroll auto pendant le refresh */
+    html {
+        scroll-behavior: auto !important;
+    }
+    
+    /* Skeleton loading - Préserver l'espace pendant le chargement */
+    .element-container {
+        min-height: fit-content;
+    }
+
     
     .main {
         background-color: #000000 !important;
