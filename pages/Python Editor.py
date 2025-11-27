@@ -299,20 +299,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =============================================
-# HEADER
-# =============================================
-current_time = datetime.now().strftime("%H:%M:%S")
-ai_status = "🤖 AI: ON" if st.session_state.groq_client else "🤖 AI: OFF"
-st.markdown(f"""
-<div style="background:#FFAA00;padding:8px 20px;color:#000;font-weight:bold;font-size:14px;border-bottom:2px solid #FFAA00;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
-    <div style="display:flex;align-items:center;gap:15px;">
-        <div>⬛ BLOOMBERG ENS® TERMINAL - ADVANCED PYTHON IDE</div>
-    </div>
-    <div>{current_time} UTC • PYTHON {sys.version.split()[0]} • {ai_status}</div>
-</div>
-""", unsafe_allow_html=True)
-
-# =============================================
 # SESSION STATE INITIALIZATION
 # =============================================
 if 'cells' not in st.session_state:
@@ -345,6 +331,20 @@ if 'groq_client' not in st.session_state:
                 st.session_state.groq_client = Groq(api_key=groq_api_key)
         except:
             pass
+
+# =============================================
+# HEADER
+# =============================================
+current_time = datetime.now().strftime("%H:%M:%S")
+ai_status = "🤖 AI: ON" if st.session_state.groq_client else "🤖 AI: OFF"
+st.markdown(f"""
+<div style="background:#FFAA00;padding:8px 20px;color:#000;font-weight:bold;font-size:14px;border-bottom:2px solid #FFAA00;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+    <div style="display:flex;align-items:center;gap:15px;">
+        <div>⬛ BLOOMBERG ENS® TERMINAL - ADVANCED PYTHON IDE</div>
+    </div>
+    <div>{current_time} UTC • PYTHON {sys.version.split()[0]} • {ai_status}</div>
+</div>
+""", unsafe_allow_html=True)
 
 # =============================================
 # UTILITY FUNCTIONS
