@@ -5,7 +5,7 @@ import json
 
 # Décommenter et installer si nécessaire:
 # pip install supabase
-# from supabase import create_client, Client
+from supabase import create_client, Client
 
 # =============================================
 # PAGE CONFIG
