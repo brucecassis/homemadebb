@@ -470,11 +470,14 @@ if df is not None:
             'title': f'{selected_display} - H4 Candlestick Chart',
             'ylabel': 'Price ($)',
             'volume': show_volume,
-            'ylabel_lower': 'Volume' if show_volume else None,
             'figsize': (16, 10) if show_volume else (16, 8),
             'returnfig': True,
             'warn_too_much_data': 10000
         }
+        
+        # N'ajouter ylabel_lower que si le volume est affiché
+        if show_volume:
+            kwargs['ylabel_lower'] = 'Volume'
         
         # N'ajouter addplot que s'il y a des indicateurs
         if apds:
