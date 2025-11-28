@@ -173,52 +173,50 @@ st.markdown(f"""
 
 @st.cache_data(ttl=3600)
 def get_available_stocks():
-    """Récupère la liste des actions disponibles (basé sur vos fichiers CSV)"""
-    # Liste complète des actions disponibles dans votre base Supabase
-    stocks = [
-        'A', 'AAL', 'AAPL', 'ABBV', 'ABNB', 'ABT', 'ACGL', 'ACN', 'ADBE', 'ADI', 
-        'ADM', 'ADP', 'ADSK', 'AEE', 'AEP', 'AES', 'AFL', 'AIG', 'AIZ', 'AJG', 
-        'AKAM', 'ALB', 'ALGN', 'ALL', 'ALLE', 'AMAT', 'AMCR', 'AMD', 'AME', 'AMGN', 
-        'AMP', 'AMT', 'AMZN', 'ANET', 'AON', 'AOS', 'APA', 'APD', 'APH', 'APTV', 
-        'ARE', 'ATO', 'AVB', 'AVGO', 'AVY', 'AWK', 'AXON', 'AXP', 'AZO', 'BA', 
-        'BAC', 'BALL', 'BAX', 'BBWI', 'BBY', 'BDX', 'BEN', 'BF_B', 'BG', 'BIIB', 
-        'BIO', 'BK', 'BKNG', 'BKR', 'BLK', 'BMY', 'BR', 'BRK_B', 'BRO', 'BSX', 
-        'BWA', 'BX', 'BXP', 'C', 'CAG', 'CAH', 'CARR', 'CAT', 'CB', 'CBOE', 
-        'CBRE', 'CCI', 'CCL', 'CDNS', 'CDW', 'CE', 'CEG', 'CF', 'CFG', 'CHD', 
-        'CHRW', 'CHTR', 'CI', 'CINF', 'CL', 'CLX', 'CMA', 'CMCSA', 'CME', 'CMG', 
-        'CMI', 'CMS', 'CNC', 'CNP', 'COF', 'COO', 'COP', 'COR', 'COST', 'CPB', 
-        'CPRT', 'CPT', 'CRL', 'CRM', 'CSCO', 'CSGP', 'CSX', 'CVS', 'CVX', 'D', 
-        'DAL', 'DAN', 'DAR', 'DD', 'DE', 'DG', 'DGX', 'DHI', 'DIS', 'DLR', 
-        'DLTR', 'DOV', 'DOW', 'DPZ', 'DTE', 'DUK', 'DVA', 'DVN', 'DXCM', 'EA', 
-        'EBAY', 'ECL', 'EFX', 'EG', 'EIX', 'EL', 'ELV', 'EMN', 'EMR', 'ENPH', 
-        'EOG', 'EPAM', 'EQIX', 'EQR', 'EQT', 'ES', 'ESS', 'ETN', 'ETR', 'ETSY', 
-        'EVRG', 'EW', 'EXC', 'EXPD', 'EXPE', 'EXR', 'F', 'FANG', 'FAST', 'FCX', 
-        'FDS', 'FDX', 'FE', 'FFIV', 'FICO', 'FIS', 'FITB', 'FMC', 'FOX', 'FOXA', 
-        'FRT', 'FSLR', 'FTNT', 'FTV', 'GD', 'GE', 'GEHC', 'GEN', 'GEV', 'GILD', 
-        'GIS', 'GL', 'GM', 'GNRC', 'GPC', 'GPN', 'GRMN', 'GS', 'GWW', 'HAL', 
-        'HAS', 'HBAN', 'HCA', 'HD', 'HIG', 'HII', 'HLT', 'HOLX', 'HON', 'HPE', 
-        'HPQ', 'HRL', 'HSIC', 'HST', 'HSY', 'HUBB', 'HUM', 'HWM', 'IBM', 'ICE', 
-        'IDXX', 'IEX', 'IFF', 'ILMN', 'INCY', 'INTC', 'INTU', 'INVH', 'IP', 'IPG', 
-        'IQV', 'IR', 'IRM', 'ISRG', 'IT', 'ITW', 'IVZ', 'J', 'JBHT', 'JBL', 
-        'JCI', 'JKHY', 'JNJ', 'JPM', 'K', 'KDP', 'KEY', 'KEYS', 'KHC', 'KIM', 
-        'KLAC', 'KMB', 'KMI', 'KO', 'KR', 'KVUE', 'L', 'LDOS', 'LEN', 'LH', 
-        'LHX', 'LIN', 'LKQ', 'LLY', 'LMT', 'LOW', 'LRCX', 'LULU', 'LUV', 'LVS', 
-        'LW', 'LYB', 'LYV', 'MA', 'MAA', 'MAR', 'MAS', 'MCD', 'MCHP', 'MCK', 
-        'MCO', 'MDLZ', 'MDT', 'MET', 'META', 'MGM', 'MHK', 'MKC', 'MKTX', 'MLM', 
-        'MMC', 'MNST', 'MOH', 'MOS', 'MPC', 'MPWR', 'MRK', 'MRNA', 'MS', 'MSCI', 
-        'MSFT', 'MSI', 'MTB', 'MTCH', 'MTD', 'MU', 'NCLH', 'NDAQ', 'NDSN', 'NEE', 
-        'NEM', 'NFLX', 'NI', 'NKE', 'NOC', 'NRG', 'NSC', 'NTAP', 'NTRS', 'NUE', 
-        'NVDA', 'NVR', 'NWS', 'NWSA', 'NXPI', 'O', 'ODFL', 'OGN', 'OKE', 'OMC', 
-        'ON', 'ORCL', 'ORLY', 'OTIS', 'OXY', 'PANW', 'PAYC', 'PAYX', 'PCAR', 'PCG', 
-        'PEG', 'PEP', 'PFE', 'PFG', 'PG', 'PGR', 'PH', 'PHM', 'PKG', 'PLD', 
-        'PM', 'PNC', 'PNR', 'PNW', 'POOL', 'PPG', 'PPL', 'PRU', 'PSA', 'PSX', 
-        'PTC', 'PWR', 'PYPL', 'QCOM', 'QQQ', 'QRVO', 'RCL', 'REG', 'REGN', 'RF', 
-        'RHI', 'RJF', 'RL', 'RMD', 'ROK', 'ROL', 'ROP', 'ROST', 'RSG', 'RTX', 
-        'RVTY', 'SBAC', 'SBUX', 'SEDG', 'SEE', 'SHW', 'SJM', 'SLB', 'SNA', 'SNPS', 
-        'SO', 'SPG', 'SPGI', 'SRE', 'VIXM'
-    ]
+    """
+    Récupère la liste des tables disponibles depuis Supabase.
     
-    return sorted(stocks)
+    IMPORTANT: Cette fonction doit être adaptée selon votre base de données.
+    Actuellement, elle liste manuellement les tables. 
+    
+    Pour obtenir automatiquement les tables, vous devrez :
+    1. Créer une fonction RPC dans Supabase
+    2. Ou utiliser l'interface Supabase pour lister vos tables et les copier ici
+    """
+    try:
+        # MÉTHODE 1 : Liste manuelle (à remplacer par VOS VRAIES tables)
+        # Allez dans votre dashboard Supabase > Table Editor et listez toutes vos tables _h4_data
+        
+        known_tables = [
+            'aapl_h4_data',
+            'msft_h4_data',
+            'googl_h4_data',
+            'amzn_h4_data',
+            'nvda_h4_data',
+            'meta_h4_data',
+            'tsla_h4_data',
+            'goog_h4_data',
+            'nflx_h4_data',
+            'dis_h4_data'
+            # AJOUTEZ ICI TOUTES VOS TABLES !
+        ]
+        
+        # Extraire les tickers (partie avant _h4_data)
+        stocks = []
+        for table in known_tables:
+            if table.endswith('_h4_data'):
+                ticker = table.replace('_h4_data', '').upper()
+                stocks.append(ticker)
+        
+        if not stocks:
+            st.error("❌ Aucune table trouvée. Veuillez mettre à jour la liste dans get_available_stocks()")
+            return []
+        
+        return sorted(stocks)
+        
+    except Exception as e:
+        st.error(f"❌ Erreur lors de la récupération des tables: {str(e)}")
+        return []
 
 @st.cache_data(ttl=300)
 def get_stock_data(ticker, start_date, end_date):
@@ -230,6 +228,13 @@ def get_stock_data(ticker, start_date, end_date):
         start_str = start_date.strftime('%Y-%m-%d')
         end_str = end_date.strftime('%Y-%m-%d')
         
+        # Vérifier que la table existe en faisant une petite requête test
+        test_response = supabase.table(table_name).select("date").limit(1).execute()
+        
+        if not test_response.data:
+            st.warning(f"⚠️ La table {table_name} existe mais semble vide")
+            return None
+        
         # Requête Supabase
         response = supabase.table(table_name)\
             .select("date, open, high, low, close, volume")\
@@ -238,15 +243,19 @@ def get_stock_data(ticker, start_date, end_date):
             .order('date', desc=False)\
             .execute()
         
-        if response.data:
+        if response.data and len(response.data) > 0:
             df = pd.DataFrame(response.data)
             df['date'] = pd.to_datetime(df['date'])
             df = df.set_index('date')
+            
+            st.success(f"✅ {ticker}: {len(df)} lignes chargées")
             return df
         else:
+            st.warning(f"⚠️ Aucune donnée pour {ticker} entre {start_str} et {end_str}")
             return None
+            
     except Exception as e:
-        st.error(f"Erreur pour {ticker}: {str(e)}")
+        st.error(f"❌ Erreur pour {ticker} (table: {table_name}): {str(e)}")
         return None
 
 def calculate_portfolio_metrics(portfolio_df, weights):
@@ -290,12 +299,29 @@ def calculate_portfolio_metrics(portfolio_df, weights):
 
 st.markdown("### 💼 PORTFOLIO CONFIGURATION")
 
+# TEST DE CONNEXION SUPABASE
+with st.expander("🔍 VÉRIFIER LA CONNEXION SUPABASE"):
+    if st.button("Tester la connexion"):
+        try:
+            # Test simple : essayer de lire une table
+            test = supabase.table("aapl_h4_data").select("date").limit(1).execute()
+            if test.data:
+                st.success("✅ Connexion Supabase OK!")
+                st.json(test.data[0])
+            else:
+                st.error("❌ Connexion OK mais table aapl_h4_data vide ou inexistante")
+        except Exception as e:
+            st.error(f"❌ Erreur de connexion: {str(e)}")
+
 # Récupérer la liste des actions disponibles
 available_stocks = get_available_stocks()
 
 if not available_stocks:
-    st.error("❌ Aucune action disponible dans la base de données")
+    st.error("❌ Aucune action disponible. Veuillez mettre à jour la fonction get_available_stocks() avec vos vraies tables.")
+    st.info("💡 Allez dans votre Dashboard Supabase > Table Editor et notez tous les noms de tables qui se terminent par '_h4_data'")
     st.stop()
+
+st.success(f"✅ {len(available_stocks)} actions disponibles dans la base de données")
 
 # ===== SÉLECTION DES ACTIONS =====
 st.markdown("#### 📊 SELECT STOCKS")
@@ -303,10 +329,13 @@ st.markdown("#### 📊 SELECT STOCKS")
 col1, col2 = st.columns([3, 1])
 
 with col1:
+    # Sélectionner les 3 premières actions par défaut (ou moins s'il y en a moins)
+    default_selection = available_stocks[:min(3, len(available_stocks))]
+    
     selected_stocks = st.multiselect(
         "Choisissez les actions pour votre portefeuille",
         options=available_stocks,
-        default=['AAPL', 'MSFT', 'GOOGL'] if all(s in available_stocks for s in ['AAPL', 'MSFT', 'GOOGL']) else available_stocks[:3],
+        default=default_selection,
         help="Sélectionnez jusqu'à 20 actions"
     )
 
@@ -347,7 +376,7 @@ with col_date3:
     # Raccourcis de période
     period_preset = st.selectbox(
         "Période prédéfinie",
-        options=['Personnalisée', '1 Mois', '3 Mois', '6 Mois', '1 An', '2 Ans', '5 Ans', 'Max'],
+        options=['Personnalisée', '1 Mois', '3 Mois', '6 Mois', '1 An', '2 Ans', '5 Ans'],
         index=0
     )
     
@@ -365,8 +394,6 @@ with col_date3:
             start_date = (datetime.now() - timedelta(days=730)).date()
         elif period_preset == '5 Ans':
             start_date = (datetime.now() - timedelta(days=1825)).date()
-        elif period_preset == 'Max':
-            start_date = (datetime.now() - timedelta(days=3650)).date()
 
 # Vérifier que start_date < end_date
 if start_date >= end_date:
@@ -381,9 +408,9 @@ st.markdown("#### 💰 PORTFOLIO ALLOCATION")
 # Choix du mode d'allocation
 allocation_mode = st.radio(
     "Mode d'allocation",
-    options=['Équipondéré', 'Personnalisé', 'Value Weighted'],
+    options=['Équipondéré', 'Personnalisé'],
     horizontal=True,
-    help="Équipondéré: poids égaux | Personnalisé: définir manuellement | Value Weighted: pondération par capitalisation"
+    help="Équipondéré: poids égaux | Personnalisé: définir manuellement"
 )
 
 weights = {}
@@ -396,7 +423,7 @@ if allocation_mode == 'Équipondéré':
     
     st.info(f"✅ Allocation équipondérée: {equal_weight:.2f}% par action")
 
-elif allocation_mode == 'Personnalisé':
+else:  # Personnalisé
     # Sliders pour chaque action
     st.markdown("**Définissez le poids de chaque action (en %) :**")
     
@@ -422,16 +449,6 @@ elif allocation_mode == 'Personnalisé':
     else:
         st.success(f"✅ Portefeuille équilibré: {total_weight:.2f}%")
 
-else:  # Value Weighted
-    st.info("🔄 Chargement des capitalisations boursières...")
-    # Pour l'instant, on fait une répartition équipondérée
-    # TODO: Implémenter la récupération de la capitalisation boursière
-    equal_weight = 100.0 / len(selected_stocks)
-    for stock in selected_stocks:
-        weights[stock] = equal_weight
-    
-    st.warning("⚠️ Mode Value Weighted pas encore implémenté. Allocation équipondérée utilisée.")
-
 st.markdown('<hr>', unsafe_allow_html=True)
 
 # ===== BOUTON DE SIMULATION =====
@@ -446,6 +463,7 @@ if st.button("🚀 LANCER LA SIMULATION", use_container_width=True):
     # Charger les données pour chaque action
     portfolio_data = pd.DataFrame()
     weight_array = []
+    successful_stocks = []
     
     for idx, stock in enumerate(selected_stocks):
         status_text.text(f"Chargement de {stock}... ({idx+1}/{len(selected_stocks)})")
@@ -456,15 +474,20 @@ if st.button("🚀 LANCER LA SIMULATION", use_container_width=True):
         if df is not None and len(df) > 0:
             portfolio_data[stock] = df['close']
             weight_array.append(weights[stock] / 100.0)
-        else:
-            st.warning(f"⚠️ Pas de données pour {stock} sur cette période")
+            successful_stocks.append(stock)
     
     progress_bar.empty()
     status_text.empty()
     
     if portfolio_data.empty:
         st.error("❌ Aucune donnée disponible pour les actions sélectionnées sur cette période")
+        st.info("💡 Vérifiez que :")
+        st.info("1. Les tables existent bien dans Supabase")
+        st.info("2. Les données couvrent la période sélectionnée")
+        st.info("3. La colonne 'date' contient des dates dans la plage choisie")
         st.stop()
+    
+    st.success(f"✅ Données chargées pour {len(successful_stocks)} actions")
     
     # Normaliser les poids
     weight_array = np.array(weight_array)
