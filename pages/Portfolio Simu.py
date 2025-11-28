@@ -465,7 +465,6 @@ if df is not None:
         
         # Créer le graphique
         kwargs = {
-            'data': df_filtered,
             'type': 'candle',
             'style': s,
             'title': f'{selected_display} - H4 Candlestick Chart',
@@ -481,7 +480,7 @@ if df is not None:
         if apds:
             kwargs['addplot'] = apds
         
-        fig, axes = mpf.plot(**kwargs)
+        fig, axes = mpf.plot(df_filtered, **kwargs)
         
         # Personnaliser les couleurs des axes
         for ax in axes:
