@@ -188,17 +188,17 @@ def get_available_stocks():
         # Allez dans votre dashboard Supabase > Table Editor et listez toutes vos tables _h4_data
         
         known_tables = [
-            'aapl_h4_data',
-            'msft_h4_data',
-            'googl_h4_data',
-            'amzn_h4_data',
-            'nvda_h4_data',
-            'meta_h4_data',
-            'tsla_h4_data',
-            'goog_h4_data',
-            'nflx_h4_data',
-            'dis_h4_data'
-            # AJOUTEZ ICI TOUTES VOS TABLES !
+            'aapl_h4_data', 'msft_h4_data', 'googl_h4_data', 'goog_h4_data', 'amzn_h4_data',
+            'nvda_h4_data', 'meta_h4_data', 'tsla_h4_data', 'brk_b_h4_data', 'unh_h4_data',
+            'jnj_h4_data', 'jpm_h4_data', 'v_h4_data', 'pg_h4_data', 'xom_h4_data',
+            'hd_h4_data', 'cvx_h4_data', 'ma_h4_data', 'abbv_h4_data', 'pfe_h4_data',
+            'avgo_h4_data', 'cost_h4_data', 'dis_h4_data', 'ko_h4_data', 'adbe_h4_data',
+            'pep_h4_data', 'csco_h4_data', 'tmo_h4_data', 'nflx_h4_data', 'wmt_h4_data',
+            'mcd_h4_data', 'abt_h4_data', 'crm_h4_data', 'lin_h4_data', 'dhp_h4_data',
+            'acn_h4_data', 'nke_h4_data', 'txt_h4_data', 'orcl_h4_data', 'intc_h4_data',
+            'vz_h4_data', 'cmcsa_h4_data', 'mrk_h4_data', 'amd_h4_data', 'qcom_h4_data',
+            'ibm_h4_data', 'ba_h4_data', 'cat_h4_data', 'ge_h4_data', 'spg_h4_data'
+            # AJOUTEZ ICI TOUTES VOS AUTRES TABLES !
         ]
         
         # Extraire les tickers (partie avant _h4_data)
@@ -224,9 +224,9 @@ def get_stock_data(ticker, start_date, end_date):
     try:
         table_name = f"{ticker.lower()}_h4_data"
         
-        # Convertir les dates en string ISO
-        start_str = start_date.strftime('%Y-%m-%d')
-        end_str = end_date.strftime('%Y-%m-%d')
+        # Convertir les dates en timestamps (début à 00:00:00, fin à 23:59:59)
+        start_str = f"{start_date.strftime('%Y-%m-%d')} 00:00:00"
+        end_str = f"{end_date.strftime('%Y-%m-%d')} 23:59:59"
         
         # Vérifier que la table existe en faisant une petite requête test
         test_response = supabase.table(table_name).select("date").limit(1).execute()
@@ -235,7 +235,7 @@ def get_stock_data(ticker, start_date, end_date):
             st.warning(f"⚠️ La table {table_name} existe mais semble vide")
             return None
         
-        # Requête Supabase
+        # Requête Supabase avec timestamps
         response = supabase.table(table_name)\
             .select("date, open, high, low, close, volume")\
             .gte('date', start_str)\
@@ -246,10 +246,22 @@ def get_stock_data(ticker, start_date, end_date):
         if response.data and len(response.data) > 0:
             df = pd.DataFrame(response.data)
             df['date'] = pd.to_datetime(df['date'])
+            
+            # Grouper par jour (prendre la dernière valeur de close de chaque jour)
+            # Car vous avez plusieurs entrées par jour (13:30 et 16:00)
             df = df.set_index('date')
             
-            st.success(f"✅ {ticker}: {len(df)} lignes chargées")
-            return df
+            # Resampler par jour - prendre la dernière valeur close de chaque jour
+            daily_df = pd.DataFrame({
+                'open': df['open'].resample('D').first(),
+                'high': df['high'].resample('D').max(),
+                'low': df['low'].resample('D').min(),
+                'close': df['close'].resample('D').last(),
+                'volume': df['volume'].resample('D').sum()
+            }).dropna()
+            
+            st.success(f"✅ {ticker}: {len(response.data)} lignes chargées → {len(daily_df)} jours")
+            return daily_df
         else:
             st.warning(f"⚠️ Aucune donnée pour {ticker} entre {start_str} et {end_str}")
             return None
