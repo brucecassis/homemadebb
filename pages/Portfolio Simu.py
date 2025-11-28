@@ -22,8 +22,8 @@ supabase = init_supabase()
 # PAGE CONFIG
 # =============================================
 st.set_page_config(
-    page_title="Bloomberg Terminal - Portfolio Simulator",
-    page_icon="💼",
+    page_title="Bloomberg Terminal - Stock Charts",
+    page_icon="📈",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -160,8 +160,8 @@ st.markdown("""
 st.markdown(f"""
 <div style="background:#FFAA00;padding:8px 20px;color:#000;font-weight:bold;font-size:14px;border-bottom:2px solid #FFAA00;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
     <div style="display:flex;align-items:center;gap:15px;">
-        <div>💼 BLOOMBERG ENS® TERMINAL - PORTFOLIO SIMULATOR</div>
-        <a href="/" style="background:#333;color:#FFAA00;border:1px solid #000;padding:4px 12px;font-size:11px;text-decoration:none;">MARKETS</a>
+        <div>📈 BLOOMBERG ENS® TERMINAL - STOCK CHARTS</div>
+        <a href="/" style="background:#333;color:#FFAA00;border:1px solid #000;padding:4px 12px;font-size:11px;text-decoration:none;">PORTFOLIO</a>
     </div>
     <div>{datetime.now().strftime("%H:%M:%S")} UTC</div>
 </div>
@@ -173,50 +173,27 @@ st.markdown(f"""
 
 @st.cache_data(ttl=3600)
 def get_available_stocks():
-    """
-    Récupère la liste des tables disponibles depuis Supabase.
+    """Récupère la liste des actions disponibles"""
+    known_tables = [
+        'aapl_h4_data', 'msft_h4_data', 'googl_h4_data', 'goog_h4_data', 'amzn_h4_data',
+        'nvda_h4_data', 'meta_h4_data', 'tsla_h4_data', 'brk_b_h4_data', 'unh_h4_data',
+        'jnj_h4_data', 'jpm_h4_data', 'v_h4_data', 'pg_h4_data', 'xom_h4_data',
+        'hd_h4_data', 'cvx_h4_data', 'ma_h4_data', 'abbv_h4_data', 'pfe_h4_data',
+        'avgo_h4_data', 'cost_h4_data', 'dis_h4_data', 'ko_h4_data', 'adbe_h4_data',
+        'pep_h4_data', 'csco_h4_data', 'tmo_h4_data', 'nflx_h4_data', 'wmt_h4_data',
+        'mcd_h4_data', 'abt_h4_data', 'crm_h4_data', 'lin_h4_data', 'dhp_h4_data',
+        'acn_h4_data', 'nke_h4_data', 'txt_h4_data', 'orcl_h4_data', 'intc_h4_data',
+        'vz_h4_data', 'cmcsa_h4_data', 'mrk_h4_data', 'amd_h4_data', 'qcom_h4_data',
+        'ibm_h4_data', 'ba_h4_data', 'cat_h4_data', 'ge_h4_data', 'spg_h4_data'
+    ]
     
-    IMPORTANT: Cette fonction doit être adaptée selon votre base de données.
-    Actuellement, elle liste manuellement les tables. 
+    stocks = []
+    for table in known_tables:
+        if table.endswith('_h4_data'):
+            ticker = table.replace('_h4_data', '').upper()
+            stocks.append(ticker)
     
-    Pour obtenir automatiquement les tables, vous devrez :
-    1. Créer une fonction RPC dans Supabase
-    2. Ou utiliser l'interface Supabase pour lister vos tables et les copier ici
-    """
-    try:
-        # MÉTHODE 1 : Liste manuelle (à remplacer par VOS VRAIES tables)
-        # Allez dans votre dashboard Supabase > Table Editor et listez toutes vos tables _h4_data
-        
-        known_tables = [
-            'aapl_h4_data', 'msft_h4_data', 'googl_h4_data', 'goog_h4_data', 'amzn_h4_data',
-            'nvda_h4_data', 'meta_h4_data', 'tsla_h4_data', 'brk_b_h4_data', 'unh_h4_data',
-            'jnj_h4_data', 'jpm_h4_data', 'v_h4_data', 'pg_h4_data', 'xom_h4_data',
-            'hd_h4_data', 'cvx_h4_data', 'ma_h4_data', 'abbv_h4_data', 'pfe_h4_data',
-            'avgo_h4_data', 'cost_h4_data', 'dis_h4_data', 'ko_h4_data', 'adbe_h4_data',
-            'pep_h4_data', 'csco_h4_data', 'tmo_h4_data', 'nflx_h4_data', 'wmt_h4_data',
-            'mcd_h4_data', 'abt_h4_data', 'crm_h4_data', 'lin_h4_data', 'dhp_h4_data',
-            'acn_h4_data', 'nke_h4_data', 'txt_h4_data', 'orcl_h4_data', 'intc_h4_data',
-            'vz_h4_data', 'cmcsa_h4_data', 'mrk_h4_data', 'amd_h4_data', 'qcom_h4_data',
-            'ibm_h4_data', 'ba_h4_data', 'cat_h4_data', 'ge_h4_data', 'spg_h4_data'
-            # AJOUTEZ ICI TOUTES VOS AUTRES TABLES !
-        ]
-        
-        # Extraire les tickers (partie avant _h4_data)
-        stocks = []
-        for table in known_tables:
-            if table.endswith('_h4_data'):
-                ticker = table.replace('_h4_data', '').upper()
-                stocks.append(ticker)
-        
-        if not stocks:
-            st.error("❌ Aucune table trouvée. Veuillez mettre à jour la liste dans get_available_stocks()")
-            return []
-        
-        return sorted(stocks)
-        
-    except Exception as e:
-        st.error(f"❌ Erreur lors de la récupération des tables: {str(e)}")
-        return []
+    return sorted(stocks)
 
 @st.cache_data(ttl=300)
 def get_stock_data(ticker, start_date, end_date):
@@ -224,12 +201,9 @@ def get_stock_data(ticker, start_date, end_date):
     try:
         table_name = f"{ticker.lower()}_h4_data"
         
-        # Convertir les dates en format ISO avec timezone
-        # Pour s'assurer de capturer toutes les données de la journée
         start_str = f"{start_date.strftime('%Y-%m-%d')}T00:00:00+00:00"
         end_str = f"{end_date.strftime('%Y-%m-%d')}T23:59:59+00:00"
         
-        # Requête Supabase directement sans test préalable
         response = supabase.table(table_name)\
             .select("date, open, high, low, close, volume")\
             .gte('date', start_str)\
@@ -240,12 +214,8 @@ def get_stock_data(ticker, start_date, end_date):
         if response.data and len(response.data) > 0:
             df = pd.DataFrame(response.data)
             df['date'] = pd.to_datetime(df['date'])
-            
-            # Grouper par jour (prendre la dernière valeur de close de chaque jour)
-            # Car vous avez plusieurs entrées par jour (13:30 et 16:00)
             df = df.set_index('date')
             
-            # Resampler par jour - prendre la dernière valeur close de chaque jour
             daily_df = pd.DataFrame({
                 'open': df['open'].resample('D').first(),
                 'high': df['high'].resample('D').max(),
@@ -254,116 +224,68 @@ def get_stock_data(ticker, start_date, end_date):
                 'volume': df['volume'].resample('D').sum()
             }).dropna()
             
-            if len(daily_df) > 0:
-                st.success(f"✅ {ticker}: {len(response.data)} entrées → {len(daily_df)} jours")
-                return daily_df
-            else:
-                st.warning(f"⚠️ {ticker}: Données chargées mais vides après regroupement")
-                return None
+            return daily_df
         else:
-            st.warning(f"⚠️ {ticker}: Aucune donnée entre {start_date} et {end_date}")
             return None
             
     except Exception as e:
-        error_msg = str(e)
-        if "does not exist" in error_msg.lower() or "relation" in error_msg.lower():
-            st.error(f"❌ {ticker}: Table {table_name} n'existe pas")
-        else:
-            st.error(f"❌ {ticker}: {error_msg}")
+        st.error(f"❌ Erreur lors du chargement de {ticker}: {str(e)}")
         return None
 
-def calculate_portfolio_metrics(portfolio_df, weights):
-    """Calcule les métriques du portefeuille"""
-    # Rendements quotidiens
-    returns = portfolio_df.pct_change().dropna()
+def calculate_technical_indicators(df):
+    """Calcule les indicateurs techniques"""
+    # SMA 20 et 50 jours
+    df['SMA_20'] = df['close'].rolling(window=20).mean()
+    df['SMA_50'] = df['close'].rolling(window=50).mean()
     
-    # Rendement du portefeuille
-    portfolio_returns = (returns * weights).sum(axis=1)
+    # Bollinger Bands
+    sma_20 = df['close'].rolling(window=20).mean()
+    std_20 = df['close'].rolling(window=20).std()
+    df['BB_upper'] = sma_20 + (std_20 * 2)
+    df['BB_lower'] = sma_20 - (std_20 * 2)
     
-    # Valeur cumulée du portefeuille
-    cumulative_returns = (1 + portfolio_returns).cumprod()
+    # RSI (14 jours)
+    delta = df['close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    rs = gain / loss
+    df['RSI'] = 100 - (100 / (1 + rs))
     
-    # Métriques
-    total_return = (cumulative_returns.iloc[-1] - 1) * 100
-    
-    # Volatilité annualisée
-    volatility = portfolio_returns.std() * np.sqrt(252) * 100
-    
-    # Sharpe Ratio (simplifié, sans taux sans risque)
-    sharpe = (portfolio_returns.mean() / portfolio_returns.std()) * np.sqrt(252) if portfolio_returns.std() > 0 else 0
-    
-    # Max Drawdown
-    cumulative = cumulative_returns
-    running_max = cumulative.expanding().max()
-    drawdown = (cumulative - running_max) / running_max
-    max_drawdown = drawdown.min() * 100
-    
-    return {
-        'total_return': total_return,
-        'volatility': volatility,
-        'sharpe': sharpe,
-        'max_drawdown': max_drawdown,
-        'cumulative_returns': cumulative_returns,
-        'portfolio_returns': portfolio_returns
-    }
+    return df
 
 # =============================================
 # INTERFACE PRINCIPALE
 # =============================================
 
-st.markdown("### 💼 PORTFOLIO CONFIGURATION")
-
-# TEST DE CONNEXION SUPABASE
-with st.expander("🔍 VÉRIFIER LA CONNEXION SUPABASE"):
-    if st.button("Tester la connexion"):
-        try:
-            # Test simple : essayer de lire une table
-            test = supabase.table("aapl_h4_data").select("date").limit(1).execute()
-            if test.data:
-                st.success("✅ Connexion Supabase OK!")
-                st.json(test.data[0])
-            else:
-                st.error("❌ Connexion OK mais table aapl_h4_data vide ou inexistante")
-        except Exception as e:
-            st.error(f"❌ Erreur de connexion: {str(e)}")
+st.markdown("### 📊 STOCK CHART VIEWER")
 
 # Récupérer la liste des actions disponibles
 available_stocks = get_available_stocks()
 
 if not available_stocks:
-    st.error("❌ Aucune action disponible. Veuillez mettre à jour la fonction get_available_stocks() avec vos vraies tables.")
-    st.info("💡 Allez dans votre Dashboard Supabase > Table Editor et notez tous les noms de tables qui se terminent par '_h4_data'")
+    st.error("❌ Aucune action disponible")
     st.stop()
 
-st.success(f"✅ {len(available_stocks)} actions disponibles dans la base de données")
-
-# ===== SÉLECTION DES ACTIONS =====
-st.markdown("#### 📊 SELECT STOCKS")
-
-col1, col2 = st.columns([3, 1])
+# ===== SÉLECTION DE L'ACTION =====
+col1, col2, col3 = st.columns([2, 1, 1])
 
 with col1:
-    # Sélectionner les 3 premières actions par défaut (ou moins s'il y en a moins)
-    default_selection = available_stocks[:min(3, len(available_stocks))]
-    
-    selected_stocks = st.multiselect(
-        "Choisissez les actions pour votre portefeuille",
+    selected_stock = st.selectbox(
+        "📈 Sélectionnez une action",
         options=available_stocks,
-        default=default_selection,
-        help="Sélectionnez jusqu'à 20 actions"
+        index=0,
+        help="Choisissez l'action à analyser"
     )
 
 with col2:
-    st.metric("Actions sélectionnées", len(selected_stocks))
+    chart_type = st.selectbox(
+        "Type de graphique",
+        options=['Candlestick', 'Line', 'OHLC'],
+        index=0
+    )
 
-if not selected_stocks:
-    st.warning("⚠️ Veuillez sélectionner au moins une action")
-    st.stop()
-
-# Limiter à 20 actions
-if len(selected_stocks) > 20:
-    st.warning("⚠️ Maximum 20 actions. Les actions supplémentaires seront ignorées.")
-    selected_stocks = selected_stocks[:20]
+with col3:
+    show_volume = st.checkbox("Afficher volume", value=True)
 
 st.markdown('<hr>', unsafe_allow_html=True)
 
@@ -375,7 +297,7 @@ col_date1, col_date2, col_date3 = st.columns([2, 2, 2])
 with col_date1:
     start_date = st.date_input(
         "Date de début",
-        value=datetime.now() - timedelta(days=365),
+        value=datetime.now() - timedelta(days=90),
         max_value=datetime.now()
     )
 
@@ -387,16 +309,17 @@ with col_date2:
     )
 
 with col_date3:
-    # Raccourcis de période
     period_preset = st.selectbox(
         "Période prédéfinie",
-        options=['Personnalisée', '1 Mois', '3 Mois', '6 Mois', '1 An', '2 Ans', '5 Ans'],
-        index=0
+        options=['Personnalisée', '1 Semaine', '1 Mois', '3 Mois', '6 Mois', '1 An', '2 Ans'],
+        index=3
     )
     
     if period_preset != 'Personnalisée':
         end_date = datetime.now().date()
-        if period_preset == '1 Mois':
+        if period_preset == '1 Semaine':
+            start_date = (datetime.now() - timedelta(days=7)).date()
+        elif period_preset == '1 Mois':
             start_date = (datetime.now() - timedelta(days=30)).date()
         elif period_preset == '3 Mois':
             start_date = (datetime.now() - timedelta(days=90)).date()
@@ -406,228 +329,168 @@ with col_date3:
             start_date = (datetime.now() - timedelta(days=365)).date()
         elif period_preset == '2 Ans':
             start_date = (datetime.now() - timedelta(days=730)).date()
-        elif period_preset == '5 Ans':
-            start_date = (datetime.now() - timedelta(days=1825)).date()
 
-# Vérifier que start_date < end_date
 if start_date >= end_date:
     st.error("❌ La date de début doit être antérieure à la date de fin")
     st.stop()
 
 st.markdown('<hr>', unsafe_allow_html=True)
 
-# ===== ALLOCATION DU PORTEFEUILLE =====
-st.markdown("#### 💰 PORTFOLIO ALLOCATION")
+# ===== OPTIONS D'ANALYSE =====
+st.markdown("#### 🔧 TECHNICAL ANALYSIS")
 
-# Choix du mode d'allocation
-allocation_mode = st.radio(
-    "Mode d'allocation",
-    options=['Équipondéré', 'Personnalisé'],
-    horizontal=True,
-    help="Équipondéré: poids égaux | Personnalisé: définir manuellement"
-)
+col_tech1, col_tech2 = st.columns(2)
 
-weights = {}
+with col_tech1:
+    show_sma = st.checkbox("Afficher SMA (20, 50)", value=True)
+    show_bollinger = st.checkbox("Afficher Bollinger Bands", value=False)
 
-if allocation_mode == 'Équipondéré':
-    # Répartition égale
-    equal_weight = 100.0 / len(selected_stocks)
-    for stock in selected_stocks:
-        weights[stock] = equal_weight
-    
-    st.info(f"✅ Allocation équipondérée: {equal_weight:.2f}% par action")
-
-else:  # Personnalisé
-    # Sliders pour chaque action
-    st.markdown("**Définissez le poids de chaque action (en %) :**")
-    
-    # Créer des colonnes pour les sliders
-    n_cols = 4
-    cols = st.columns(n_cols)
-    
-    for idx, stock in enumerate(selected_stocks):
-        with cols[idx % n_cols]:
-            weights[stock] = st.slider(
-                f"{stock}",
-                min_value=0.0,
-                max_value=100.0,
-                value=100.0 / len(selected_stocks),
-                step=0.5,
-                key=f"weight_{stock}"
-            )
-    
-    # Vérifier que la somme fait 100%
-    total_weight = sum(weights.values())
-    if abs(total_weight - 100.0) > 0.1:
-        st.warning(f"⚠️ Total: {total_weight:.2f}% (devrait être 100%)")
-    else:
-        st.success(f"✅ Portefeuille équilibré: {total_weight:.2f}%")
+with col_tech2:
+    show_rsi = st.checkbox("Afficher RSI", value=False)
 
 st.markdown('<hr>', unsafe_allow_html=True)
 
-# ===== BOUTON DE SIMULATION =====
-if st.button("🚀 LANCER LA SIMULATION", use_container_width=True):
+# ===== CHARGER ET AFFICHER LES DONNÉES =====
+if st.button("📊 AFFICHER LE GRAPHIQUE", use_container_width=True):
     
-    st.markdown("### 📊 SIMULATION RESULTS")
+    with st.spinner(f"Chargement des données pour {selected_stock}..."):
+        df = get_stock_data(selected_stock, start_date, end_date)
     
-    # Barre de progression
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    # Charger les données pour chaque action
-    portfolio_data = pd.DataFrame()
-    weight_array = []
-    successful_stocks = []
-    
-    for idx, stock in enumerate(selected_stocks):
-        status_text.text(f"Chargement de {stock}... ({idx+1}/{len(selected_stocks)})")
-        progress_bar.progress((idx + 1) / len(selected_stocks))
-        
-        df = get_stock_data(stock, start_date, end_date)
-        
-        if df is not None and len(df) > 0:
-            portfolio_data[stock] = df['close']
-            weight_array.append(weights[stock] / 100.0)
-            successful_stocks.append(stock)
-    
-    progress_bar.empty()
-    status_text.empty()
-    
-    if portfolio_data.empty:
-        st.error("❌ Aucune donnée disponible pour les actions sélectionnées sur cette période")
-        st.info("💡 Vérifiez que :")
-        st.info("1. Les tables existent bien dans Supabase")
-        st.info("2. Les données couvrent la période sélectionnée")
-        st.info("3. La colonne 'date' contient des dates dans la plage choisie")
+    if df is None or len(df) == 0:
+        st.error(f"❌ Aucune donnée disponible pour {selected_stock} sur cette période")
         st.stop()
     
-    st.success(f"✅ Données chargées pour {len(successful_stocks)} actions")
+    st.success(f"✅ {len(df)} jours de données chargés pour {selected_stock}")
     
-    # Normaliser les poids
-    weight_array = np.array(weight_array)
-    weight_array = weight_array / weight_array.sum()
+    # Calculer les indicateurs techniques
+    df = calculate_technical_indicators(df)
     
-    # Supprimer les NaN
-    portfolio_data = portfolio_data.fillna(method='ffill').fillna(method='bfill')
+    # ===== MÉTRIQUES PRINCIPALES =====
+    st.markdown("#### 📊 KEY METRICS")
     
-    # Calculer les métriques
-    metrics = calculate_portfolio_metrics(portfolio_data, weight_array)
+    current_price = df['close'].iloc[-1]
+    prev_price = df['close'].iloc[-2] if len(df) > 1 else current_price
+    price_change = current_price - prev_price
+    price_change_pct = (price_change / prev_price) * 100 if prev_price != 0 else 0
     
-    # ===== AFFICHAGE DES MÉTRIQUES =====
-    st.markdown("#### 📈 PERFORMANCE METRICS")
+    period_start_price = df['close'].iloc[0]
+    period_return = ((current_price - period_start_price) / period_start_price) * 100
     
-    metric_cols = st.columns(5)
+    metric_cols = st.columns(6)
     
     with metric_cols[0]:
-        st.metric("Total Return", f"{metrics['total_return']:+.2f}%")
+        st.metric("Prix actuel", f"${current_price:.2f}", f"{price_change_pct:+.2f}%")
     
     with metric_cols[1]:
-        st.metric("Volatility (ann.)", f"{metrics['volatility']:.2f}%")
+        st.metric("Plus haut", f"${df['high'].max():.2f}")
     
     with metric_cols[2]:
-        st.metric("Sharpe Ratio", f"{metrics['sharpe']:.2f}")
+        st.metric("Plus bas", f"${df['low'].min():.2f}")
     
     with metric_cols[3]:
-        st.metric("Max Drawdown", f"{metrics['max_drawdown']:.2f}%")
+        st.metric("Volume moyen", f"{df['volume'].mean():.0f}")
     
     with metric_cols[4]:
-        period_days = (end_date - start_date).days
-        st.metric("Period (days)", f"{period_days}")
+        volatility = df['close'].pct_change().std() * np.sqrt(252) * 100
+        st.metric("Volatilité (ann.)", f"{volatility:.2f}%")
+    
+    with metric_cols[5]:
+        st.metric("Rendement période", f"{period_return:+.2f}%")
     
     st.markdown('<hr>', unsafe_allow_html=True)
     
-    # ===== GRAPHIQUE DE PERFORMANCE =====
-    st.markdown("#### 📊 PORTFOLIO VALUE EVOLUTION")
+    # ===== GRAPHIQUE PRINCIPAL =====
+    st.markdown(f"#### 📈 {selected_stock} - PRICE CHART")
     
+    # Créer le graphique principal
     fig = go.Figure()
     
-    # Courbe du portefeuille
-    portfolio_value = metrics['cumulative_returns'] * 100
+    if chart_type == 'Candlestick':
+        fig.add_trace(go.Candlestick(
+            x=df.index,
+            open=df['open'],
+            high=df['high'],
+            low=df['low'],
+            close=df['close'],
+            name=selected_stock,
+            increasing_line_color='#00FF00',
+            decreasing_line_color='#FF0000'
+        ))
+    elif chart_type == 'OHLC':
+        fig.add_trace(go.Ohlc(
+            x=df.index,
+            open=df['open'],
+            high=df['high'],
+            low=df['low'],
+            close=df['close'],
+            name=selected_stock,
+            increasing_line_color='#00FF00',
+            decreasing_line_color='#FF0000'
+        ))
+    else:  # Line
+        fig.add_trace(go.Scatter(
+            x=df.index,
+            y=df['close'],
+            mode='lines',
+            name=selected_stock,
+            line=dict(color='#FFAA00', width=2)
+        ))
     
-    fig.add_trace(go.Scatter(
-        x=portfolio_value.index,
-        y=portfolio_value.values,
-        mode='lines',
-        name='Portfolio',
-        line=dict(color='#FFAA00', width=3),
-        fill='tozeroy',
-        fillcolor='rgba(255,170,0,0.1)',
-        hovertemplate='<b>Portfolio</b><br>Value: %{y:.2f}<br>Date: %{x}<extra></extra>'
-    ))
+    # Ajouter les indicateurs techniques
+    if show_sma:
+        fig.add_trace(go.Scatter(
+            x=df.index,
+            y=df['SMA_20'],
+            mode='lines',
+            name='SMA 20',
+            line=dict(color='#00FFFF', width=1, dash='dot')
+        ))
+        fig.add_trace(go.Scatter(
+            x=df.index,
+            y=df['SMA_50'],
+            mode='lines',
+            name='SMA 50',
+            line=dict(color='#FF00FF', width=1, dash='dot')
+        ))
     
-    # Ligne de référence à 100
-    fig.add_shape(
-        type="line",
-        x0=portfolio_value.index[0],
-        x1=portfolio_value.index[-1],
-        y0=100,
-        y1=100,
-        line=dict(color="#666", width=1, dash="dash")
-    )
+    if show_bollinger:
+        fig.add_trace(go.Scatter(
+            x=df.index,
+            y=df['BB_upper'],
+            mode='lines',
+            name='BB Upper',
+            line=dict(color='#888', width=1, dash='dash'),
+            showlegend=True
+        ))
+        fig.add_trace(go.Scatter(
+            x=df.index,
+            y=df['BB_lower'],
+            mode='lines',
+            name='BB Lower',
+            line=dict(color='#888', width=1, dash='dash'),
+            fill='tonexty',
+            fillcolor='rgba(136, 136, 136, 0.1)',
+            showlegend=True
+        ))
     
     fig.update_layout(
-        title=f"Portfolio Performance ({start_date} to {end_date})",
+        title=f"{selected_stock} - {start_date} to {end_date}",
         paper_bgcolor='#000',
         plot_bgcolor='#111',
         font=dict(color='#FFAA00', size=10),
         xaxis=dict(
             gridcolor='#333',
             showgrid=True,
-            title="Date"
+            title="Date",
+            rangeslider=dict(visible=False)
         ),
         yaxis=dict(
             gridcolor='#333',
             showgrid=True,
-            title="Portfolio Value (Base 100)"
+            title="Price (USD)"
         ),
         hovermode='x unified',
-        height=500
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
-    
-    st.markdown('<hr>', unsafe_allow_html=True)
-    
-    # ===== GRAPHIQUE DES ACTIONS INDIVIDUELLES =====
-    st.markdown("#### 📈 INDIVIDUAL STOCKS PERFORMANCE")
-    
-    fig_stocks = go.Figure()
-    
-    # Couleurs
-    colors = ['#00FFFF', '#FF00FF', '#00FF00', '#FFA500', '#FF0000', '#FFFF00',
-              '#FF1493', '#00CED1', '#32CD32', '#FFD700']
-    
-    for idx, stock in enumerate(portfolio_data.columns):
-        normalized = (portfolio_data[stock] / portfolio_data[stock].iloc[0]) * 100
-        
-        fig_stocks.add_trace(go.Scatter(
-            x=normalized.index,
-            y=normalized.values,
-            mode='lines',
-            name=f"{stock} ({weights[stock]:.1f}%)",
-            line=dict(color=colors[idx % len(colors)], width=2),
-            hovertemplate=f'<b>{stock}</b><br>%{{y:.2f}}<br>%{{x}}<extra></extra>'
-        ))
-    
-    # Ajouter le portefeuille
-    fig_stocks.add_trace(go.Scatter(
-        x=portfolio_value.index,
-        y=portfolio_value.values,
-        mode='lines',
-        name='PORTFOLIO',
-        line=dict(color='#FFAA00', width=4, dash='dot'),
-        hovertemplate='<b>PORTFOLIO</b><br>%{y:.2f}<br>%{x}<extra></extra>'
-    ))
-    
-    fig_stocks.update_layout(
-        title="Individual Stocks vs Portfolio (Base 100)",
-        paper_bgcolor='#000',
-        plot_bgcolor='#111',
-        font=dict(color='#FFAA00', size=10),
-        xaxis=dict(gridcolor='#333', showgrid=True, title="Date"),
-        yaxis=dict(gridcolor='#333', showgrid=True, title="Normalized Value (Base 100)"),
-        hovermode='x unified',
-        height=500,
+        height=600,
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -637,129 +500,161 @@ if st.button("🚀 LANCER LA SIMULATION", use_container_width=True):
         )
     )
     
-    st.plotly_chart(fig_stocks, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True)
     
-    st.markdown('<hr>', unsafe_allow_html=True)
-    
-    # ===== COMPOSITION DU PORTEFEUILLE =====
-    st.markdown("#### 💼 PORTFOLIO COMPOSITION")
-    
-    # Graphique en camembert
-    fig_pie = go.Figure(data=[go.Pie(
-        labels=list(weights.keys()),
-        values=list(weights.values()),
-        hole=0.4,
-        marker=dict(
-            colors=colors[:len(weights)],
-            line=dict(color='#000', width=2)
-        ),
-        textfont=dict(size=12, color='#000'),
-        hovertemplate='<b>%{label}</b><br>Weight: %{value:.2f}%<extra></extra>'
-    )])
-    
-    fig_pie.update_layout(
-        title="Portfolio Allocation",
-        paper_bgcolor='#000',
-        font=dict(color='#FFAA00', size=10),
-        height=400,
-        showlegend=True,
-        legend=dict(
-            orientation="v",
-            yanchor="middle",
-            y=0.5,
-            xanchor="left",
-            x=1.1
-        )
-    )
-    
-    st.plotly_chart(fig_pie, use_container_width=True)
-    
-    st.markdown('<hr>', unsafe_allow_html=True)
-    
-    # ===== TABLEAU DE PERFORMANCE PAR ACTION =====
-    st.markdown("#### 📊 INDIVIDUAL STOCK PERFORMANCE")
-    
-    perf_data = []
-    
-    for stock in portfolio_data.columns:
-        start_price = portfolio_data[stock].iloc[0]
-        end_price = portfolio_data[stock].iloc[-1]
-        stock_return = ((end_price - start_price) / start_price) * 100
+    # ===== GRAPHIQUE DU VOLUME =====
+    if show_volume:
+        st.markdown("#### 📊 VOLUME")
         
-        stock_returns = portfolio_data[stock].pct_change().dropna()
-        stock_vol = stock_returns.std() * np.sqrt(252) * 100
+        fig_volume = go.Figure()
         
-        perf_data.append({
-            'Stock': stock,
-            'Weight (%)': f"{weights[stock]:.2f}",
-            'Start Price': f"${start_price:.2f}",
-            'End Price': f"${end_price:.2f}",
-            'Return (%)': f"{stock_return:+.2f}",
-            'Volatility (%)': f"{stock_vol:.2f}"
-        })
+        colors = ['#00FF00' if df['close'].iloc[i] >= df['open'].iloc[i] else '#FF0000' 
+                  for i in range(len(df))]
+        
+        fig_volume.add_trace(go.Bar(
+            x=df.index,
+            y=df['volume'],
+            name='Volume',
+            marker_color=colors,
+            showlegend=False
+        ))
+        
+        fig_volume.update_layout(
+            title="Trading Volume",
+            paper_bgcolor='#000',
+            plot_bgcolor='#111',
+            font=dict(color='#FFAA00', size=10),
+            xaxis=dict(
+                gridcolor='#333',
+                showgrid=True,
+                title="Date"
+            ),
+            yaxis=dict(
+                gridcolor='#333',
+                showgrid=True,
+                title="Volume"
+            ),
+            height=250
+        )
+        
+        st.plotly_chart(fig_volume, use_container_width=True)
     
-    perf_df = pd.DataFrame(perf_data)
-    
-    # Afficher le tableau avec un style personnalisé
-    st.dataframe(
-        perf_df,
-        use_container_width=True,
-        hide_index=True
-    )
+    # ===== GRAPHIQUE RSI =====
+    if show_rsi:
+        st.markdown("#### 📉 RSI (Relative Strength Index)")
+        
+        fig_rsi = go.Figure()
+        
+        fig_rsi.add_trace(go.Scatter(
+            x=df.index,
+            y=df['RSI'],
+            mode='lines',
+            name='RSI',
+            line=dict(color='#FFAA00', width=2)
+        ))
+        
+        # Lignes de référence
+        fig_rsi.add_shape(
+            type="line",
+            x0=df.index[0],
+            x1=df.index[-1],
+            y0=70,
+            y1=70,
+            line=dict(color="#FF0000", width=1, dash="dash")
+        )
+        fig_rsi.add_shape(
+            type="line",
+            x0=df.index[0],
+            x1=df.index[-1],
+            y0=30,
+            y1=30,
+            line=dict(color="#00FF00", width=1, dash="dash")
+        )
+        
+        fig_rsi.update_layout(
+            title="RSI (14 periods)",
+            paper_bgcolor='#000',
+            plot_bgcolor='#111',
+            font=dict(color='#FFAA00', size=10),
+            xaxis=dict(
+                gridcolor='#333',
+                showgrid=True,
+                title="Date"
+            ),
+            yaxis=dict(
+                gridcolor='#333',
+                showgrid=True,
+                title="RSI",
+                range=[0, 100]
+            ),
+            height=250
+        )
+        
+        st.plotly_chart(fig_rsi, use_container_width=True)
+        
+        # Interprétation RSI
+        current_rsi = df['RSI'].iloc[-1]
+        if current_rsi > 70:
+            st.warning(f"⚠️ RSI = {current_rsi:.2f} - Action potentiellement SURACHETÉ")
+        elif current_rsi < 30:
+            st.warning(f"⚠️ RSI = {current_rsi:.2f} - Action potentiellement SURVENDU")
+        else:
+            st.info(f"✅ RSI = {current_rsi:.2f} - Zone NEUTRE")
     
     st.markdown('<hr>', unsafe_allow_html=True)
     
-    # ===== ANALYSE DES RISQUES =====
-    st.markdown("#### ⚠️ RISK ANALYSIS")
+    # ===== STATISTIQUES DÉTAILLÉES =====
+    st.markdown("#### 📊 DETAILED STATISTICS")
     
-    # Matrice de corrélation
-    corr_matrix = portfolio_data.pct_change().corr()
+    stats_cols = st.columns(4)
     
-    fig_corr = go.Figure(data=go.Heatmap(
-        z=corr_matrix.values,
-        x=corr_matrix.columns,
-        y=corr_matrix.columns,
-        colorscale=[
-            [0, '#FF0000'],
-            [0.5, '#000000'],
-            [1, '#00FF00']
-        ],
-        zmid=0,
-        text=corr_matrix.values,
-        texttemplate='%{text:.2f}',
-        textfont={"size": 10, "color": "#FFAA00"},
-        showscale=True,
-        colorbar=dict(
-            title="Corr",
-            tickvals=[-1, -0.5, 0, 0.5, 1],
-            ticktext=['-1.0', '-0.5', '0', '0.5', '1.0']
+    with stats_cols[0]:
+        st.markdown("**Prix**")
+        st.write(f"• Ouverture: ${df['open'].iloc[0]:.2f}")
+        st.write(f"• Clôture: ${df['close'].iloc[-1]:.2f}")
+        st.write(f"• Plus haut: ${df['high'].max():.2f}")
+        st.write(f"• Plus bas: ${df['low'].min():.2f}")
+    
+    with stats_cols[1]:
+        st.markdown("**Rendements**")
+        daily_returns = df['close'].pct_change()
+        st.write(f"• Rendement total: {period_return:+.2f}%")
+        st.write(f"• Rdt moyen jour: {daily_returns.mean()*100:+.3f}%")
+        st.write(f"• Meilleur jour: {daily_returns.max()*100:+.2f}%")
+        st.write(f"• Pire jour: {daily_returns.min()*100:+.2f}%")
+    
+    with stats_cols[2]:
+        st.markdown("**Volatilité**")
+        st.write(f"• Écart-type: {daily_returns.std()*100:.2f}%")
+        st.write(f"• Vol. annualisée: {volatility:.2f}%")
+        st.write(f"• Amplitude moy.: ${(df['high'] - df['low']).mean():.2f}")
+    
+    with stats_cols[3]:
+        st.markdown("**Volume**")
+        st.write(f"• Volume total: {df['volume'].sum():,.0f}")
+        st.write(f"• Volume moyen: {df['volume'].mean():,.0f}")
+        st.write(f"• Volume max: {df['volume'].max():,.0f}")
+        st.write(f"• Volume min: {df['volume'].min():,.0f}")
+    
+    st.markdown('<hr>', unsafe_allow_html=True)
+    
+    # ===== TABLEAU DES DONNÉES =====
+    with st.expander("📋 VOIR LES DONNÉES BRUTES"):
+        display_df = df[['open', 'high', 'low', 'close', 'volume']].copy()
+        display_df = display_df.round(2)
+        display_df['volume'] = display_df['volume'].astype(int)
+        
+        st.dataframe(
+            display_df.tail(50),
+            use_container_width=True,
+            height=400
         )
-    ))
-    
-    fig_corr.update_layout(
-        title="Correlation Matrix",
-        paper_bgcolor='#000',
-        plot_bgcolor='#111',
-        font=dict(color='#FFAA00', size=10),
-        xaxis=dict(tickfont=dict(color='#FFAA00', size=9)),
-        yaxis=dict(tickfont=dict(color='#FFAA00', size=9)),
-        height=400
-    )
-    
-    st.plotly_chart(fig_corr, use_container_width=True)
-    
-    st.caption("""
-    **📖 Interprétation de la corrélation :**
-    - 🟢 **Vert (1.0)** : Corrélation parfaite - les actions évoluent ensemble
-    - ⚫ **Noir (0)** : Aucune corrélation - mouvements indépendants
-    - 🔴 **Rouge (-1.0)** : Corrélation inverse - les actions évoluent en sens opposé
-    """)
 
 # ===== FOOTER =====
 st.markdown('<hr>', unsafe_allow_html=True)
 st.markdown(f"""
 <div style='text-align: center; color: #666; font-size: 9px; font-family: "Courier New", monospace; padding: 10px;'>
-    © 2025 BLOOMBERG ENS® | PORTFOLIO SIMULATOR | DONNÉES HISTORIQUES SUPABASE<br>
-    SIMULATION COMPLÈTE • LAST UPDATE: {datetime.now().strftime('%H:%M:%S')}
+    © 2025 BLOOMBERG ENS® | STOCK CHART VIEWER | DONNÉES HISTORIQUES SUPABASE<br>
+    ANALYSE TECHNIQUE COMPLÈTE • LAST UPDATE: {datetime.now().strftime('%H:%M:%S')}
 </div>
 """, unsafe_allow_html=True)
