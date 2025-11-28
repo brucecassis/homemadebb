@@ -78,6 +78,12 @@ st.markdown("""
     .stDateInput > label {
         color: #FF8C00 !important;
     }
+    
+    /* Warning box */
+    .stAlert {
+        background-color: #1a1a1a !important;
+        color: #FF8C00 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -181,57 +187,126 @@ df = load_data(selected_table)
 
 if df is not None:
     # ============================================================================
-    # PARAMETRES DE PERIODE
+    # PARAMETRES DE PERIODE - AMELIORE
     # ============================================================================
     
     st.sidebar.markdown("---")
     st.sidebar.subheader("📅 Period Selection")
     
-    # Options de période
-    period_type = st.sidebar.radio(
-        "Period Type:",
-        ["Last N Candles", "Custom Date Range"]
+    # Options de période avec raccourcis rapides
+    period_options = {
+        "Last 50 Candles": 50,
+        "Last 100 Candles": 100,
+        "Last 200 Candles": 200,
+        "Last 500 Candles": 500,
+        "Last 1000 Candles": 1000,
+        "Custom Number": -1,
+        "Custom Date Range": -2
+    }
+    
+    period_choice = st.sidebar.selectbox(
+        "Choose Period:",
+        list(period_options.keys()),
+        index=3  # Default: Last 500 Candles
     )
     
-    if period_type == "Last N Candles":
-        # Slider pour nombre de bougies
+    period_value = period_options[period_choice]
+    
+    # Filtrage selon le choix
+    if period_value > 0:
+        # Nombre prédéfini de bougies
+        num_candles = min(period_value, len(df))
+        df_filtered = df.tail(num_candles)
+        
+    elif period_value == -1:
+        # Nombre personnalisé de bougies
         max_candles = len(df)
         num_candles = st.sidebar.slider(
             "Number of candles:",
-            min_value=50,
+            min_value=10,
             max_value=min(max_candles, 5000),
             value=min(500, max_candles),
-            step=50
+            step=10
         )
         df_filtered = df.tail(num_candles)
-    
+        
     else:
-        # Sélection de dates personnalisées
+        # Période personnalisée par dates
+        st.sidebar.markdown("**Select Date Range:**")
+        
         min_date = df.index.min().date()
         max_date = df.index.max().date()
         
-        col1, col2 = st.sidebar.columns(2)
-        with col1:
-            start_date = st.date_input(
-                "Start Date:",
-                value=max_date - timedelta(days=90),
-                min_value=min_date,
-                max_value=max_date
-            )
-        with col2:
-            end_date = st.date_input(
-                "End Date:",
-                value=max_date,
-                min_value=min_date,
-                max_value=max_date
-            )
+        # Afficher les dates disponibles
+        st.sidebar.info(f"📅 Available data: {min_date} to {max_date}")
+        
+        # Raccourcis de dates
+        date_preset = st.sidebar.selectbox(
+            "Quick Date Range:",
+            ["Custom", "Last Week", "Last Month", "Last 3 Months", "Last 6 Months", "Last Year", "Year to Date", "All Data"]
+        )
+        
+        if date_preset == "Last Week":
+            start_date = max_date - timedelta(days=7)
+            end_date = max_date
+        elif date_preset == "Last Month":
+            start_date = max_date - timedelta(days=30)
+            end_date = max_date
+        elif date_preset == "Last 3 Months":
+            start_date = max_date - timedelta(days=90)
+            end_date = max_date
+        elif date_preset == "Last 6 Months":
+            start_date = max_date - timedelta(days=180)
+            end_date = max_date
+        elif date_preset == "Last Year":
+            start_date = max_date - timedelta(days=365)
+            end_date = max_date
+        elif date_preset == "Year to Date":
+            start_date = datetime(max_date.year, 1, 1).date()
+            end_date = max_date
+        elif date_preset == "All Data":
+            start_date = min_date
+            end_date = max_date
+        else:
+            # Custom - utiliser les date inputs
+            col1, col2 = st.sidebar.columns(2)
+            with col1:
+                start_date = st.date_input(
+                    "From:",
+                    value=max_date - timedelta(days=90),
+                    min_value=min_date,
+                    max_value=max_date,
+                    key="start_date"
+                )
+            with col2:
+                end_date = st.date_input(
+                    "To:",
+                    value=max_date,
+                    min_value=min_date,
+                    max_value=max_date,
+                    key="end_date"
+                )
+        
+        # Afficher les dates sélectionnées si ce n'est pas Custom
+        if date_preset != "Custom":
+            st.sidebar.write(f"**From:** {start_date}")
+            st.sidebar.write(f"**To:** {end_date}")
+        
+        # Validation des dates
+        if start_date > end_date:
+            st.sidebar.error("⚠️ Start date must be before end date!")
+            st.stop()
         
         # Filtrer par dates
         df_filtered = df.loc[start_date:end_date]
         
         if len(df_filtered) == 0:
-            st.warning("⚠️ No data available for this period!")
+            st.warning(f"⚠️ No data available between {start_date} and {end_date}!")
+            st.info(f"Available data range: {min_date} to {max_date}")
             st.stop()
+        
+        # Afficher le nombre de bougies dans la période
+        st.sidebar.success(f"✅ {len(df_filtered)} candles in selected period")
     
     # ============================================================================
     # AUTRES PARAMETRES
@@ -248,6 +323,9 @@ if df is not None:
     
     # Toggle pour afficher le volume
     show_volume = st.sidebar.checkbox("Show Volume", value=True)
+    
+    # Toggle pour afficher les moyennes mobiles
+    show_ma = st.sidebar.checkbox("Show Moving Averages", value=True)
     
     # ============================================================================
     # AFFICHAGE DES STATS - STYLE BLOOMBERG
@@ -271,7 +349,7 @@ if df is not None:
     with col5:
         st.metric("CANDLES", f"{len(df_filtered):,}")
     
-    st.markdown(f"**PERIOD:** {df_filtered.index[0].strftime('%Y-%m-%d')} to {df_filtered.index[-1].strftime('%Y-%m-%d')}")
+    st.markdown(f"**PERIOD:** {df_filtered.index[0].strftime('%Y-%m-%d %H:%M')} to {df_filtered.index[-1].strftime('%Y-%m-%d %H:%M')}")
     
     st.divider()
     
@@ -284,9 +362,10 @@ if df is not None:
         st.subheader(f"📈 {selected_display} - LINE CHART")
         
         # Calculer les moyennes mobiles
-        df_filtered['SMA50'] = df_filtered['close'].rolling(window=50).mean()
-        df_filtered['SMA100'] = df_filtered['close'].rolling(window=100).mean()
-        df_filtered['SMA200'] = df_filtered['close'].rolling(window=200).mean()
+        if show_ma:
+            df_filtered['SMA50'] = df_filtered['close'].rolling(window=50).mean()
+            df_filtered['SMA100'] = df_filtered['close'].rolling(window=100).mean()
+            df_filtered['SMA200'] = df_filtered['close'].rolling(window=200).mean()
         
         if show_volume:
             fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 10), 
@@ -303,15 +382,16 @@ if df is not None:
                 linewidth=2, color='#00D9FF', label='Close', zorder=5)
         
         # Moyennes mobiles
-        if len(df_filtered) >= 50:
-            ax1.plot(df_filtered.index, df_filtered['SMA50'], 
-                    linewidth=1.5, color='#FF1493', label='SMA 50', alpha=0.8)
-        if len(df_filtered) >= 100:
-            ax1.plot(df_filtered.index, df_filtered['SMA100'], 
-                    linewidth=1.5, color='#00FF00', label='SMA 100', alpha=0.8)
-        if len(df_filtered) >= 200:
-            ax1.plot(df_filtered.index, df_filtered['SMA200'], 
-                    linewidth=1.5, color='#FFD700', label='SMA 200', alpha=0.8)
+        if show_ma:
+            if len(df_filtered) >= 50:
+                ax1.plot(df_filtered.index, df_filtered['SMA50'], 
+                        linewidth=1.5, color='#FF1493', label='SMA 50', alpha=0.8)
+            if len(df_filtered) >= 100:
+                ax1.plot(df_filtered.index, df_filtered['SMA100'], 
+                        linewidth=1.5, color='#00FF00', label='SMA 100', alpha=0.8)
+            if len(df_filtered) >= 200:
+                ax1.plot(df_filtered.index, df_filtered['SMA200'], 
+                        linewidth=1.5, color='#FFD700', label='SMA 200', alpha=0.8)
         
         ax1.set_title(f'{selected_display} - H4 Chart', 
                      fontsize=18, fontweight='bold', color='#FF8C00', pad=20)
@@ -372,15 +452,16 @@ if df is not None:
         
         # Ajouter les moyennes mobiles
         apds = []
-        if len(df_filtered) >= 50:
-            apds.append(mpf.make_addplot(df_filtered['close'].rolling(50).mean(), 
-                                         color='#FF1493', width=1.5))
-        if len(df_filtered) >= 100:
-            apds.append(mpf.make_addplot(df_filtered['close'].rolling(100).mean(), 
-                                         color='#00FF00', width=1.5))
-        if len(df_filtered) >= 200:
-            apds.append(mpf.make_addplot(df_filtered['close'].rolling(200).mean(), 
-                                         color='#FFD700', width=1.5))
+        if show_ma:
+            if len(df_filtered) >= 50:
+                apds.append(mpf.make_addplot(df_filtered['close'].rolling(50).mean(), 
+                                             color='#FF1493', width=1.5))
+            if len(df_filtered) >= 100:
+                apds.append(mpf.make_addplot(df_filtered['close'].rolling(100).mean(), 
+                                             color='#00FF00', width=1.5))
+            if len(df_filtered) >= 200:
+                apds.append(mpf.make_addplot(df_filtered['close'].rolling(200).mean(), 
+                                             color='#FFD700', width=1.5))
         
         # Créer le graphique
         fig, axes = mpf.plot(
@@ -435,7 +516,7 @@ if df is not None:
     display_df['Change'] = display_df['Change'].apply(lambda x: f"${x:.2f}")
     display_df['Change %'] = display_df['Change %'].apply(lambda x: f"{x:+.2f}%")
     
-    st.dataframe(display_df, width='stretch')
+    st.dataframe(display_df, use_container_width=True)
     
     # Footer
     st.markdown("---")
