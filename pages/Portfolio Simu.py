@@ -195,27 +195,141 @@ def get_available_stocks():
     
     return sorted(stocks)
 
-@st.cache_data(ttl=300)
-def get_stock_data(ticker, start_date, end_date):
-    """Récupère les données d'une action depuis Supabase"""
+def get_date_range_for_stock(ticker):
+    """Récupère la plage de dates disponible pour une action"""
     try:
         table_name = f"{ticker.lower()}_h4_data"
         
-        start_str = f"{start_date.strftime('%Y-%m-%d')}T00:00:00+00:00"
-        end_str = f"{end_date.strftime('%Y-%m-%d')}T23:59:59+00:00"
-        
+        # Récupérer la première et dernière date
         response = supabase.table(table_name)\
-            .select("date, open, high, low, close, volume")\
-            .gte('date', start_str)\
-            .lte('date', end_str)\
+            .select("date")\
             .order('date', desc=False)\
+            .limit(1)\
             .execute()
         
+        first_date = None
         if response.data and len(response.data) > 0:
+            first_date = pd.to_datetime(response.data[0]['date']).date()
+        
+        response = supabase.table(table_name)\
+            .select("date")\
+            .order('date', desc=True)\
+            .limit(1)\
+            .execute()
+        
+        last_date = None
+        if response.data and len(response.data) > 0:
+            last_date = pd.to_datetime(response.data[0]['date']).date()
+        
+        return first_date, last_date
+    except Exception as e:
+        st.error(f"❌ Erreur lors de la récupération des dates: {str(e)}")
+        return None, None
+
+@st.cache_data(ttl=300)
+def get_stock_data(ticker, start_date, end_date):
+    """Récupère les données d'une action depuis Supabase avec diagnostic amélioré"""
+    try:
+        table_name = f"{ticker.lower()}_h4_data"
+        
+        # Convertir les dates en datetime si ce sont des objets date
+        if isinstance(start_date, datetime):
+            start_date = start_date.date()
+        if isinstance(end_date, datetime):
+            end_date = end_date.date()
+        
+        # Format simplifié sans timezone - juste la date
+        start_str = start_date.strftime('%Y-%m-%d')
+        end_str = end_date.strftime('%Y-%m-%d')
+        
+        st.info(f"🔍 Recherche de données pour {ticker} du {start_str} au {end_str}")
+        
+        # D'abord, vérifier combien de données existent dans la table
+        count_response = supabase.table(table_name)\
+            .select("date", count="exact")\
+            .execute()
+        
+        total_count = count_response.count if hasattr(count_response, 'count') else 0
+        st.info(f"📊 Total d'entrées dans {table_name}: {total_count}")
+        
+        # Récupérer un échantillon pour voir le format des dates
+        sample_response = supabase.table(table_name)\
+            .select("date")\
+            .limit(5)\
+            .execute()
+        
+        if sample_response.data:
+            st.info(f"📅 Échantillon de dates dans la table:")
+            for item in sample_response.data[:3]:
+                st.write(f"  • {item['date']}")
+        
+        # Essayer plusieurs formats de requête
+        response = None
+        
+        # Méthode 1: Avec timezone
+        try:
+            start_str_tz = f"{start_date.strftime('%Y-%m-%d')}T00:00:00+00:00"
+            end_str_tz = f"{end_date.strftime('%Y-%m-%d')}T23:59:59+00:00"
+            
+            response = supabase.table(table_name)\
+                .select("date, open, high, low, close, volume")\
+                .gte('date', start_str_tz)\
+                .lte('date', end_str_tz)\
+                .order('date', desc=False)\
+                .execute()
+            
+            if response.data and len(response.data) > 0:
+                st.success(f"✅ Méthode 1 (avec TZ): {len(response.data)} entrées trouvées")
+        except Exception as e:
+            st.warning(f"⚠️ Méthode 1 échouée: {str(e)}")
+        
+        # Méthode 2: Sans timezone, juste la date
+        if not response or not response.data:
+            try:
+                response = supabase.table(table_name)\
+                    .select("date, open, high, low, close, volume")\
+                    .gte('date', start_str)\
+                    .lte('date', end_str)\
+                    .order('date', desc=False)\
+                    .execute()
+                
+                if response.data and len(response.data) > 0:
+                    st.success(f"✅ Méthode 2 (sans TZ): {len(response.data)} entrées trouvées")
+            except Exception as e:
+                st.warning(f"⚠️ Méthode 2 échouée: {str(e)}")
+        
+        # Méthode 3: Récupérer toutes les données et filtrer après
+        if not response or not response.data:
+            try:
+                st.info("🔄 Tentative de récupération de toutes les données...")
+                response = supabase.table(table_name)\
+                    .select("date, open, high, low, close, volume")\
+                    .order('date', desc=False)\
+                    .execute()
+                
+                if response.data and len(response.data) > 0:
+                    st.success(f"✅ Méthode 3 (tout): {len(response.data)} entrées totales")
+                    # Filtrer en Python
+                    df_temp = pd.DataFrame(response.data)
+                    df_temp['date'] = pd.to_datetime(df_temp['date'])
+                    df_temp = df_temp[(df_temp['date'].dt.date >= start_date) & 
+                                      (df_temp['date'].dt.date <= end_date)]
+                    if len(df_temp) > 0:
+                        st.success(f"✅ Après filtrage: {len(df_temp)} entrées dans la période demandée")
+                        response.data = df_temp.to_dict('records')
+            except Exception as e:
+                st.error(f"❌ Méthode 3 échouée: {str(e)}")
+        
+        if response and response.data and len(response.data) > 0:
             df = pd.DataFrame(response.data)
             df['date'] = pd.to_datetime(df['date'])
+            
+            # Afficher les statistiques
+            st.info(f"📊 Période des données: {df['date'].min()} à {df['date'].max()}")
+            
             df = df.set_index('date')
             
+            # Resampler par jour
             daily_df = pd.DataFrame({
                 'open': df['open'].resample('D').first(),
                 'high': df['high'].resample('D').max(),
@@ -224,12 +338,20 @@ def get_stock_data(ticker, start_date, end_date):
                 'volume': df['volume'].resample('D').sum()
             }).dropna()
             
-            return daily_df
+            if len(daily_df) > 0:
+                st.success(f"✅ {ticker}: {len(response.data)} entrées → {len(daily_df)} jours")
+                return daily_df
+            else:
+                st.warning(f"⚠️ {ticker}: Données vides après regroupement")
+                return None
         else:
+            st.error(f"❌ Aucune donnée trouvée pour {ticker}")
             return None
             
     except Exception as e:
-        st.error(f"❌ Erreur lors du chargement de {ticker}: {str(e)}")
+        st.error(f"❌ Erreur pour {ticker}: {str(e)}")
+        import traceback
+        st.error(f"Détails: {traceback.format_exc()}")
         return None
 
 def calculate_technical_indicators(df):
@@ -266,6 +388,19 @@ if not available_stocks:
     st.error("❌ Aucune action disponible")
     st.stop()
 
+# ===== TEST DE CONNEXION =====
+with st.expander("🔍 DIAGNOSTIC DE CONNEXION"):
+    if st.button("Tester la connexion Supabase"):
+        try:
+            test = supabase.table("aapl_h4_data").select("date, close").limit(5).execute()
+            if test.data:
+                st.success("✅ Connexion Supabase OK!")
+                st.json(test.data)
+            else:
+                st.error("❌ Table accessible mais vide")
+        except Exception as e:
+            st.error(f"❌ Erreur: {str(e)}")
+
 # ===== SÉLECTION DE L'ACTION =====
 col1, col2, col3 = st.columns([2, 1, 1])
 
@@ -287,6 +422,15 @@ with col2:
 with col3:
     show_volume = st.checkbox("Afficher volume", value=True)
 
+# Afficher la plage de dates disponible
+if st.checkbox("🔍 Voir les dates disponibles", value=True):
+    with st.spinner(f"Récupération des dates pour {selected_stock}..."):
+        first_date, last_date = get_date_range_for_stock(selected_stock)
+        if first_date and last_date:
+            st.success(f"📅 Données disponibles de **{first_date}** à **{last_date}**")
+        else:
+            st.warning("⚠️ Impossible de récupérer les dates disponibles")
+
 st.markdown('<hr>', unsafe_allow_html=True)
 
 # ===== PÉRIODE D'ANALYSE =====
@@ -294,45 +438,54 @@ st.markdown("#### 📅 TIME PERIOD")
 
 col_date1, col_date2, col_date3 = st.columns([2, 2, 2])
 
+# Période prédéfinie d'abord
+with col_date3:
+    period_preset = st.selectbox(
+        "Période prédéfinie",
+        options=['Personnalisée', '1 Semaine', '1 Mois', '3 Mois', '6 Mois', '1 An', '2 Ans', '5 Ans'],
+        index=3  # 3 Mois par défaut
+    )
+
+# Définir les dates par défaut
+end_date = datetime.now().date()
+if period_preset == '1 Semaine':
+    start_date = (datetime.now() - timedelta(days=7)).date()
+elif period_preset == '1 Mois':
+    start_date = (datetime.now() - timedelta(days=30)).date()
+elif period_preset == '3 Mois':
+    start_date = (datetime.now() - timedelta(days=90)).date()
+elif period_preset == '6 Mois':
+    start_date = (datetime.now() - timedelta(days=180)).date()
+elif period_preset == '1 An':
+    start_date = (datetime.now() - timedelta(days=365)).date()
+elif period_preset == '2 Ans':
+    start_date = (datetime.now() - timedelta(days=730)).date()
+elif period_preset == '5 Ans':
+    start_date = (datetime.now() - timedelta(days=1825)).date()
+else:
+    start_date = (datetime.now() - timedelta(days=90)).date()
+
 with col_date1:
     start_date = st.date_input(
         "Date de début",
-        value=datetime.now() - timedelta(days=90),
+        value=start_date,
         max_value=datetime.now()
     )
 
 with col_date2:
     end_date = st.date_input(
         "Date de fin",
-        value=datetime.now(),
+        value=end_date,
         max_value=datetime.now()
     )
-
-with col_date3:
-    period_preset = st.selectbox(
-        "Période prédéfinie",
-        options=['Personnalisée', '1 Semaine', '1 Mois', '3 Mois', '6 Mois', '1 An', '2 Ans'],
-        index=3
-    )
-    
-    if period_preset != 'Personnalisée':
-        end_date = datetime.now().date()
-        if period_preset == '1 Semaine':
-            start_date = (datetime.now() - timedelta(days=7)).date()
-        elif period_preset == '1 Mois':
-            start_date = (datetime.now() - timedelta(days=30)).date()
-        elif period_preset == '3 Mois':
-            start_date = (datetime.now() - timedelta(days=90)).date()
-        elif period_preset == '6 Mois':
-            start_date = (datetime.now() - timedelta(days=180)).date()
-        elif period_preset == '1 An':
-            start_date = (datetime.now() - timedelta(days=365)).date()
-        elif period_preset == '2 Ans':
-            start_date = (datetime.now() - timedelta(days=730)).date()
 
 if start_date >= end_date:
     st.error("❌ La date de début doit être antérieure à la date de fin")
     st.stop()
+
+# Afficher la période sélectionnée
+period_days = (end_date - start_date).days
+st.info(f"📊 Période sélectionnée: **{period_days} jours** (du {start_date} au {end_date})")
 
 st.markdown('<hr>', unsafe_allow_html=True)
 
@@ -358,6 +511,10 @@ if st.button("📊 AFFICHER LE GRAPHIQUE", use_container_width=True):
     
     if df is None or len(df) == 0:
         st.error(f"❌ Aucune donnée disponible pour {selected_stock} sur cette période")
+        st.info("💡 Vérifiez que:")
+        st.info("1. La table existe dans Supabase")
+        st.info("2. Les données couvrent la période sélectionnée")
+        st.info("3. Utilisez le bouton 'Voir les dates disponibles' ci-dessus")
         st.stop()
     
     st.success(f"✅ {len(df)} jours de données chargés pour {selected_stock}")
