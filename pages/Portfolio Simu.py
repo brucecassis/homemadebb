@@ -224,18 +224,12 @@ def get_stock_data(ticker, start_date, end_date):
     try:
         table_name = f"{ticker.lower()}_h4_data"
         
-        # Convertir les dates en timestamps (début à 00:00:00, fin à 23:59:59)
-        start_str = f"{start_date.strftime('%Y-%m-%d')} 00:00:00"
-        end_str = f"{end_date.strftime('%Y-%m-%d')} 23:59:59"
+        # Convertir les dates en format ISO avec timezone
+        # Pour s'assurer de capturer toutes les données de la journée
+        start_str = f"{start_date.strftime('%Y-%m-%d')}T00:00:00+00:00"
+        end_str = f"{end_date.strftime('%Y-%m-%d')}T23:59:59+00:00"
         
-        # Vérifier que la table existe en faisant une petite requête test
-        test_response = supabase.table(table_name).select("date").limit(1).execute()
-        
-        if not test_response.data:
-            st.warning(f"⚠️ La table {table_name} existe mais semble vide")
-            return None
-        
-        # Requête Supabase avec timestamps
+        # Requête Supabase directement sans test préalable
         response = supabase.table(table_name)\
             .select("date, open, high, low, close, volume")\
             .gte('date', start_str)\
@@ -260,14 +254,22 @@ def get_stock_data(ticker, start_date, end_date):
                 'volume': df['volume'].resample('D').sum()
             }).dropna()
             
-            st.success(f"✅ {ticker}: {len(response.data)} lignes chargées → {len(daily_df)} jours")
-            return daily_df
+            if len(daily_df) > 0:
+                st.success(f"✅ {ticker}: {len(response.data)} entrées → {len(daily_df)} jours")
+                return daily_df
+            else:
+                st.warning(f"⚠️ {ticker}: Données chargées mais vides après regroupement")
+                return None
         else:
-            st.warning(f"⚠️ Aucune donnée pour {ticker} entre {start_str} et {end_str}")
+            st.warning(f"⚠️ {ticker}: Aucune donnée entre {start_date} et {end_date}")
             return None
             
     except Exception as e:
-        st.error(f"❌ Erreur pour {ticker} (table: {table_name}): {str(e)}")
+        error_msg = str(e)
+        if "does not exist" in error_msg.lower() or "relation" in error_msg.lower():
+            st.error(f"❌ {ticker}: Table {table_name} n'existe pas")
+        else:
+            st.error(f"❌ {ticker}: {error_msg}")
         return None
 
 def calculate_portfolio_metrics(portfolio_df, weights):
