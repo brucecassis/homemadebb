@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
+import mplfinance as mpf
 from supabase import create_client, Client
 from datetime import datetime, timedelta
 import matplotlib.dates as mdates
@@ -9,7 +9,7 @@ import matplotlib.dates as mdates
 # ============================================================================
 # CONFIG STREAMLIT - STYLE BLOOMBERG
 # ============================================================================
-st.set_page_config(page_title="Portfolio Simulator", page_icon="💼", layout="wide")
+st.set_page_config(page_title="Stock Chart Analyzer", page_icon="📊", layout="wide")
 
 # CSS personnalisé style Bloomberg
 st.markdown("""
@@ -20,7 +20,7 @@ st.markdown("""
     }
     
     /* Texte en orange Bloomberg */
-    .stMarkdown, .stMetric label, p, label {
+    .stMarkdown, .stMetric label, p {
         color: #FF8C00 !important;
     }
     
@@ -34,6 +34,11 @@ st.markdown("""
     /* Delta des métriques */
     [data-testid="stMetricDelta"] {
         color: #00FF00 !important;
+    }
+    
+    /* Sidebar style */
+    [data-testid="stSidebar"] {
+        background-color: #1a1a1a;
     }
     
     /* Titres */
@@ -54,13 +59,18 @@ st.markdown("""
         background-color: #FF8C00 !important;
     }
     
-    /* Number input */
-    .stNumberInput > label {
+    /* Radio buttons */
+    .stRadio > label, .stRadio div {
         color: #FF8C00 !important;
     }
     
     /* Select box */
-    .stSelectbox > label, .stMultiselect > label {
+    .stSelectbox > label, .stSelectbox div {
+        color: #FF8C00 !important;
+    }
+    
+    /* Checkbox */
+    .stCheckbox > label {
         color: #FF8C00 !important;
     }
     
@@ -68,18 +78,10 @@ st.markdown("""
     .stDateInput > label {
         color: #FF8C00 !important;
     }
-    
-    /* Expander */
-    .streamlit-expanderHeader {
-        color: #FF8C00 !important;
-        background-color: #1a1a1a !important;
-    }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("💼 PORTFOLIO SIMULATOR")
-st.markdown("**Simulate and analyze your stock portfolio performance over time**")
-st.divider()
+st.title("📊 STOCK CHART ANALYZER")
 
 # ============================================================================
 # PARAMETRES SUPABASE
@@ -95,31 +97,48 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 @st.cache_data(ttl=3600)
 def get_all_tables():
     """Récupère la liste de toutes les tables disponibles"""
-    tables = [
-        'a_h4_data', 'aal_h4_data', 'aapl_h4_data', 'abbv_h4_data', 'abnb_h4_data', 
-        'abt_h4_data', 'acgl_h4_data', 'acn_h4_data', 'adbe_h4_data', 'adi_h4_data',
-        'adm_h4_data', 'adp_h4_data', 'adsk_h4_data', 'aee_h4_data', 'aep_h4_data',
-        'aes_h4_data', 'afl_h4_data', 'aig_h4_data', 'aiz_h4_data', 'ajg_h4_data',
-        'akam_h4_data', 'alb_h4_data', 'algn_h4_data', 'all_h4_data', 'alle_h4_data',
-        'amat_h4_data', 'amcr_h4_data', 'amd_h4_data', 'ame_h4_data', 'amgn_h4_data',
-        'amp_h4_data', 'amt_h4_data', 'amzn_h4_data', 'anet_h4_data', 'aon_h4_data',
-        'ba_h4_data', 'bac_h4_data', 'meta_h4_data', 'msft_h4_data', 'nvda_h4_data', 
-        'qqq_h4_data', 'vixm_h4_data'
-    ]
-    return sorted(tables)
+    try:
+        # Liste des tables principales (tu peux l'enrichir)
+        tables = [
+            'a_h4_data', 'aal_h4_data', 'aapl_h4_data', 'abbv_h4_data', 'abnb_h4_data', 
+            'abt_h4_data', 'acgl_h4_data', 'acn_h4_data', 'adbe_h4_data', 'adi_h4_data',
+            'adm_h4_data', 'adp_h4_data', 'adsk_h4_data', 'aee_h4_data', 'aep_h4_data',
+            'aes_h4_data', 'afl_h4_data', 'aig_h4_data', 'aiz_h4_data', 'ajg_h4_data',
+            'akam_h4_data', 'alb_h4_data', 'algn_h4_data', 'all_h4_data', 'alle_h4_data',
+            'amat_h4_data', 'amcr_h4_data', 'amd_h4_data', 'ame_h4_data', 'amgn_h4_data',
+            'amp_h4_data', 'amt_h4_data', 'amzn_h4_data', 'anet_h4_data', 'aon_h4_data',
+            'aos_h4_data', 'apa_h4_data', 'apd_h4_data', 'aph_h4_data', 'aptv_h4_data',
+            'are_h4_data', 'ato_h4_data', 'avb_h4_data', 'avgo_h4_data', 'avy_h4_data',
+            'awk_h4_data', 'axon_h4_data', 'axp_h4_data', 'azo_h4_data', 'ba_h4_data',
+            'bac_h4_data', 'ball_h4_data', 'bax_h4_data', 'bbwi_h4_data', 'bby_h4_data',
+            'bdx_h4_data', 'ben_h4_data', 'bf_b_h4_data', 'bg_h4_data', 'biib_h4_data',
+            'bio_h4_data', 'bk_h4_data', 'bkng_h4_data', 'bkr_h4_data', 'blk_h4_data',
+            'bmy_h4_data', 'br_h4_data', 'brk_b_h4_data', 'bro_h4_data', 'bsx_h4_data',
+            'bwa_h4_data', 'bx_h4_data', 'bxp_h4_data', 'c_h4_data', 'cag_h4_data',
+            'cah_h4_data', 'carr_h4_data', 'cat_h4_data', 'cb_h4_data', 'cboe_h4_data',
+            'cbre_h4_data', 'cci_h4_data', 'ccl_h4_data', 'cdns_h4_data', 'cdw_h4_data',
+            'meta_h4_data', 'msft_h4_data', 'nvda_h4_data', 'morgan_stanley_h4_data',
+            'qqq_h4_data', 'vixm_h4_data'
+        ]
+        
+        return sorted(tables)
+    except:
+        return ['morgan_stanley_h4_data']
 
 # ============================================================================
 # RECUPERATION DES DONNEES
 # ============================================================================
 
 @st.cache_data(ttl=600)
-def load_data(table_name, start_date, end_date):
+def load_data(table_name):
     try:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
         
-        response = supabase.table(table_name).select("*").order("date", desc=False).limit(10000).execute()
+        with st.spinner("📥 Loading data from database..."):
+            response = supabase.table(table_name).select("*").order("date", desc=False).limit(10000).execute()
         
         if not response.data:
+            st.error("❌ No data found in table!")
             return None
         
         df = pd.DataFrame(response.data)
@@ -132,424 +151,295 @@ def load_data(table_name, start_date, end_date):
         
         df = df.dropna(subset=['open', 'high', 'low', 'close'])
         
-        # Filtrer par période
-        df = df.loc[start_date:end_date]
-        
         return df
     
     except Exception as e:
-        st.error(f"❌ Error loading {table_name}: {str(e)}")
+        st.error(f"❌ Error loading data: {str(e)}")
         return None
 
 # ============================================================================
-# PARAMETRES DU PORTEFEUILLE - EN HAUT
+# SIDEBAR - PARAMETRES
 # ============================================================================
 
-st.subheader("⚙️ PORTFOLIO CONFIGURATION")
+st.sidebar.header("⚙️ CHART SETTINGS")
 
-# Ligne 1: Période
-col1, col2 = st.columns(2)
-with col1:
-    start_date = st.date_input(
-        "Start Date:",
-        value=datetime.now().date() - timedelta(days=365),
-        max_value=datetime.now().date()
-    )
-with col2:
-    end_date = st.date_input(
-        "End Date:",
-        value=datetime.now().date(),
-        max_value=datetime.now().date()
-    )
-
-# Ligne 2: Sélection des actions
+# Liste déroulante pour choisir la table
 available_tables = get_all_tables()
 table_names_display = [t.replace('_h4_data', '').upper() for t in available_tables]
+table_dict = dict(zip(table_names_display, available_tables))
 
-selected_stocks = st.multiselect(
-    "Select Stocks for Portfolio:",
+selected_display = st.sidebar.selectbox(
+    "Select Stock:",
     table_names_display,
-    default=['AAPL', 'MSFT', 'NVDA'] if all(s in table_names_display for s in ['AAPL', 'MSFT', 'NVDA']) else table_names_display[:3]
+    index=table_names_display.index('MORGAN_STANLEY') if 'MORGAN_STANLEY' in table_names_display else 0
 )
 
-if not selected_stocks:
-    st.warning("⚠️ Please select at least one stock!")
-    st.stop()
+selected_table = table_dict[selected_display]
 
-# Ligne 3: Configuration des pondérations
-st.markdown("**Portfolio Weights (%)**")
+# Charger les données
+df = load_data(selected_table)
 
-weights = {}
-total_weight = 0
-
-cols = st.columns(len(selected_stocks))
-for i, stock in enumerate(selected_stocks):
-    with cols[i]:
-        weight = st.number_input(
-            f"{stock}",
-            min_value=0.0,
-            max_value=100.0,
-            value=100.0 / len(selected_stocks),
-            step=1.0,
-            key=f"weight_{stock}"
-        )
-        weights[stock] = weight
-        total_weight += weight
-
-# Vérifier que la somme fait 100%
-if abs(total_weight - 100.0) > 0.01:
-    st.error(f"⚠️ Total weight must equal 100%! Current: {total_weight:.2f}%")
-    st.stop()
-else:
-    st.success(f"✅ Portfolio weights: {total_weight:.2f}%")
-
-# Capital initial
-initial_capital = st.number_input(
-    "Initial Capital ($):",
-    min_value=1000.0,
-    max_value=10000000.0,
-    value=10000.0,
-    step=1000.0
-)
-
-st.divider()
-
-# ============================================================================
-# BOUTON DE SIMULATION
-# ============================================================================
-
-if st.button("🚀 RUN SIMULATION", type="primary"):
+if df is not None:
+    # ============================================================================
+    # PARAMETRES DE PERIODE
+    # ============================================================================
     
-    with st.spinner("📊 Loading data and calculating portfolio performance..."):
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📅 Period Selection")
+    
+    # Options de période
+    period_type = st.sidebar.radio(
+        "Period Type:",
+        ["Last N Candles", "Custom Date Range"]
+    )
+    
+    if period_type == "Last N Candles":
+        # Slider pour nombre de bougies
+        max_candles = len(df)
+        num_candles = st.sidebar.slider(
+            "Number of candles:",
+            min_value=50,
+            max_value=min(max_candles, 5000),
+            value=min(500, max_candles),
+            step=50
+        )
+        df_filtered = df.tail(num_candles)
+    
+    else:
+        # Sélection de dates personnalisées
+        min_date = df.index.min().date()
+        max_date = df.index.max().date()
         
-        # Charger les données pour chaque action
-        portfolio_data = {}
-        
-        for stock in selected_stocks:
-            table_name = stock.lower() + '_h4_data'
-            df = load_data(table_name, start_date, end_date)
-            
-            if df is not None and len(df) > 0:
-                portfolio_data[stock] = df['close']
-            else:
-                st.warning(f"⚠️ No data available for {stock} in this period")
-        
-        if not portfolio_data:
-            st.error("❌ No data available for any stock in the selected period!")
-            st.stop()
-        
-        # Créer un DataFrame avec tous les prix de clôture
-        prices_df = pd.DataFrame(portfolio_data)
-        
-        # Supprimer les NaN (dates manquantes)
-        prices_df = prices_df.dropna()
-        
-        if len(prices_df) == 0:
-            st.error("❌ No common dates found for all stocks!")
-            st.stop()
-        
-        # ====================================================================
-        # CALCUL DU PORTEFEUILLE
-        # ====================================================================
-        
-        # Calculer le nombre d'actions à acheter pour chaque titre
-        shares = {}
-        for stock in selected_stocks:
-            weight_amount = initial_capital * (weights[stock] / 100.0)
-            initial_price = prices_df[stock].iloc[0]
-            shares[stock] = weight_amount / initial_price
-        
-        # Calculer la valeur du portefeuille à chaque date
-        portfolio_values = pd.Series(0, index=prices_df.index)
-        
-        for stock in selected_stocks:
-            portfolio_values += prices_df[stock] * shares[stock]
-        
-        # Calculer les rendements quotidiens
-        daily_returns = portfolio_values.pct_change()
-        
-        # ====================================================================
-        # STATISTIQUES DU PORTEFEUILLE
-        # ====================================================================
-        
-        final_value = portfolio_values.iloc[-1]
-        total_return = ((final_value - initial_capital) / initial_capital) * 100
-        total_return_abs = final_value - initial_capital
-        
-        # Rendement annualisé
-        days = (prices_df.index[-1] - prices_df.index[0]).days
-        years = days / 365.25
-        annualized_return = ((final_value / initial_capital) ** (1 / years) - 1) * 100 if years > 0 else 0
-        
-        # Volatilité (écart-type annualisé)
-        volatility = daily_returns.std() * np.sqrt(252) * 100  # 252 jours de trading
-        
-        # Maximum Drawdown
-        cumulative = (1 + daily_returns).cumprod()
-        running_max = cumulative.cummax()
-        drawdown = (cumulative - running_max) / running_max * 100
-        max_drawdown = drawdown.min()
-        
-        # Sharpe Ratio (en supposant un taux sans risque de 2%)
-        risk_free_rate = 0.02
-        excess_return = annualized_return / 100 - risk_free_rate
-        sharpe_ratio = excess_return / (volatility / 100) if volatility > 0 else 0
-        
-        # Meilleur et pire jour
-        best_day = daily_returns.max() * 100
-        worst_day = daily_returns.min() * 100
-        
-        # ====================================================================
-        # AFFICHAGE DES STATISTIQUES PRINCIPALES
-        # ====================================================================
-        
-        st.subheader("📊 PORTFOLIO PERFORMANCE")
-        
-        col1, col2, col3, col4, col5 = st.columns(5)
-        
+        col1, col2 = st.sidebar.columns(2)
         with col1:
-            st.metric(
-                "Initial Value",
-                f"${initial_capital:,.2f}"
+            start_date = st.date_input(
+                "Start Date:",
+                value=max_date - timedelta(days=90),
+                min_value=min_date,
+                max_value=max_date
             )
-        
         with col2:
-            st.metric(
-                "Final Value",
-                f"${final_value:,.2f}",
-                f"{total_return_abs:+,.2f} ({total_return:+.2f}%)"
+            end_date = st.date_input(
+                "End Date:",
+                value=max_date,
+                min_value=min_date,
+                max_value=max_date
             )
         
-        with col3:
-            st.metric(
-                "Annualized Return",
-                f"{annualized_return:.2f}%"
-            )
+        # Filtrer par dates
+        df_filtered = df.loc[start_date:end_date]
         
-        with col4:
-            st.metric(
-                "Volatility",
-                f"{volatility:.2f}%"
-            )
+        if len(df_filtered) == 0:
+            st.warning("⚠️ No data available for this period!")
+            st.stop()
+    
+    # ============================================================================
+    # AUTRES PARAMETRES
+    # ============================================================================
+    
+    st.sidebar.markdown("---")
+    
+    # Choix du type de graphique
+    chart_type = st.sidebar.radio(
+        "Chart Type:",
+        ["📈 Line Chart", "🕯️ Candlestick"],
+        index=1
+    )
+    
+    # Toggle pour afficher le volume
+    show_volume = st.sidebar.checkbox("Show Volume", value=True)
+    
+    # ============================================================================
+    # AFFICHAGE DES STATS - STYLE BLOOMBERG
+    # ============================================================================
+    
+    col1, col2, col3, col4, col5 = st.columns(5)
+    
+    last_price = df['close'].iloc[-1]
+    prev_price = df['close'].iloc[-2]
+    price_change = last_price - prev_price
+    pct_change = (price_change / prev_price) * 100
+    
+    with col1:
+        st.metric("LAST PRICE", f"${last_price:.2f}", f"{price_change:+.2f} ({pct_change:+.2f}%)")
+    with col2:
+        st.metric("HIGH", f"${df_filtered['high'].max():.2f}")
+    with col3:
+        st.metric("LOW", f"${df_filtered['low'].min():.2f}")
+    with col4:
+        st.metric("VOLUME", f"{df_filtered['volume'].sum()/1e6:.1f}M")
+    with col5:
+        st.metric("CANDLES", f"{len(df_filtered):,}")
+    
+    st.markdown(f"**PERIOD:** {df_filtered.index[0].strftime('%Y-%m-%d')} to {df_filtered.index[-1].strftime('%Y-%m-%d')}")
+    
+    st.divider()
+    
+    # ============================================================================
+    # GRAPHIQUE STYLE BLOOMBERG
+    # ============================================================================
+    
+    if chart_type == "📈 Line Chart":
+        # ========== COURBE STYLE BLOOMBERG ==========
+        st.subheader(f"📈 {selected_display} - LINE CHART")
         
-        with col5:
-            st.metric(
-                "Sharpe Ratio",
-                f"{sharpe_ratio:.2f}"
-            )
+        # Calculer les moyennes mobiles
+        df_filtered['SMA50'] = df_filtered['close'].rolling(window=50).mean()
+        df_filtered['SMA100'] = df_filtered['close'].rolling(window=100).mean()
+        df_filtered['SMA200'] = df_filtered['close'].rolling(window=200).mean()
         
-        col6, col7, col8, col9 = st.columns(4)
+        if show_volume:
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 10), 
+                                            gridspec_kw={'height_ratios': [3, 1]},
+                                            facecolor='#000000')
+        else:
+            fig, ax1 = plt.subplots(figsize=(16, 8), facecolor='#000000')
         
-        with col6:
-            st.metric(
-                "Max Drawdown",
-                f"{max_drawdown:.2f}%"
-            )
+        # Graphique principal - Prix
+        ax1.set_facecolor('#0a0a0a')
         
-        with col7:
-            st.metric(
-                "Best Day",
-                f"{best_day:+.2f}%"
-            )
+        # Prix de clôture
+        ax1.plot(df_filtered.index, df_filtered['close'], 
+                linewidth=2, color='#00D9FF', label='Close', zorder=5)
         
-        with col8:
-            st.metric(
-                "Worst Day",
-                f"{worst_day:.2f}%"
-            )
+        # Moyennes mobiles
+        if len(df_filtered) >= 50:
+            ax1.plot(df_filtered.index, df_filtered['SMA50'], 
+                    linewidth=1.5, color='#FF1493', label='SMA 50', alpha=0.8)
+        if len(df_filtered) >= 100:
+            ax1.plot(df_filtered.index, df_filtered['SMA100'], 
+                    linewidth=1.5, color='#00FF00', label='SMA 100', alpha=0.8)
+        if len(df_filtered) >= 200:
+            ax1.plot(df_filtered.index, df_filtered['SMA200'], 
+                    linewidth=1.5, color='#FFD700', label='SMA 200', alpha=0.8)
         
-        with col9:
-            st.metric(
-                "Trading Days",
-                f"{len(prices_df):,}"
-            )
-        
-        st.divider()
-        
-        # ====================================================================
-        # GRAPHIQUE DE LA VALEUR DU PORTEFEUILLE
-        # ====================================================================
-        
-        st.subheader("📈 PORTFOLIO VALUE OVER TIME")
-        
-        fig, ax = plt.subplots(figsize=(16, 8), facecolor='#000000')
-        ax.set_facecolor('#0a0a0a')
-        
-        # Tracer la valeur du portefeuille
-        ax.plot(portfolio_values.index, portfolio_values.values, 
-                linewidth=2.5, color='#00D9FF', label='Portfolio Value', zorder=5)
-        
-        # Ligne de référence (capital initial)
-        ax.axhline(y=initial_capital, color='#FF8C00', linestyle='--', 
-                   linewidth=1.5, label='Initial Capital', alpha=0.7)
-        
-        # Remplir les zones de profit/perte
-        ax.fill_between(portfolio_values.index, portfolio_values.values, initial_capital,
-                        where=(portfolio_values.values >= initial_capital),
-                        color='#00FF00', alpha=0.2, label='Profit Zone')
-        ax.fill_between(portfolio_values.index, portfolio_values.values, initial_capital,
-                        where=(portfolio_values.values < initial_capital),
-                        color='#FF0000', alpha=0.2, label='Loss Zone')
-        
-        ax.set_title('Portfolio Value Evolution', 
+        ax1.set_title(f'{selected_display} - H4 Chart', 
                      fontsize=18, fontweight='bold', color='#FF8C00', pad=20)
-        ax.set_xlabel('Date', fontsize=12, color='#FF8C00', fontweight='bold')
-        ax.set_ylabel('Value ($)', fontsize=12, color='#FF8C00', fontweight='bold')
-        ax.grid(True, alpha=0.2, color='#333333', linestyle='-', linewidth=0.5)
-        ax.legend(loc='upper left', facecolor='#1a1a1a', edgecolor='#FF8C00', 
+        ax1.set_ylabel('Price ($)', fontsize=12, color='#FF8C00', fontweight='bold')
+        ax1.grid(True, alpha=0.2, color='#333333', linestyle='-', linewidth=0.5)
+        ax1.legend(loc='upper left', facecolor='#1a1a1a', edgecolor='#FF8C00', 
                   fontsize=10, labelcolor='#FF8C00')
-        ax.tick_params(colors='#FFFFFF', labelsize=10)
+        ax1.tick_params(colors='#FFFFFF', labelsize=10)
         
-        # Format des dates
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-        plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+        if show_volume:
+            # Graphique du volume
+            ax2.set_facecolor('#0a0a0a')
+            colors = ['#4169E1' if df_filtered['close'].iloc[i] >= df_filtered['open'].iloc[i] 
+                     else '#808080' for i in range(len(df_filtered))]
+            ax2.bar(df_filtered.index, df_filtered['volume'], color=colors, alpha=0.6, width=0.8)
+            ax2.set_ylabel('Volume', fontsize=12, color='#FF8C00', fontweight='bold')
+            ax2.set_xlabel('Date', fontsize=12, color='#FF8C00', fontweight='bold')
+            ax2.grid(True, alpha=0.2, color='#333333', linestyle='-', linewidth=0.5)
+            ax2.tick_params(colors='#FFFFFF', labelsize=10)
+            
+            # Format des dates
+            ax2.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45, ha='right')
+        else:
+            ax1.set_xlabel('Date', fontsize=12, color='#FF8C00', fontweight='bold')
+            ax1.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45, ha='right')
         
         fig.tight_layout()
         st.pyplot(fig)
+    
+    else:
+        # ========== BOUGIES STYLE BLOOMBERG (BLEU/GRIS) ==========
+        st.subheader(f"🕯️ {selected_display} - CANDLESTICK CHART")
         
-        # ====================================================================
-        # GRAPHIQUE DRAWDOWN
-        # ====================================================================
+        # Style Bloomberg avec couleurs bleues (bull) et grises (bear)
+        mc = mpf.make_marketcolors(
+            up='#4169E1',        # Bleu royal pour les bougies haussières
+            down='#808080',      # Gris pour les bougies baissières
+            edge='inherit',
+            wick='inherit',
+            volume={
+                'up': '#4169E1',
+                'down': '#808080'
+            },
+            alpha=0.9
+        )
         
-        st.subheader("📉 DRAWDOWN ANALYSIS")
+        s = mpf.make_mpf_style(
+            marketcolors=mc,
+            gridstyle='-',
+            gridcolor='#333333',
+            facecolor='#0a0a0a',
+            figcolor='#000000',
+            gridaxis='both',
+            y_on_right=False
+        )
         
-        fig2, ax2 = plt.subplots(figsize=(16, 5), facecolor='#000000')
-        ax2.set_facecolor('#0a0a0a')
+        # Ajouter les moyennes mobiles
+        apds = []
+        if len(df_filtered) >= 50:
+            apds.append(mpf.make_addplot(df_filtered['close'].rolling(50).mean(), 
+                                         color='#FF1493', width=1.5))
+        if len(df_filtered) >= 100:
+            apds.append(mpf.make_addplot(df_filtered['close'].rolling(100).mean(), 
+                                         color='#00FF00', width=1.5))
+        if len(df_filtered) >= 200:
+            apds.append(mpf.make_addplot(df_filtered['close'].rolling(200).mean(), 
+                                         color='#FFD700', width=1.5))
         
-        ax2.fill_between(drawdown.index, drawdown.values, 0,
-                         color='#FF0000', alpha=0.5)
-        ax2.plot(drawdown.index, drawdown.values, 
-                 linewidth=2, color='#FF0000', label='Drawdown')
+        # Créer le graphique
+        fig, axes = mpf.plot(
+            df_filtered,
+            type='candle',
+            style=s,
+            title=f'{selected_display} - H4 Candlestick Chart',
+            ylabel='Price ($)',
+            volume=show_volume,
+            ylabel_lower='Volume' if show_volume else None,
+            figsize=(16, 10) if show_volume else (16, 8),
+            addplot=apds if apds else None,
+            returnfig=True,
+            warn_too_much_data=10000
+        )
         
-        ax2.set_title('Portfolio Drawdown Over Time', 
-                      fontsize=16, fontweight='bold', color='#FF8C00', pad=20)
-        ax2.set_xlabel('Date', fontsize=12, color='#FF8C00', fontweight='bold')
-        ax2.set_ylabel('Drawdown (%)', fontsize=12, color='#FF8C00', fontweight='bold')
-        ax2.grid(True, alpha=0.2, color='#333333', linestyle='-', linewidth=0.5)
-        ax2.tick_params(colors='#FFFFFF', labelsize=10)
+        # Personnaliser les couleurs des axes
+        for ax in axes:
+            ax.set_facecolor('#0a0a0a')
+            ax.tick_params(colors='#FFFFFF', labelsize=10)
+            ax.spines['bottom'].set_color('#FF8C00')
+            ax.spines['top'].set_color('#FF8C00')
+            ax.spines['left'].set_color('#FF8C00')
+            ax.spines['right'].set_color('#FF8C00')
+            ax.yaxis.label.set_color('#FF8C00')
+            ax.xaxis.label.set_color('#FF8C00')
+            ax.title.set_color('#FF8C00')
         
-        # Format des dates
-        ax2.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-        plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45, ha='right')
-        
-        fig2.tight_layout()
-        st.pyplot(fig2)
-        
-        # ====================================================================
-        # CONTRIBUTION PAR ACTION
-        # ====================================================================
-        
-        st.subheader("📊 INDIVIDUAL STOCK CONTRIBUTION")
-        
-        # Calculer la contribution de chaque action
-        contributions = {}
-        for stock in selected_stocks:
-            initial_value = shares[stock] * prices_df[stock].iloc[0]
-            final_value_stock = shares[stock] * prices_df[stock].iloc[-1]
-            contribution = final_value_stock - initial_value
-            contributions[stock] = {
-                'Initial Value': initial_value,
-                'Final Value': final_value_stock,
-                'Absolute Return': contribution,
-                'Return %': (contribution / initial_value) * 100,
-                'Weight': weights[stock]
-            }
-        
-        contrib_df = pd.DataFrame(contributions).T
-        
-        # Afficher le tableau
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            # Graphique en barres
-            fig3, ax3 = plt.subplots(figsize=(10, 6), facecolor='#000000')
-            ax3.set_facecolor('#0a0a0a')
-            
-            colors = ['#00FF00' if x > 0 else '#FF0000' for x in contrib_df['Return %']]
-            ax3.barh(contrib_df.index, contrib_df['Return %'], color=colors, alpha=0.8)
-            
-            ax3.set_title('Individual Stock Returns (%)', 
-                          fontsize=14, fontweight='bold', color='#FF8C00', pad=15)
-            ax3.set_xlabel('Return (%)', fontsize=11, color='#FF8C00', fontweight='bold')
-            ax3.grid(True, alpha=0.2, color='#333333', linestyle='-', linewidth=0.5, axis='x')
-            ax3.tick_params(colors='#FFFFFF', labelsize=10)
-            ax3.axvline(x=0, color='#FFFFFF', linestyle='-', linewidth=0.5)
-            
-            fig3.tight_layout()
-            st.pyplot(fig3)
-        
-        with col2:
-            # Tableau formaté
-            display_contrib = contrib_df.copy()
-            display_contrib['Initial Value'] = display_contrib['Initial Value'].apply(lambda x: f"${x:,.2f}")
-            display_contrib['Final Value'] = display_contrib['Final Value'].apply(lambda x: f"${x:,.2f}")
-            display_contrib['Absolute Return'] = display_contrib['Absolute Return'].apply(lambda x: f"${x:+,.2f}")
-            display_contrib['Return %'] = display_contrib['Return %'].apply(lambda x: f"{x:+.2f}%")
-            display_contrib['Weight'] = display_contrib['Weight'].apply(lambda x: f"{x:.1f}%")
-            
-            st.dataframe(display_contrib, width='stretch')
-        
-        # ====================================================================
-        # CORRELATION MATRIX
-        # ====================================================================
-        
-        st.subheader("🔗 CORRELATION MATRIX")
-        
-        # Calculer les rendements quotidiens de chaque action
-        returns_df = prices_df.pct_change().dropna()
-        correlation_matrix = returns_df.corr()
-        
-        # Créer une heatmap
-        fig4, ax4 = plt.subplots(figsize=(10, 8), facecolor='#000000')
-        ax4.set_facecolor('#0a0a0a')
-        
-        im = ax4.imshow(correlation_matrix, cmap='RdYlGn', aspect='auto', vmin=-1, vmax=1)
-        
-        # Ajouter les valeurs dans les cellules
-        for i in range(len(correlation_matrix)):
-            for j in range(len(correlation_matrix)):
-                text = ax4.text(j, i, f'{correlation_matrix.iloc[i, j]:.2f}',
-                               ha="center", va="center", color="black", fontsize=10, fontweight='bold')
-        
-        ax4.set_xticks(range(len(correlation_matrix)))
-        ax4.set_yticks(range(len(correlation_matrix)))
-        ax4.set_xticklabels(correlation_matrix.columns, rotation=45, ha='right')
-        ax4.set_yticklabels(correlation_matrix.columns)
-        ax4.tick_params(colors='#FFFFFF', labelsize=10)
-        
-        ax4.set_title('Stock Returns Correlation Matrix', 
-                      fontsize=14, fontweight='bold', color='#FF8C00', pad=15)
-        
-        # Colorbar
-        cbar = plt.colorbar(im, ax=ax4)
-        cbar.ax.tick_params(colors='#FFFFFF')
-        
-        fig4.tight_layout()
-        st.pyplot(fig4)
-        
-        # ====================================================================
-        # DONNÉES DÉTAILLÉES
-        # ====================================================================
-        
-        with st.expander("📋 VIEW DETAILED DATA"):
-            st.subheader("Portfolio Value History")
-            
-            detailed_df = pd.DataFrame({
-                'Date': portfolio_values.index,
-                'Portfolio Value': portfolio_values.values,
-                'Daily Return %': daily_returns.values * 100,
-                'Cumulative Return %': ((portfolio_values.values / initial_capital) - 1) * 100
-            })
-            
-            detailed_df['Portfolio Value'] = detailed_df['Portfolio Value'].apply(lambda x: f"${x:,.2f}")
-            detailed_df['Daily Return %'] = detailed_df['Daily Return %'].apply(lambda x: f"{x:+.2f}%")
-            detailed_df['Cumulative Return %'] = detailed_df['Cumulative Return %'].apply(lambda x: f"{x:+.2f}%")
-            
-            st.dataframe(detailed_df.tail(50), width='stretch')
-        
-        # Footer
-        st.markdown("---")
-        st.markdown(f"**Simulation completed** | {len(selected_stocks)} stocks | Period: {start_date} to {end_date}")
+        st.pyplot(fig)
+    
+    # ============================================================================
+    # TABLEAU DE DONNEES - STYLE BLOOMBERG
+    # ============================================================================
+    
+    st.divider()
+    st.subheader("📋 RECENT DATA")
+    
+    # Préparer le dataframe pour l'affichage
+    display_df = df_filtered.tail(20).sort_index(ascending=False).copy()
+    display_df['Change'] = display_df['close'] - display_df['open']
+    display_df['Change %'] = (display_df['Change'] / display_df['open'] * 100).round(2)
+    
+    # Sélectionner les colonnes
+    display_df = display_df[['open', 'high', 'low', 'close', 'volume', 'Change', 'Change %']]
+    
+    # Formatter
+    display_df['open'] = display_df['open'].apply(lambda x: f"${x:.2f}")
+    display_df['high'] = display_df['high'].apply(lambda x: f"${x:.2f}")
+    display_df['low'] = display_df['low'].apply(lambda x: f"${x:.2f}")
+    display_df['close'] = display_df['close'].apply(lambda x: f"${x:.2f}")
+    display_df['volume'] = display_df['volume'].apply(lambda x: f"{int(x):,}")
+    display_df['Change'] = display_df['Change'].apply(lambda x: f"${x:.2f}")
+    display_df['Change %'] = display_df['Change %'].apply(lambda x: f"{x:+.2f}%")
+    
+    st.dataframe(display_df, width='stretch')
+    
+    # Footer
+    st.markdown("---")
+    st.markdown(f"**Data Source:** Supabase | **Stock:** {selected_display} | **Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 else:
-    st.info("👆 Configure your portfolio above and click 'RUN SIMULATION' to start")
+    st.warning("⚠️ Unable to load data. Check your Supabase connection.")
