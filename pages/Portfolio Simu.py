@@ -464,19 +464,24 @@ if df is not None:
                                              color='#FFD700', width=1.5))
         
         # Créer le graphique
-        fig, axes = mpf.plot(
-            df_filtered,
-            type='candle',
-            style=s,
-            title=f'{selected_display} - H4 Candlestick Chart',
-            ylabel='Price ($)',
-            volume=show_volume,
-            ylabel_lower='Volume' if show_volume else None,
-            figsize=(16, 10) if show_volume else (16, 8),
-            addplot=apds if apds else None,
-            returnfig=True,
-            warn_too_much_data=10000
-        )
+        kwargs = {
+            'data': df_filtered,
+            'type': 'candle',
+            'style': s,
+            'title': f'{selected_display} - H4 Candlestick Chart',
+            'ylabel': 'Price ($)',
+            'volume': show_volume,
+            'ylabel_lower': 'Volume' if show_volume else None,
+            'figsize': (16, 10) if show_volume else (16, 8),
+            'returnfig': True,
+            'warn_too_much_data': 10000
+        }
+        
+        # N'ajouter addplot que s'il y a des indicateurs
+        if apds:
+            kwargs['addplot'] = apds
+        
+        fig, axes = mpf.plot(**kwargs)
         
         # Personnaliser les couleurs des axes
         for ax in axes:
