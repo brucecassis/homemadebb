@@ -144,17 +144,35 @@ def load_data(table_name):
     try:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
         
-        # Pour 10 ans de données H4: 
-        # ~6 bougies par jour * 252 jours de trading * 10 ans = ~15,000 bougies
-        # On met 100,000 pour être large et couvrir toutes les données
-        response = supabase.table(table_name).select("*").order("date", desc=False).limit(100000).execute()
+        # Récupérer TOUTES les données avec pagination
+        all_data = []
+        batch_size = 1000
+        offset = 0
         
-        if not response.data:
+        while True:
+            response = supabase.table(table_name).select("*").order("date", desc=False).range(offset, offset + batch_size - 1).execute()
+            
+            if not response.data:
+                break
+            
+            all_data.extend(response.data)
+            
+            # Si on a récupéré moins que batch_size, on a tout récupéré
+            if len(response.data) < batch_size:
+                break
+            
+            offset += batch_size
+        
+        if not all_data:
             return None
         
-        df = pd.DataFrame(response.data)
+        df = pd.DataFrame(all_data)
         df['date'] = pd.to_datetime(df['date'])
         df = df.set_index('date')
+        
+        # Supprimer les doublons potentiels et trier
+        df = df[~df.index.duplicated(keep='first')]
+        df = df.sort_index()
         
         for col in ['open', 'high', 'low', 'close', 'volume']:
             if col in df.columns:
