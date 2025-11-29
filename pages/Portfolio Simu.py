@@ -10,7 +10,7 @@ import matplotlib.dates as mdates
 # ============================================================================
 # CONFIG STREAMLIT - STYLE BLOOMBERG
 # ============================================================================
-st.set_page_config(page_title="Stock Chart Analyzer", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Portfolio Simulation", page_icon="📊", layout="wide")
 
 # CSS personnalisé style Bloomberg
 st.markdown("""
@@ -228,7 +228,7 @@ if chart_mode == "📊 Single Stock Analysis":
     
 else:
     # MODE MULTIPLE - Multi-sélection
-    default_stocks = ['MORGAN_STANLEY', 'AAPL', 'MSFT', 'NVDA'] if all(s in table_names_display for s in ['MORGAN_STANLEY', 'AAPL', 'MSFT', 'NVDA']) else table_names_display[:4]
+    default_stocks = ['MORGAN_STANLEY', 'AAPL', 'MSFT', 'NVDA'] if all(s in table_names_display for s in ['AAPL', 'MSFT', 'NVDA']) else table_names_display[:4]
     
     selected_displays = st.sidebar.multiselect(
         "Select Stocks to Compare:",
