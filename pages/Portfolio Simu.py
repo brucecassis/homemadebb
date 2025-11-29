@@ -258,111 +258,92 @@ if not data_dict:
 df_reference = list(data_dict.values())[0]
 
 # ============================================================================
-# PARAMETRES DE PERIODE
+# PARAMETRES DE PERIODE - VERSION CUSTOM UNIQUEMENT
 # ============================================================================
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("📅 Period Selection")
 
-period_options = {
-    "Custom Date Range": -2
-}
+# On garde uniquement l'option Custom Date Range
+st.sidebar.markdown("**Select Date Range:**")
 
-period_choice = st.sidebar.selectbox(
-    "Choose Period:",
-    list(period_options.keys()),
-    index=3
+min_date = df_reference.index.min().date()
+max_date = df_reference.index.max().date()
+
+# Afficher les dates disponibles
+st.sidebar.info(f"📅 Available data: {min_date} to {max_date}")
+
+# Raccourcis de dates (optionnel - vous pouvez garder ou supprimer)
+date_preset = st.sidebar.selectbox(
+    "Quick Date Range:",
+    ["Custom", "Last Week", "Last Month", "Last 3 Months", "Last 6 Months", "Last Year", "Year to Date", "All Data"]
 )
 
-period_value = period_options[period_choice]
-
-# Filtrage des données
-data_filtered = {}
-
-if period_value > 0:
-    num_candles = period_value
-    for ticker, df in data_dict.items():
-        data_filtered[ticker] = df.tail(min(num_candles, len(df)))
-        
-elif period_value == -1:
-    max_candles = min([len(df) for df in data_dict.values()])
-    num_candles = st.sidebar.slider(
-        "Number of candles:",
-        min_value=10,
-        max_value=min(max_candles, 5000),
-        value=min(500, max_candles),
-        step=10
-    )
-    for ticker, df in data_dict.items():
-        data_filtered[ticker] = df.tail(num_candles)
-        
+if date_preset == "Last Week":
+    start_date = max_date - timedelta(days=7)
+    end_date = max_date
+elif date_preset == "Last Month":
+    start_date = max_date - timedelta(days=30)
+    end_date = max_date
+elif date_preset == "Last 3 Months":
+    start_date = max_date - timedelta(days=90)
+    end_date = max_date
+elif date_preset == "Last 6 Months":
+    start_date = max_date - timedelta(days=180)
+    end_date = max_date
+elif date_preset == "Last Year":
+    start_date = max_date - timedelta(days=365)
+    end_date = max_date
+elif date_preset == "Year to Date":
+    start_date = datetime(max_date.year, 1, 1).date()
+    end_date = max_date
+elif date_preset == "All Data":
+    start_date = min_date
+    end_date = max_date
 else:
-    st.sidebar.markdown("**Select Date Range:**")
-    
-    min_date = min([df.index.min().date() for df in data_dict.values()])
-    max_date = max([df.index.max().date() for df in data_dict.values()])
-    
-    st.sidebar.info(f"📅 Available data: {min_date} to {max_date}")
-    
-    date_preset = st.sidebar.selectbox(
-        "Quick Date Range:",
-        ["Custom", "Last Week", "Last Month", "Last 3 Months", "Last 6 Months", "Last Year", "Year to Date", "All Data"]
-    )
-    
-    if date_preset == "Last Week":
-        start_date = max_date - timedelta(days=7)
-        end_date = max_date
-    elif date_preset == "Last Month":
-        start_date = max_date - timedelta(days=30)
-        end_date = max_date
-    elif date_preset == "Last 3 Months":
-        start_date = max_date - timedelta(days=90)
-        end_date = max_date
-    elif date_preset == "Last 6 Months":
-        start_date = max_date - timedelta(days=180)
-        end_date = max_date
-    elif date_preset == "Last Year":
-        start_date = max_date - timedelta(days=365)
-        end_date = max_date
-    elif date_preset == "Year to Date":
-        start_date = datetime(max_date.year, 1, 1).date()
-        end_date = max_date
-    elif date_preset == "All Data":
-        start_date = min_date
-        end_date = max_date
-    else:
-        col1, col2 = st.sidebar.columns(2)
-        with col1:
-            start_date = st.date_input(
-                "From:",
-                value=max_date - timedelta(days=90),
-                min_value=min_date,
-                max_value=max_date,
-                key="start_date"
-            )
-        with col2:
-            end_date = st.date_input(
-                "To:",
-                value=max_date,
-                min_value=min_date,
-                max_value=max_date,
-                key="end_date"
-            )
-    
-    if date_preset != "Custom":
-        st.sidebar.write(f"**From:** {start_date}")
-        st.sidebar.write(f"**To:** {end_date}")
-    
-    if start_date > end_date:
-        st.sidebar.error("⚠️ Start date must be before end date!")
-        st.stop()
-    
-    for ticker, df in data_dict.items():
-        data_filtered[ticker] = df.loc[start_date:end_date]
-    
-    if all(len(df) == 0 for df in data_filtered.values()):
-        st.warning(f"⚠️ No data available between {start_date} and {end_date}!")
-        st.stop()
+    # Custom - utiliser les date inputs
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        start_date = st.date_input(
+            "From:",
+            value=max_date - timedelta(days=90),
+            min_value=min_date,
+            max_value=max_date,
+            key="start_date"
+        )
+    with col2:
+        end_date = st.date_input(
+            "To:",
+            value=max_date,
+            min_value=min_date,
+            max_value=max_date,
+            key="end_date"
+        )
+
+# Afficher les dates sélectionnées si ce n'est pas Custom
+if date_preset != "Custom":
+    st.sidebar.write(f"**From:** {start_date}")
+    st.sidebar.write(f"**To:** {end_date}")
+
+# Validation des dates
+if start_date > end_date:
+    st.sidebar.error("⚠️ Start date must be before end date!")
+    st.stop()
+
+# Filtrer par dates pour tous les tickers
+data_filtered = {}
+for ticker, df in data_dict.items():
+    data_filtered[ticker] = df.loc[start_date:end_date]
+
+# Vérifier qu'il y a des données
+if all(len(df) == 0 for df in data_filtered.values()):
+    st.warning(f"⚠️ No data available between {start_date} and {end_date}!")
+    st.info(f"Available data range: {min_date} to {max_date}")
+    st.stop()
+
+# Afficher le nombre de bougies dans la période
+total_candles = max(len(df) for df in data_filtered.values() if len(df) > 0)
+st.sidebar.success(f"✅ {total_candles} candles in selected period")
 
 # ============================================================================
 # AUTRES PARAMETRES
