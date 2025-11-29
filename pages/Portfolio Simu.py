@@ -69,6 +69,11 @@ st.markdown("""
         color: #FF8C00 !important;
     }
     
+    /* Multi-select */
+    .stMultiSelect > label, .stMultiSelect div {
+        color: #FF8C00 !important;
+    }
+    
     /* Checkbox */
     .stCheckbox > label {
         color: #FF8C00 !important;
@@ -104,7 +109,6 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 def get_all_tables():
     """Récupère la liste de toutes les tables disponibles"""
     try:
-        # Liste des tables principales (tu peux l'enrichir)
         tables = [
             'a_h4_data', 'aal_h4_data', 'aapl_h4_data', 'abbv_h4_data', 'abnb_h4_data', 
             'abt_h4_data', 'acgl_h4_data', 'acn_h4_data', 'adbe_h4_data', 'adi_h4_data',
@@ -140,11 +144,9 @@ def load_data(table_name):
     try:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
         
-        with st.spinner("📥 Loading data from database..."):
-            response = supabase.table(table_name).select("*").order("date", desc=False).limit(10000).execute()
+        response = supabase.table(table_name).select("*").order("date", desc=False).limit(10000).execute()
         
         if not response.data:
-            st.error("❌ No data found in table!")
             return None
         
         df = pd.DataFrame(response.data)
@@ -160,8 +162,19 @@ def load_data(table_name):
         return df
     
     except Exception as e:
-        st.error(f"❌ Error loading data: {str(e)}")
+        st.error(f"❌ Error loading data for {table_name}: {str(e)}")
         return None
+
+# ============================================================================
+# FONCTION POUR NORMALISER LES DONNEES SUR BASE 100
+# ============================================================================
+
+def normalize_to_base_100(df, column='close'):
+    """Normalise une série de prix sur base 100"""
+    if len(df) == 0:
+        return pd.Series()
+    first_value = df[column].iloc[0]
+    return (df[column] / first_value) * 100
 
 # ============================================================================
 # SIDEBAR - PARAMETRES
@@ -169,172 +182,202 @@ def load_data(table_name):
 
 st.sidebar.header("⚙️ CHART SETTINGS")
 
-# Liste déroulante pour choisir la table
+# Onglets pour sélection unique ou multiple
+chart_mode = st.sidebar.radio(
+    "Chart Mode:",
+    ["📊 Single Stock Analysis", "📈 Multi-Stock Comparison"],
+    index=0
+)
+
 available_tables = get_all_tables()
 table_names_display = [t.replace('_h4_data', '').upper() for t in available_tables]
 table_dict = dict(zip(table_names_display, available_tables))
 
-selected_display = st.sidebar.selectbox(
-    "Select Stock:",
-    table_names_display,
-    index=table_names_display.index('MORGAN_STANLEY') if 'MORGAN_STANLEY' in table_names_display else 0
-)
-
-selected_table = table_dict[selected_display]
-
-# Charger les données
-df = load_data(selected_table)
-
-if df is not None:
-    # ============================================================================
-    # PARAMETRES DE PERIODE - AMELIORE
-    # ============================================================================
-    
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📅 Period Selection")
-    
-    # Options de période avec raccourcis rapides
-    period_options = {
-        "Last 50 Candles": 50,
-        "Last 100 Candles": 100,
-        "Last 200 Candles": 200,
-        "Last 500 Candles": 500,
-        "Last 1000 Candles": 1000,
-        "Custom Number": -1,
-        "Custom Date Range": -2
-    }
-    
-    period_choice = st.sidebar.selectbox(
-        "Choose Period:",
-        list(period_options.keys()),
-        index=3  # Default: Last 500 Candles
+if chart_mode == "📊 Single Stock Analysis":
+    # MODE UNIQUE - Sélection simple
+    selected_display = st.sidebar.selectbox(
+        "Select Stock:",
+        table_names_display,
+        index=table_names_display.index('MORGAN_STANLEY') if 'MORGAN_STANLEY' in table_names_display else 0
     )
     
-    period_value = period_options[period_choice]
+    selected_tables = [table_dict[selected_display]]
+    selected_displays = [selected_display]
     
-    # Filtrage selon le choix
-    if period_value > 0:
-        # Nombre prédéfini de bougies
-        num_candles = min(period_value, len(df))
-        df_filtered = df.tail(num_candles)
+else:
+    # MODE MULTIPLE - Multi-sélection
+    default_stocks = ['MORGAN_STANLEY', 'AAPL', 'MSFT', 'NVDA'] if all(s in table_names_display for s in ['MORGAN_STANLEY', 'AAPL', 'MSFT', 'NVDA']) else table_names_display[:4]
+    
+    selected_displays = st.sidebar.multiselect(
+        "Select Stocks to Compare:",
+        table_names_display,
+        default=default_stocks
+    )
+    
+    if not selected_displays:
+        st.warning("⚠️ Please select at least one stock to display")
+        st.stop()
+    
+    selected_tables = [table_dict[display] for display in selected_displays]
+
+# Charger les données pour tous les tickers sélectionnés
+data_dict = {}
+with st.spinner("📥 Loading data from database..."):
+    for table, display in zip(selected_tables, selected_displays):
+        df = load_data(table)
+        if df is not None:
+            data_dict[display] = df
+
+if not data_dict:
+    st.error("❌ No data could be loaded!")
+    st.stop()
+
+# Utiliser le premier ticker pour les paramètres de période
+df_reference = list(data_dict.values())[0]
+
+# ============================================================================
+# PARAMETRES DE PERIODE
+# ============================================================================
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("📅 Period Selection")
+
+period_options = {
+    "Last 50 Candles": 50,
+    "Last 100 Candles": 100,
+    "Last 200 Candles": 200,
+    "Last 500 Candles": 500,
+    "Last 1000 Candles": 1000,
+    "Custom Number": -1,
+    "Custom Date Range": -2
+}
+
+period_choice = st.sidebar.selectbox(
+    "Choose Period:",
+    list(period_options.keys()),
+    index=3
+)
+
+period_value = period_options[period_choice]
+
+# Filtrage des données
+data_filtered = {}
+
+if period_value > 0:
+    num_candles = period_value
+    for ticker, df in data_dict.items():
+        data_filtered[ticker] = df.tail(min(num_candles, len(df)))
         
-    elif period_value == -1:
-        # Nombre personnalisé de bougies
-        max_candles = len(df)
-        num_candles = st.sidebar.slider(
-            "Number of candles:",
-            min_value=10,
-            max_value=min(max_candles, 5000),
-            value=min(500, max_candles),
-            step=10
-        )
-        df_filtered = df.tail(num_candles)
+elif period_value == -1:
+    max_candles = min([len(df) for df in data_dict.values()])
+    num_candles = st.sidebar.slider(
+        "Number of candles:",
+        min_value=10,
+        max_value=min(max_candles, 5000),
+        value=min(500, max_candles),
+        step=10
+    )
+    for ticker, df in data_dict.items():
+        data_filtered[ticker] = df.tail(num_candles)
         
+else:
+    st.sidebar.markdown("**Select Date Range:**")
+    
+    min_date = min([df.index.min().date() for df in data_dict.values()])
+    max_date = max([df.index.max().date() for df in data_dict.values()])
+    
+    st.sidebar.info(f"📅 Available data: {min_date} to {max_date}")
+    
+    date_preset = st.sidebar.selectbox(
+        "Quick Date Range:",
+        ["Custom", "Last Week", "Last Month", "Last 3 Months", "Last 6 Months", "Last Year", "Year to Date", "All Data"]
+    )
+    
+    if date_preset == "Last Week":
+        start_date = max_date - timedelta(days=7)
+        end_date = max_date
+    elif date_preset == "Last Month":
+        start_date = max_date - timedelta(days=30)
+        end_date = max_date
+    elif date_preset == "Last 3 Months":
+        start_date = max_date - timedelta(days=90)
+        end_date = max_date
+    elif date_preset == "Last 6 Months":
+        start_date = max_date - timedelta(days=180)
+        end_date = max_date
+    elif date_preset == "Last Year":
+        start_date = max_date - timedelta(days=365)
+        end_date = max_date
+    elif date_preset == "Year to Date":
+        start_date = datetime(max_date.year, 1, 1).date()
+        end_date = max_date
+    elif date_preset == "All Data":
+        start_date = min_date
+        end_date = max_date
     else:
-        # Période personnalisée par dates
-        st.sidebar.markdown("**Select Date Range:**")
-        
-        min_date = df.index.min().date()
-        max_date = df.index.max().date()
-        
-        # Afficher les dates disponibles
-        st.sidebar.info(f"📅 Available data: {min_date} to {max_date}")
-        
-        # Raccourcis de dates
-        date_preset = st.sidebar.selectbox(
-            "Quick Date Range:",
-            ["Custom", "Last Week", "Last Month", "Last 3 Months", "Last 6 Months", "Last Year", "Year to Date", "All Data"]
-        )
-        
-        if date_preset == "Last Week":
-            start_date = max_date - timedelta(days=7)
-            end_date = max_date
-        elif date_preset == "Last Month":
-            start_date = max_date - timedelta(days=30)
-            end_date = max_date
-        elif date_preset == "Last 3 Months":
-            start_date = max_date - timedelta(days=90)
-            end_date = max_date
-        elif date_preset == "Last 6 Months":
-            start_date = max_date - timedelta(days=180)
-            end_date = max_date
-        elif date_preset == "Last Year":
-            start_date = max_date - timedelta(days=365)
-            end_date = max_date
-        elif date_preset == "Year to Date":
-            start_date = datetime(max_date.year, 1, 1).date()
-            end_date = max_date
-        elif date_preset == "All Data":
-            start_date = min_date
-            end_date = max_date
-        else:
-            # Custom - utiliser les date inputs
-            col1, col2 = st.sidebar.columns(2)
-            with col1:
-                start_date = st.date_input(
-                    "From:",
-                    value=max_date - timedelta(days=90),
-                    min_value=min_date,
-                    max_value=max_date,
-                    key="start_date"
-                )
-            with col2:
-                end_date = st.date_input(
-                    "To:",
-                    value=max_date,
-                    min_value=min_date,
-                    max_value=max_date,
-                    key="end_date"
-                )
-        
-        # Afficher les dates sélectionnées si ce n'est pas Custom
-        if date_preset != "Custom":
-            st.sidebar.write(f"**From:** {start_date}")
-            st.sidebar.write(f"**To:** {end_date}")
-        
-        # Validation des dates
-        if start_date > end_date:
-            st.sidebar.error("⚠️ Start date must be before end date!")
-            st.stop()
-        
-        # Filtrer par dates
-        df_filtered = df.loc[start_date:end_date]
-        
-        if len(df_filtered) == 0:
-            st.warning(f"⚠️ No data available between {start_date} and {end_date}!")
-            st.info(f"Available data range: {min_date} to {max_date}")
-            st.stop()
-        
-        # Afficher le nombre de bougies dans la période
-        st.sidebar.success(f"✅ {len(df_filtered)} candles in selected period")
+        col1, col2 = st.sidebar.columns(2)
+        with col1:
+            start_date = st.date_input(
+                "From:",
+                value=max_date - timedelta(days=90),
+                min_value=min_date,
+                max_value=max_date,
+                key="start_date"
+            )
+        with col2:
+            end_date = st.date_input(
+                "To:",
+                value=max_date,
+                min_value=min_date,
+                max_value=max_date,
+                key="end_date"
+            )
     
-    # ============================================================================
-    # AUTRES PARAMETRES
-    # ============================================================================
+    if date_preset != "Custom":
+        st.sidebar.write(f"**From:** {start_date}")
+        st.sidebar.write(f"**To:** {end_date}")
     
-    st.sidebar.markdown("---")
+    if start_date > end_date:
+        st.sidebar.error("⚠️ Start date must be before end date!")
+        st.stop()
     
-    # Choix du type de graphique
+    for ticker, df in data_dict.items():
+        data_filtered[ticker] = df.loc[start_date:end_date]
+    
+    if all(len(df) == 0 for df in data_filtered.values()):
+        st.warning(f"⚠️ No data available between {start_date} and {end_date}!")
+        st.stop()
+
+# ============================================================================
+# AUTRES PARAMETRES
+# ============================================================================
+
+st.sidebar.markdown("---")
+
+if chart_mode == "📊 Single Stock Analysis":
     chart_type = st.sidebar.radio(
         "Chart Type:",
         ["📈 Line Chart", "🕯️ Candlestick"],
         index=1
     )
-    
-    # Toggle pour afficher le volume
     show_volume = st.sidebar.checkbox("Show Volume", value=True)
-    
-    # Toggle pour afficher les moyennes mobiles
     show_ma = st.sidebar.checkbox("Show Moving Averages", value=True)
+else:
+    show_ma = st.sidebar.checkbox("Show Moving Averages", value=False)
+
+# ============================================================================
+# AFFICHAGE MODE SINGLE STOCK
+# ============================================================================
+
+if chart_mode == "📊 Single Stock Analysis":
+    ticker = selected_displays[0]
+    df_filtered = data_filtered[ticker]
     
-    # ============================================================================
-    # AFFICHAGE DES STATS - STYLE BLOOMBERG
-    # ============================================================================
-    
+    # Stats
     col1, col2, col3, col4, col5 = st.columns(5)
     
-    last_price = df['close'].iloc[-1]
-    prev_price = df['close'].iloc[-2]
+    last_price = df_filtered['close'].iloc[-1]
+    prev_price = df_filtered['close'].iloc[-2]
     price_change = last_price - prev_price
     pct_change = (price_change / prev_price) * 100
     
@@ -353,15 +396,10 @@ if df is not None:
     
     st.divider()
     
-    # ============================================================================
-    # GRAPHIQUE STYLE BLOOMBERG
-    # ============================================================================
-    
+    # Graphique
     if chart_type == "📈 Line Chart":
-        # ========== COURBE STYLE BLOOMBERG ==========
-        st.subheader(f"📈 {selected_display} - LINE CHART")
+        st.subheader(f"📈 {ticker} - LINE CHART")
         
-        # Calculer les moyennes mobiles
         if show_ma:
             df_filtered['SMA50'] = df_filtered['close'].rolling(window=50).mean()
             df_filtered['SMA100'] = df_filtered['close'].rolling(window=100).mean()
@@ -374,14 +412,10 @@ if df is not None:
         else:
             fig, ax1 = plt.subplots(figsize=(16, 8), facecolor='#000000')
         
-        # Graphique principal - Prix
         ax1.set_facecolor('#0a0a0a')
-        
-        # Prix de clôture
         ax1.plot(df_filtered.index, df_filtered['close'], 
                 linewidth=2, color='#00D9FF', label='Close', zorder=5)
         
-        # Moyennes mobiles
         if show_ma:
             if len(df_filtered) >= 50:
                 ax1.plot(df_filtered.index, df_filtered['SMA50'], 
@@ -393,7 +427,7 @@ if df is not None:
                 ax1.plot(df_filtered.index, df_filtered['SMA200'], 
                         linewidth=1.5, color='#FFD700', label='SMA 200', alpha=0.8)
         
-        ax1.set_title(f'{selected_display} - H4 Chart', 
+        ax1.set_title(f'{ticker} - H4 Chart', 
                      fontsize=18, fontweight='bold', color='#FF8C00', pad=20)
         ax1.set_ylabel('Price ($)', fontsize=12, color='#FF8C00', fontweight='bold')
         ax1.grid(True, alpha=0.2, color='#333333', linestyle='-', linewidth=0.5)
@@ -402,7 +436,6 @@ if df is not None:
         ax1.tick_params(colors='#FFFFFF', labelsize=10)
         
         if show_volume:
-            # Graphique du volume
             ax2.set_facecolor('#0a0a0a')
             colors = ['#4169E1' if df_filtered['close'].iloc[i] >= df_filtered['open'].iloc[i] 
                      else '#808080' for i in range(len(df_filtered))]
@@ -411,8 +444,6 @@ if df is not None:
             ax2.set_xlabel('Date', fontsize=12, color='#FF8C00', fontweight='bold')
             ax2.grid(True, alpha=0.2, color='#333333', linestyle='-', linewidth=0.5)
             ax2.tick_params(colors='#FFFFFF', labelsize=10)
-            
-            # Format des dates
             ax2.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
             plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45, ha='right')
         else:
@@ -424,19 +455,14 @@ if df is not None:
         st.pyplot(fig)
     
     else:
-        # ========== BOUGIES STYLE BLOOMBERG (BLEU/GRIS) ==========
-        st.subheader(f"🕯️ {selected_display} - CANDLESTICK CHART")
+        st.subheader(f"🕯️ {ticker} - CANDLESTICK CHART")
         
-        # Style Bloomberg avec couleurs bleues (bull) et grises (bear)
         mc = mpf.make_marketcolors(
-            up='#4169E1',        # Bleu royal pour les bougies haussières
-            down='#808080',      # Gris pour les bougies baissières
+            up='#4169E1',
+            down='#808080',
             edge='inherit',
             wick='inherit',
-            volume={
-                'up': '#4169E1',
-                'down': '#808080'
-            },
+            volume={'up': '#4169E1', 'down': '#808080'},
             alpha=0.9
         )
         
@@ -450,7 +476,6 @@ if df is not None:
             y_on_right=False
         )
         
-        # Ajouter les moyennes mobiles
         apds = []
         if show_ma:
             if len(df_filtered) >= 50:
@@ -463,11 +488,10 @@ if df is not None:
                 apds.append(mpf.make_addplot(df_filtered['close'].rolling(200).mean(), 
                                              color='#FFD700', width=1.5))
         
-        # Créer le graphique
         kwargs = {
             'type': 'candle',
             'style': s,
-            'title': f'{selected_display} - H4 Candlestick Chart',
+            'title': f'{ticker} - H4 Candlestick Chart',
             'ylabel': 'Price ($)',
             'volume': show_volume,
             'figsize': (16, 10) if show_volume else (16, 8),
@@ -475,17 +499,14 @@ if df is not None:
             'warn_too_much_data': 10000
         }
         
-        # N'ajouter ylabel_lower que si le volume est affiché
         if show_volume:
             kwargs['ylabel_lower'] = 'Volume'
         
-        # N'ajouter addplot que s'il y a des indicateurs
         if apds:
             kwargs['addplot'] = apds
         
         fig, axes = mpf.plot(df_filtered, **kwargs)
         
-        # Personnaliser les couleurs des axes
         for ax in axes:
             ax.set_facecolor('#0a0a0a')
             ax.tick_params(colors='#FFFFFF', labelsize=10)
@@ -499,22 +520,16 @@ if df is not None:
         
         st.pyplot(fig)
     
-    # ============================================================================
-    # TABLEAU DE DONNEES - STYLE BLOOMBERG
-    # ============================================================================
-    
+    # Tableau de données
     st.divider()
     st.subheader("📋 RECENT DATA")
     
-    # Préparer le dataframe pour l'affichage
     display_df = df_filtered.tail(20).sort_index(ascending=False).copy()
     display_df['Change'] = display_df['close'] - display_df['open']
     display_df['Change %'] = (display_df['Change'] / display_df['open'] * 100).round(2)
     
-    # Sélectionner les colonnes
     display_df = display_df[['open', 'high', 'low', 'close', 'volume', 'Change', 'Change %']]
     
-    # Formatter
     display_df['open'] = display_df['open'].apply(lambda x: f"${x:.2f}")
     display_df['high'] = display_df['high'].apply(lambda x: f"${x:.2f}")
     display_df['low'] = display_df['low'].apply(lambda x: f"${x:.2f}")
@@ -524,10 +539,111 @@ if df is not None:
     display_df['Change %'] = display_df['Change %'].apply(lambda x: f"{x:+.2f}%")
     
     st.dataframe(display_df, use_container_width=True)
-    
-    # Footer
-    st.markdown("---")
-    st.markdown(f"**Data Source:** Supabase | **Stock:** {selected_display} | **Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+# ============================================================================
+# AFFICHAGE MODE MULTI-STOCK COMPARISON
+# ============================================================================
 
 else:
-    st.warning("⚠️ Unable to load data. Check your Supabase connection.")
+    st.subheader("📈 MULTI-STOCK COMPARISON - BASE 100")
+    
+    # Stats comparatives
+    cols = st.columns(len(selected_displays))
+    
+    for i, ticker in enumerate(selected_displays):
+        df = data_filtered[ticker]
+        if len(df) > 0:
+            last_price = df['close'].iloc[-1]
+            first_price = df['close'].iloc[0]
+            total_change_pct = ((last_price - first_price) / first_price) * 100
+            
+            with cols[i]:
+                st.metric(
+                    ticker,
+                    f"${last_price:.2f}",
+                    f"{total_change_pct:+.2f}%"
+                )
+    
+    st.divider()
+    
+    # Graphique de comparaison sur base 100
+    fig, ax = plt.subplots(figsize=(16, 10), facecolor='#000000')
+    ax.set_facecolor('#0a0a0a')
+    
+    # Palette de couleurs distinctes
+    colors = ['#00D9FF', '#FF1493', '#00FF00', '#FFD700', '#FF4500', '#9370DB', '#FF69B4', '#00CED1', '#FFA500', '#7FFF00']
+    
+    # Tracer chaque ticker normalisé sur base 100
+    for i, ticker in enumerate(selected_displays):
+        df = data_filtered[ticker]
+        if len(df) > 0:
+            normalized = normalize_to_base_100(df, 'close')
+            ax.plot(df.index, normalized, 
+                   linewidth=2.5, 
+                   color=colors[i % len(colors)], 
+                   label=ticker, 
+                   alpha=0.9)
+            
+            # Optionnel: ajouter moyennes mobiles
+            if show_ma and len(df) >= 50:
+                ma50 = (df['close'].rolling(window=50).mean() / df['close'].iloc[0]) * 100
+                ax.plot(df.index, ma50, 
+                       linewidth=1, 
+                       color=colors[i % len(colors)], 
+                       alpha=0.3, 
+                       linestyle='--')
+    
+    # Ligne de référence à 100
+    if len(data_filtered) > 0:
+        first_date = min([df.index[0] for df in data_filtered.values()])
+        last_date = max([df.index[-1] for df in data_filtered.values()])
+        ax.axhline(y=100, color='#FF8C00', linestyle='--', linewidth=1.5, alpha=0.5, label='Base 100')
+    
+    ax.set_title('Stock Performance Comparison (Base 100)', 
+                 fontsize=18, fontweight='bold', color='#FF8C00', pad=20)
+    ax.set_ylabel('Performance (Base 100)', fontsize=12, color='#FF8C00', fontweight='bold')
+    ax.set_xlabel('Date', fontsize=12, color='#FF8C00', fontweight='bold')
+    ax.grid(True, alpha=0.2, color='#333333', linestyle='-', linewidth=0.5)
+    ax.legend(loc='best', facecolor='#1a1a1a', edgecolor='#FF8C00', 
+              fontsize=11, labelcolor='#FF8C00', ncol=2)
+    ax.tick_params(colors='#FFFFFF', labelsize=10)
+    
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+    
+    fig.tight_layout()
+    st.pyplot(fig)
+    
+    # Tableau de performance
+    st.divider()
+    st.subheader("📊 PERFORMANCE SUMMARY")
+    
+    perf_data = []
+    for ticker in selected_displays:
+        df = data_filtered[ticker]
+        if len(df) > 1:
+            first_price = df['close'].iloc[0]
+            last_price = df['close'].iloc[-1]
+            total_change = last_price - first_price
+            total_change_pct = (total_change / first_price) * 100
+            high = df['high'].max()
+            low = df['low'].min()
+            avg_volume = df['volume'].mean()
+            
+            perf_data.append({
+                'Ticker': ticker,
+                'Start Price': f"${first_price:.2f}",
+                'End Price': f"${last_price:.2f}",
+                'Change': f"${total_change:+.2f}",
+                'Change %': f"{total_change_pct:+.2f}%",
+                'High': f"${high:.2f}",
+                'Low': f"${low:.2f}",
+                'Avg Volume': f"{avg_volume/1e6:.1f}M"
+            })
+    
+    perf_df = pd.DataFrame(perf_data)
+    st.dataframe(perf_df, use_container_width=True)
+
+# Footer
+st.markdown("---")
+st.markdown(f"**Data Source:** Supabase | **Mode:** {chart_mode} | **Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
