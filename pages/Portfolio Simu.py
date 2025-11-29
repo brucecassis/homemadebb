@@ -228,7 +228,7 @@ if chart_mode == "📊 Single Stock Analysis":
     
 else:
     # MODE MULTIPLE - Multi-sélection
-    default_stocks = ['MORGAN_STANLEY', 'AAPL', 'MSFT', 'NVDA'] if all(s in table_names_display for s in ['AAPL', 'MSFT', 'NVDA']) else table_names_display[:4]
+    default_stocks = ['AAPL', 'MSFT', 'NVDA'] if all(s in table_names_display for s in ['AAPL', 'MSFT', 'NVDA']) else table_names_display[:4]
     
     selected_displays = st.sidebar.multiselect(
         "Select Stocks to Compare:",
