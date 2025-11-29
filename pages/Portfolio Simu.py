@@ -265,12 +265,6 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("📅 Period Selection")
 
 period_options = {
-    "Last 50 Candles": 50,
-    "Last 100 Candles": 100,
-    "Last 200 Candles": 200,
-    "Last 500 Candles": 500,
-    "Last 1000 Candles": 1000,
-    "Custom Number": -1,
     "Custom Date Range": -2
 }
 
