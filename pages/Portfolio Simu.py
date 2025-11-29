@@ -10,7 +10,7 @@ import matplotlib.dates as mdates
 # ============================================================================
 # CONFIG STREAMLIT - STYLE BLOOMBERG
 # ============================================================================
-st.set_page_config(page_title="Portfolio Simulation", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Stock Chart Analyzer", page_icon="📊", layout="wide")
 
 # CSS personnalisé style Bloomberg
 st.markdown("""
@@ -207,7 +207,7 @@ st.sidebar.header("⚙️ CHART SETTINGS")
 # Onglets pour sélection unique ou multiple
 chart_mode = st.sidebar.radio(
     "Chart Mode:",
-    ["📊 Single Stock Analysis", "📈 Multi-Stock Comparison"],
+    ["📊 Single Stock Analysis", "📈 Multi-Stock Comparison", "🚀 Momentum Strategy"],
     index=0
 )
 
@@ -225,10 +225,32 @@ if chart_mode == "📊 Single Stock Analysis":
     
     selected_tables = [table_dict[selected_display]]
     selected_displays = [selected_display]
+
+elif chart_mode == "🚀 Momentum Strategy":
+    # MODE MOMENTUM - Sélection de 2 tickers
+    st.sidebar.markdown("### Select 2 Assets for Momentum Strategy")
+    
+    default_ticker1 = 'QQQ' if 'QQQ' in table_names_display else table_names_display[0]
+    default_ticker2 = 'VIXM' if 'VIXM' in table_names_display else table_names_display[1]
+    
+    ticker1 = st.sidebar.selectbox(
+        "Primary Asset (Buy & Hold):",
+        table_names_display,
+        index=table_names_display.index(default_ticker1)
+    )
+    
+    ticker2 = st.sidebar.selectbox(
+        "Trading Asset (RSI Strategy):",
+        table_names_display,
+        index=table_names_display.index(default_ticker2)
+    )
+    
+    selected_displays = [ticker1, ticker2]
+    selected_tables = [table_dict[ticker1], table_dict[ticker2]]
     
 else:
     # MODE MULTIPLE - Multi-sélection
-    default_stocks = ['AAPL', 'MSFT', 'NVDA'] if all(s in table_names_display for s in ['AAPL', 'MSFT', 'NVDA']) else table_names_display[:4]
+    default_stocks = ['MORGAN_STANLEY', 'AAPL', 'MSFT', 'NVDA'] if all(s in table_names_display for s in ['MORGAN_STANLEY', 'AAPL', 'MSFT', 'NVDA']) else table_names_display[:4]
     
     selected_displays = st.sidebar.multiselect(
         "Select Stocks to Compare:",
@@ -258,92 +280,117 @@ if not data_dict:
 df_reference = list(data_dict.values())[0]
 
 # ============================================================================
-# PARAMETRES DE PERIODE - VERSION CUSTOM UNIQUEMENT
+# PARAMETRES DE PERIODE
 # ============================================================================
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("📅 Period Selection")
 
-# On garde uniquement l'option Custom Date Range
-st.sidebar.markdown("**Select Date Range:**")
+period_options = {
+    "Last 50 Candles": 50,
+    "Last 100 Candles": 100,
+    "Last 200 Candles": 200,
+    "Last 500 Candles": 500,
+    "Last 1000 Candles": 1000,
+    "Custom Number": -1,
+    "Custom Date Range": -2
+}
 
-min_date = df_reference.index.min().date()
-max_date = df_reference.index.max().date()
-
-# Afficher les dates disponibles
-st.sidebar.info(f"📅 Available data: {min_date} to {max_date}")
-
-# Raccourcis de dates (optionnel - vous pouvez garder ou supprimer)
-date_preset = st.sidebar.selectbox(
-    "Quick Date Range:",
-    ["Custom", "Last Week", "Last Month", "Last 3 Months", "Last 6 Months", "Last Year", "Year to Date", "All Data"]
+period_choice = st.sidebar.selectbox(
+    "Choose Period:",
+    list(period_options.keys()),
+    index=3
 )
 
-if date_preset == "Last Week":
-    start_date = max_date - timedelta(days=7)
-    end_date = max_date
-elif date_preset == "Last Month":
-    start_date = max_date - timedelta(days=30)
-    end_date = max_date
-elif date_preset == "Last 3 Months":
-    start_date = max_date - timedelta(days=90)
-    end_date = max_date
-elif date_preset == "Last 6 Months":
-    start_date = max_date - timedelta(days=180)
-    end_date = max_date
-elif date_preset == "Last Year":
-    start_date = max_date - timedelta(days=365)
-    end_date = max_date
-elif date_preset == "Year to Date":
-    start_date = datetime(max_date.year, 1, 1).date()
-    end_date = max_date
-elif date_preset == "All Data":
-    start_date = min_date
-    end_date = max_date
-else:
-    # Custom - utiliser les date inputs
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        start_date = st.date_input(
-            "From:",
-            value=max_date - timedelta(days=90),
-            min_value=min_date,
-            max_value=max_date,
-            key="start_date"
-        )
-    with col2:
-        end_date = st.date_input(
-            "To:",
-            value=max_date,
-            min_value=min_date,
-            max_value=max_date,
-            key="end_date"
-        )
+period_value = period_options[period_choice]
 
-# Afficher les dates sélectionnées si ce n'est pas Custom
-if date_preset != "Custom":
-    st.sidebar.write(f"**From:** {start_date}")
-    st.sidebar.write(f"**To:** {end_date}")
-
-# Validation des dates
-if start_date > end_date:
-    st.sidebar.error("⚠️ Start date must be before end date!")
-    st.stop()
-
-# Filtrer par dates pour tous les tickers
+# Filtrage des données
 data_filtered = {}
-for ticker, df in data_dict.items():
-    data_filtered[ticker] = df.loc[start_date:end_date]
 
-# Vérifier qu'il y a des données
-if all(len(df) == 0 for df in data_filtered.values()):
-    st.warning(f"⚠️ No data available between {start_date} and {end_date}!")
-    st.info(f"Available data range: {min_date} to {max_date}")
-    st.stop()
-
-# Afficher le nombre de bougies dans la période
-total_candles = max(len(df) for df in data_filtered.values() if len(df) > 0)
-st.sidebar.success(f"✅ {total_candles} candles in selected period")
+if period_value > 0:
+    num_candles = period_value
+    for ticker, df in data_dict.items():
+        data_filtered[ticker] = df.tail(min(num_candles, len(df)))
+        
+elif period_value == -1:
+    max_candles = min([len(df) for df in data_dict.values()])
+    num_candles = st.sidebar.slider(
+        "Number of candles:",
+        min_value=10,
+        max_value=min(max_candles, 5000),
+        value=min(500, max_candles),
+        step=10
+    )
+    for ticker, df in data_dict.items():
+        data_filtered[ticker] = df.tail(num_candles)
+        
+else:
+    st.sidebar.markdown("**Select Date Range:**")
+    
+    min_date = min([df.index.min().date() for df in data_dict.values()])
+    max_date = max([df.index.max().date() for df in data_dict.values()])
+    
+    st.sidebar.info(f"📅 Available data: {min_date} to {max_date}")
+    
+    date_preset = st.sidebar.selectbox(
+        "Quick Date Range:",
+        ["Custom", "Last Week", "Last Month", "Last 3 Months", "Last 6 Months", "Last Year", "Year to Date", "All Data"]
+    )
+    
+    if date_preset == "Last Week":
+        start_date = max_date - timedelta(days=7)
+        end_date = max_date
+    elif date_preset == "Last Month":
+        start_date = max_date - timedelta(days=30)
+        end_date = max_date
+    elif date_preset == "Last 3 Months":
+        start_date = max_date - timedelta(days=90)
+        end_date = max_date
+    elif date_preset == "Last 6 Months":
+        start_date = max_date - timedelta(days=180)
+        end_date = max_date
+    elif date_preset == "Last Year":
+        start_date = max_date - timedelta(days=365)
+        end_date = max_date
+    elif date_preset == "Year to Date":
+        start_date = datetime(max_date.year, 1, 1).date()
+        end_date = max_date
+    elif date_preset == "All Data":
+        start_date = min_date
+        end_date = max_date
+    else:
+        col1, col2 = st.sidebar.columns(2)
+        with col1:
+            start_date = st.date_input(
+                "From:",
+                value=max_date - timedelta(days=90),
+                min_value=min_date,
+                max_value=max_date,
+                key="start_date"
+            )
+        with col2:
+            end_date = st.date_input(
+                "To:",
+                value=max_date,
+                min_value=min_date,
+                max_value=max_date,
+                key="end_date"
+            )
+    
+    if date_preset != "Custom":
+        st.sidebar.write(f"**From:** {start_date}")
+        st.sidebar.write(f"**To:** {end_date}")
+    
+    if start_date > end_date:
+        st.sidebar.error("⚠️ Start date must be before end date!")
+        st.stop()
+    
+    for ticker, df in data_dict.items():
+        data_filtered[ticker] = df.loc[start_date:end_date]
+    
+    if all(len(df) == 0 for df in data_filtered.values()):
+        st.warning(f"⚠️ No data available between {start_date} and {end_date}!")
+        st.stop()
 
 # ============================================================================
 # AUTRES PARAMETRES
@@ -359,6 +406,9 @@ if chart_mode == "📊 Single Stock Analysis":
     )
     show_volume = st.sidebar.checkbox("Show Volume", value=True)
     show_ma = st.sidebar.checkbox("Show Moving Averages", value=True)
+elif chart_mode == "🚀 Momentum Strategy":
+    # Les paramètres seront dans la page principale
+    pass
 else:
     show_ma = st.sidebar.checkbox("Show Moving Averages", value=False)
 
@@ -541,7 +591,7 @@ if chart_mode == "📊 Single Stock Analysis":
 # AFFICHAGE MODE MULTI-STOCK COMPARISON
 # ============================================================================
 
-else:
+elif chart_mode == "📈 Multi-Stock Comparison":
     st.subheader("📈 MULTI-STOCK COMPARISON - BASE 100")
     
     # Stats comparatives
@@ -1079,6 +1129,444 @@ else:
         
         else:
             st.error("⚠️ Please adjust weights to total 100% before calculating portfolio analytics")
+
+# ============================================================================
+# AFFICHAGE MODE MOMENTUM STRATEGY
+# ============================================================================
+
+elif chart_mode == "🚀 Momentum Strategy":
+    
+    st.header("🚀 MOMENTUM TRADING STRATEGY")
+    
+    # ========== PARAMÈTRES DE LA STRATÉGIE (PAGE PRINCIPALE) ==========
+    
+    st.subheader("⚙️ Strategy Configuration")
+    
+    # Organisation en colonnes pour les paramètres
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("#### 💼 Portfolio Allocation")
+        weight_ticker1 = st.slider(
+            f"% {selected_displays[0]} (Buy & Hold):",
+            min_value=0,
+            max_value=100,
+            value=60,
+            step=5,
+            key="weight_main"
+        )
+        weight_ticker2 = 100 - weight_ticker1
+        st.info(f"**{selected_displays[1]} (RSI Trading):** {weight_ticker2}%")
+        
+        st.markdown("#### 💰 Capital")
+        initial_capital_momentum = st.number_input(
+            "Initial Capital ($):",
+            min_value=1000,
+            max_value=10000000,
+            value=10000,
+            step=1000,
+            key="capital_main"
+        )
+    
+    with col2:
+        st.markdown("#### 📊 RSI Parameters")
+        rsi_buy = st.slider(
+            "RSI Buy Level:",
+            min_value=10,
+            max_value=40,
+            value=20,
+            step=5,
+            help="Buy when RSI falls below this level (oversold)",
+            key="rsi_buy_main"
+        )
+        
+        rsi_sell = st.slider(
+            "RSI Sell Level:",
+            min_value=60,
+            max_value=90,
+            value=80,
+            step=5,
+            help="Sell when RSI rises above this level (overbought)",
+            key="rsi_sell_main"
+        )
+        
+        rsi_period = st.slider(
+            "RSI Period:",
+            min_value=7,
+            max_value=28,
+            value=14,
+            step=1,
+            help="Number of periods for RSI calculation",
+            key="rsi_period_main"
+        )
+    
+    with col3:
+        st.markdown("#### 📈 Strategy Summary")
+        st.metric("Primary Asset", selected_displays[0], f"{weight_ticker1}% - Hold")
+        st.metric("Trading Asset", selected_displays[1], f"{weight_ticker2}% - RSI")
+        st.metric("Buy Signal", f"RSI ≤ {rsi_buy}", "Oversold")
+        st.metric("Sell Signal", f"RSI ≥ {rsi_sell}", "Overbought")
+        
+    st.divider()
+    
+    # Fonction pour calculer le RSI
+    def calculate_rsi(prices, period=14):
+        delta = prices.diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
+        return rsi
+    
+    # Récupérer les données des deux tickers
+    ticker1_name = selected_displays[0]
+    ticker2_name = selected_displays[1]
+    
+    df1 = data_filtered[ticker1_name].copy()
+    df2 = data_filtered[ticker2_name].copy()
+    
+    # Fusionner les données sur les dates communes
+    merged = pd.merge(
+        df1[['close']].reset_index(),
+        df2[['close']].reset_index(),
+        on='date',
+        suffixes=(f'_{ticker1_name}', f'_{ticker2_name}')
+    )
+    
+    merged = merged.set_index('date')
+    
+    if len(merged) < rsi_period + 2:
+        st.error(f"❌ Not enough data to calculate RSI with period {rsi_period}")
+        st.stop()
+    
+    # Calculer les RSI
+    merged[f'rsi_{ticker1_name}'] = calculate_rsi(merged[f'close_{ticker1_name}'], rsi_period)
+    merged[f'rsi_{ticker2_name}'] = calculate_rsi(merged[f'close_{ticker2_name}'], rsi_period)
+    
+    # ========== SIMULATION DE LA STRATÉGIE ==========
+    
+    # Initialisation
+    capital_ticker1 = initial_capital_momentum * (weight_ticker1 / 100)
+    capital_ticker2_cash = initial_capital_momentum * (weight_ticker2 / 100)
+    
+    # Acheter ticker1 immédiatement et hold
+    prix_achat_ticker1 = merged[f'close_{ticker1_name}'].iloc[0]
+    nb_actions_ticker1 = capital_ticker1 / prix_achat_ticker1
+    
+    # Variables pour ticker2 (stratégie RSI)
+    nb_actions_ticker2 = 0
+    ticker2_position = False
+    prix_achat_ticker2 = 0
+    
+    # Journal de trading
+    journal = []
+    
+    # Listes pour tracer l'évolution du portefeuille
+    valeur_portefeuille = []
+    valeur_buy_hold = []
+    
+    # Simulation
+    for i in range(len(merged)):
+        date = merged.index[i]
+        prix_ticker1 = merged[f'close_{ticker1_name}'].iloc[i]
+        prix_ticker2 = merged[f'close_{ticker2_name}'].iloc[i]
+        rsi_ticker2 = merged[f'rsi_{ticker2_name}'].iloc[i]
+        
+        # Valeur actuelle du ticker1 (buy & hold)
+        valeur_ticker1 = nb_actions_ticker1 * prix_ticker1
+        
+        # Gestion de la position ticker2 avec stratégie RSI
+        if pd.notna(rsi_ticker2):
+            # Signal d'achat: RSI <= rsi_buy et pas de position
+            if rsi_ticker2 <= rsi_buy and not ticker2_position:
+                nb_actions_ticker2 = capital_ticker2_cash / prix_ticker2
+                prix_achat_ticker2 = prix_ticker2
+                ticker2_position = True
+                journal.append({
+                    'Date': date,
+                    'Action': f'BUY {ticker2_name}',
+                    'Price': prix_ticker2,
+                    'Quantity': nb_actions_ticker2,
+                    'RSI': rsi_ticker2,
+                    'Capital': capital_ticker2_cash
+                })
+            
+            # Signal de vente: RSI >= rsi_sell et position ouverte
+            elif rsi_ticker2 >= rsi_sell and ticker2_position:
+                valeur_vente = nb_actions_ticker2 * prix_ticker2
+                profit = valeur_vente - capital_ticker2_cash
+                profit_pct = (profit / capital_ticker2_cash) * 100
+                capital_ticker2_cash = valeur_vente
+                journal.append({
+                    'Date': date,
+                    'Action': f'SELL {ticker2_name}',
+                    'Price': prix_ticker2,
+                    'Quantity': nb_actions_ticker2,
+                    'RSI': rsi_ticker2,
+                    'Buy Price': prix_achat_ticker2,
+                    'Profit': profit,
+                    'Profit %': profit_pct,
+                    'Capital After': capital_ticker2_cash
+                })
+                nb_actions_ticker2 = 0
+                ticker2_position = False
+        
+        # Valeur actuelle de la position ticker2
+        if ticker2_position:
+            valeur_ticker2 = nb_actions_ticker2 * prix_ticker2
+        else:
+            valeur_ticker2 = capital_ticker2_cash
+        
+        # Valeur totale du portefeuille avec stratégie
+        valeur_totale = valeur_ticker1 + valeur_ticker2
+        valeur_portefeuille.append(valeur_totale)
+        
+        # Valeur du portefeuille buy & hold classique
+        valeur_ticker1_bh = (initial_capital_momentum * weight_ticker1 / 100 / merged[f'close_{ticker1_name}'].iloc[0]) * prix_ticker1
+        valeur_ticker2_bh = (initial_capital_momentum * weight_ticker2 / 100 / merged[f'close_{ticker2_name}'].iloc[0]) * prix_ticker2
+        valeur_buy_hold.append(valeur_ticker1_bh + valeur_ticker2_bh)
+    
+    # Ajouter les résultats au dataframe
+    merged['portfolio_strategy'] = valeur_portefeuille
+    merged['portfolio_buy_hold'] = valeur_buy_hold
+    merged['pct_strategy'] = (merged['portfolio_strategy'] / initial_capital_momentum) * 100
+    merged['pct_buy_hold'] = (merged['portfolio_buy_hold'] / initial_capital_momentum) * 100
+    merged[f'pct_{ticker1_name}'] = (merged[f'close_{ticker1_name}'] / merged[f'close_{ticker1_name}'].iloc[0]) * 100
+    merged[f'pct_{ticker2_name}'] = (merged[f'close_{ticker2_name}'] / merged[f'close_{ticker2_name}'].iloc[0]) * 100
+    
+    # ========== AFFICHAGE DES MÉTRIQUES ==========
+    
+    st.subheader("📊 Strategy Performance")
+    
+    valeur_finale_bh = merged['portfolio_buy_hold'].iloc[-1]
+    perf_bh = ((valeur_finale_bh / initial_capital_momentum) - 1) * 100
+    
+    valeur_finale_strat = merged['portfolio_strategy'].iloc[-1]
+    perf_strat = ((valeur_finale_strat / initial_capital_momentum) - 1) * 100
+    
+    diff_perf = perf_strat - perf_bh
+    diff_valeur = valeur_finale_strat - valeur_finale_bh
+    
+    col1, col2, col3, col4, col5 = st.columns(5)
+    
+    with col1:
+        st.metric(
+            "Initial Capital",
+            f"${initial_capital_momentum:,.2f}"
+        )
+    
+    with col2:
+        st.metric(
+            "Buy & Hold",
+            f"${valeur_finale_bh:,.2f}",
+            f"{perf_bh:+.2f}%"
+        )
+    
+    with col3:
+        st.metric(
+            "Strategy",
+            f"${valeur_finale_strat:,.2f}",
+            f"{perf_strat:+.2f}%"
+        )
+    
+    with col4:
+        st.metric(
+            "Outperformance",
+            f"{diff_perf:+.2f}%",
+            f"${diff_valeur:+,.2f}"
+        )
+    
+    with col5:
+        st.metric(
+            "Total Trades",
+            f"{len(journal)}"
+        )
+    
+    st.markdown(f"**Strategy:** {ticker1_name} {weight_ticker1}% Hold + {ticker2_name} {weight_ticker2}% RSI({rsi_buy}/{rsi_sell})")
+    
+    st.divider()
+    
+    # ========== GRAPHIQUES ==========
+    
+    st.subheader("📈 Performance Charts")
+    
+    # Créer une figure avec 6 sous-graphiques
+    fig = plt.figure(figsize=(16, 18), facecolor='#000000')
+    gs = fig.add_gridspec(6, 1, height_ratios=[2, 1, 2, 1, 2, 2], hspace=0.35)
+    
+    ax1 = fig.add_subplot(gs[0])
+    ax1_rsi = fig.add_subplot(gs[1], sharex=ax1)
+    ax2 = fig.add_subplot(gs[2], sharex=ax1)
+    ax2_rsi = fig.add_subplot(gs[3], sharex=ax1)
+    ax3 = fig.add_subplot(gs[4], sharex=ax1)
+    ax4 = fig.add_subplot(gs[5], sharex=ax1)
+    
+    # --- Graphique 1: Prix ticker1 ---
+    ax1.set_facecolor('#0a0a0a')
+    ax1.plot(merged.index, merged[f'close_{ticker1_name}'], label=ticker1_name, color='#00D9FF', linewidth=1.5)
+    ax1.set_ylabel(f'Price {ticker1_name} ($)', fontsize=11, color='#00D9FF', fontweight='bold')
+    ax1.set_title(f'{ticker1_name} - Price & RSI (Buy & Hold)', fontsize=13, fontweight='bold', color='#FF8C00')
+    ax1.grid(True, alpha=0.2, color='#333333')
+    ax1.legend(loc='upper left', facecolor='#1a1a1a', edgecolor='#FF8C00', labelcolor='#FF8C00')
+    ax1.tick_params(axis='x', labelbottom=False, colors='#FFFFFF')
+    ax1.tick_params(axis='y', colors='#FFFFFF')
+    
+    # --- Graphique RSI ticker1 ---
+    ax1_rsi.set_facecolor('#0a0a0a')
+    ax1_rsi.plot(merged.index, merged[f'rsi_{ticker1_name}'], color='#00D9FF', linewidth=1.5)
+    ax1_rsi.axhline(y=70, color='#FF0000', linestyle='--', linewidth=1, alpha=0.5)
+    ax1_rsi.axhline(y=30, color='#00FF00', linestyle='--', linewidth=1, alpha=0.5)
+    ax1_rsi.axhline(y=50, color='#808080', linestyle=':', linewidth=1, alpha=0.3)
+    ax1_rsi.fill_between(merged.index, 70, merged[f'rsi_{ticker1_name}'], 
+                          where=(merged[f'rsi_{ticker1_name}'] >= 70),
+                          color='#FF0000', alpha=0.2)
+    ax1_rsi.fill_between(merged.index, 30, merged[f'rsi_{ticker1_name}'], 
+                          where=(merged[f'rsi_{ticker1_name}'] <= 30),
+                          color='#00FF00', alpha=0.2)
+    ax1_rsi.set_ylabel('RSI', fontsize=10, color='#FF8C00', fontweight='bold')
+    ax1_rsi.set_ylim(0, 100)
+    ax1_rsi.grid(True, alpha=0.2, color='#333333')
+    ax1_rsi.tick_params(axis='x', labelbottom=False, colors='#FFFFFF')
+    ax1_rsi.tick_params(axis='y', colors='#FFFFFF')
+    
+    # --- Graphique 2: Prix ticker2 avec signaux ---
+    ax2.set_facecolor('#0a0a0a')
+    ax2.plot(merged.index, merged[f'close_{ticker2_name}'], label=ticker2_name, color='#FF1493', linewidth=1.5)
+    
+    # Ajouter les signaux d'achat et de vente
+    for trade in journal:
+        if 'BUY' in trade['Action']:
+            ax2.scatter(trade['Date'], trade['Price'], color='#00FF00', marker='^', s=100, 
+                       label='Buy Signal' if trade == journal[0] else '', zorder=5)
+        elif 'SELL' in trade['Action']:
+            ax2.scatter(trade['Date'], trade['Price'], color='#FF0000', marker='v', s=100, 
+                       label='Sell Signal' if any('BUY' in t['Action'] for t in journal) else '', zorder=5)
+    
+    ax2.set_ylabel(f'Price {ticker2_name} ($)', fontsize=11, color='#FF1493', fontweight='bold')
+    ax2.set_title(f'{ticker2_name} - Price & RSI (Strategy: Buy RSI≤{rsi_buy}, Sell RSI≥{rsi_sell})', 
+                 fontsize=13, fontweight='bold', color='#FF8C00')
+    ax2.grid(True, alpha=0.2, color='#333333')
+    ax2.legend(loc='upper left', facecolor='#1a1a1a', edgecolor='#FF8C00', labelcolor='#FF8C00')
+    ax2.tick_params(axis='x', labelbottom=False, colors='#FFFFFF')
+    ax2.tick_params(axis='y', colors='#FFFFFF')
+    
+    # --- Graphique RSI ticker2 avec niveaux de trading ---
+    ax2_rsi.set_facecolor('#0a0a0a')
+    ax2_rsi.plot(merged.index, merged[f'rsi_{ticker2_name}'], color='#FF1493', linewidth=1.5)
+    ax2_rsi.axhline(y=rsi_sell, color='#FF0000', linestyle='--', linewidth=2, alpha=0.7, label=f'Sell ({rsi_sell})')
+    ax2_rsi.axhline(y=rsi_buy, color='#00FF00', linestyle='--', linewidth=2, alpha=0.7, label=f'Buy ({rsi_buy})')
+    ax2_rsi.axhline(y=50, color='#808080', linestyle=':', linewidth=1, alpha=0.3)
+    ax2_rsi.fill_between(merged.index, rsi_sell, 100, color='#FF0000', alpha=0.1)
+    ax2_rsi.fill_between(merged.index, 0, rsi_buy, color='#00FF00', alpha=0.1)
+    ax2_rsi.set_ylabel('RSI', fontsize=10, color='#FF8C00', fontweight='bold')
+    ax2_rsi.set_ylim(0, 100)
+    ax2_rsi.grid(True, alpha=0.2, color='#333333')
+    ax2_rsi.legend(loc='upper left', fontsize=8, facecolor='#1a1a1a', edgecolor='#FF8C00', labelcolor='#FF8C00')
+    ax2_rsi.tick_params(axis='x', labelbottom=False, colors='#FFFFFF')
+    ax2_rsi.tick_params(axis='y', colors='#FFFFFF')
+    
+    # --- Graphique 3: Evolution en pourcentage ---
+    ax3.set_facecolor('#0a0a0a')
+    ax3.plot(merged.index, merged[f'pct_{ticker1_name}'], label=f'{ticker1_name} Only', 
+            color='#00D9FF', linewidth=1.5, alpha=0.7)
+    ax3.plot(merged.index, merged[f'pct_{ticker2_name}'], label=f'{ticker2_name} Only', 
+            color='#FF1493', linewidth=1.5, alpha=0.7)
+    ax3.plot(merged.index, merged['pct_buy_hold'], 
+            label=f'Buy&Hold ({weight_ticker1}% {ticker1_name} / {weight_ticker2}% {ticker2_name})', 
+            color='#FFA500', linewidth=2)
+    
+    ax3.set_ylabel('Evolution (%)', fontsize=12, color='#FF8C00', fontweight='bold')
+    ax3.set_title('Individual Assets & Buy & Hold Performance', fontsize=14, fontweight='bold', color='#FF8C00')
+    ax3.axhline(y=100, color='#808080', linestyle='--', linewidth=1, alpha=0.5)
+    ax3.grid(True, alpha=0.2, color='#333333')
+    ax3.legend(loc='best', facecolor='#1a1a1a', edgecolor='#FF8C00', labelcolor='#FF8C00')
+    ax3.tick_params(axis='x', labelbottom=False, colors='#FFFFFF')
+    ax3.tick_params(axis='y', colors='#FFFFFF')
+    
+    # --- Graphique 4: Comparaison Stratégie vs Buy & Hold ---
+    ax4.set_facecolor('#0a0a0a')
+    ax4.plot(merged.index, merged['pct_buy_hold'], 
+            label=f'Buy&Hold ({weight_ticker1}% {ticker1_name} / {weight_ticker2}% {ticker2_name})', 
+            color='#FFA500', linewidth=2, alpha=0.7)
+    ax4.plot(merged.index, merged['pct_strategy'], 
+            label=f'Strategy ({ticker1_name} hold + {ticker2_name} RSI {rsi_buy}/{rsi_sell})', 
+            color='#9370DB', linewidth=2)
+    ax4.fill_between(merged.index, merged['pct_buy_hold'], merged['pct_strategy'], 
+                     where=(merged['pct_strategy'] >= merged['pct_buy_hold']), 
+                     color='#00FF00', alpha=0.2, label='Strategy Outperforms')
+    ax4.fill_between(merged.index, merged['pct_buy_hold'], merged['pct_strategy'], 
+                     where=(merged['pct_strategy'] < merged['pct_buy_hold']), 
+                     color='#FF0000', alpha=0.2, label='Buy&Hold Outperforms')
+    
+    ax4.set_xlabel('Date', fontsize=12, color='#FF8C00', fontweight='bold')
+    ax4.set_ylabel('Evolution (%)', fontsize=12, color='#FF8C00', fontweight='bold')
+    ax4.set_title('Strategy vs Buy & Hold Comparison', fontsize=14, fontweight='bold', color='#FF8C00')
+    ax4.axhline(y=100, color='#808080', linestyle='--', linewidth=1, alpha=0.5)
+    ax4.grid(True, alpha=0.2, color='#333333')
+    ax4.legend(loc='best', facecolor='#1a1a1a', edgecolor='#FF8C00', labelcolor='#FF8C00')
+    ax4.tick_params(colors='#FFFFFF')
+    ax4.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+    plt.setp(ax4.xaxis.get_majorticklabels(), rotation=45, ha='right', color='#FFFFFF')
+    
+    fig.tight_layout()
+    st.pyplot(fig)
+    
+    # ========== JOURNAL DE TRADING ==========
+    
+    st.divider()
+    st.subheader(f"📋 Trading Journal - {ticker2_name} (RSI Strategy)")
+    
+    if journal:
+        journal_df = pd.DataFrame(journal)
+        
+        # Formater les colonnes
+        if 'Price' in journal_df.columns:
+            journal_df['Price'] = journal_df['Price'].apply(lambda x: f"${x:.2f}")
+        if 'Quantity' in journal_df.columns:
+            journal_df['Quantity'] = journal_df['Quantity'].apply(lambda x: f"{x:.4f}")
+        if 'RSI' in journal_df.columns:
+            journal_df['RSI'] = journal_df['RSI'].apply(lambda x: f"{x:.2f}")
+        if 'Capital' in journal_df.columns:
+            journal_df['Capital'] = journal_df['Capital'].apply(lambda x: f"${x:.2f}")
+        if 'Buy Price' in journal_df.columns:
+            journal_df['Buy Price'] = journal_df['Buy Price'].apply(lambda x: f"${x:.2f}")
+        if 'Profit' in journal_df.columns:
+            journal_df['Profit'] = journal_df['Profit'].apply(lambda x: f"${x:+.2f}")
+        if 'Profit %' in journal_df.columns:
+            journal_df['Profit %'] = journal_df['Profit %'].apply(lambda x: f"{x:+.2f}%")
+        if 'Capital After' in journal_df.columns:
+            journal_df['Capital After'] = journal_df['Capital After'].apply(lambda x: f"${x:.2f}")
+        
+        st.dataframe(journal_df, use_container_width=True, hide_index=True)
+        
+        # Statistiques des trades
+        trades_sell = [t for t in journal if 'SELL' in t['Action']]
+        if trades_sell:
+            st.divider()
+            st.subheader("📊 Trade Statistics")
+            
+            profits = [t['Profit %'] for t in trades_sell]
+            nb_winning = sum(1 for p in profits if p > 0)
+            nb_losing = sum(1 for p in profits if p < 0)
+            
+            col1, col2, col3, col4, col5 = st.columns(5)
+            
+            with col1:
+                st.metric("Completed Trades", f"{len(trades_sell)}")
+            
+            with col2:
+                st.metric("Winning Trades", f"{nb_winning}", f"{nb_winning/len(trades_sell)*100:.1f}%")
+            
+            with col3:
+                st.metric("Losing Trades", f"{nb_losing}", f"{nb_losing/len(trades_sell)*100:.1f}%")
+            
+            with col4:
+                st.metric("Avg Profit/Trade", f"{np.mean(profits):+.2f}%")
+            
+            with col5:
+                st.metric("Best Trade", f"{max(profits):+.2f}%")
+    else:
+        st.info("No trades executed during this period with current RSI parameters")
 
 # Footer
 st.markdown("---")
