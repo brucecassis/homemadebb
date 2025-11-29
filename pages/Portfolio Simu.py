@@ -144,7 +144,10 @@ def load_data(table_name):
     try:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
         
-        response = supabase.table(table_name).select("*").order("date", desc=False).limit(10000).execute()
+        # Pour 10 ans de données H4: 
+        # ~6 bougies par jour * 252 jours de trading * 10 ans = ~15,000 bougies
+        # On met 100,000 pour être large et couvrir toutes les données
+        response = supabase.table(table_name).select("*").order("date", desc=False).limit(100000).execute()
         
         if not response.data:
             return None
