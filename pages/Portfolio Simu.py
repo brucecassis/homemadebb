@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import mplfinance as mpf
 from supabase import create_client, Client
@@ -664,6 +665,445 @@ else:
     
     perf_df = pd.DataFrame(perf_data)
     st.dataframe(perf_df, use_container_width=True)
+    
+    # ============================================================================
+    # ANALYSE DE PORTEFEUILLE
+    # ============================================================================
+    
+    st.divider()
+    st.header("💼 PORTFOLIO ANALYSIS")
+    
+    # Configuration du portefeuille
+    st.subheader("⚙️ Portfolio Configuration")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown("**Set Portfolio Weights:**")
+        weights = {}
+        total_weight = 0
+        
+        # Créer des sliders pour chaque ticker
+        for ticker in selected_displays:
+            default_weight = 100 / len(selected_displays)  # Répartition égale par défaut
+            weight = st.slider(
+                f"{ticker} Weight (%):",
+                min_value=0.0,
+                max_value=100.0,
+                value=default_weight,
+                step=0.5,
+                key=f"weight_{ticker}"
+            )
+            weights[ticker] = weight
+            total_weight += weight
+        
+        # Vérification des poids
+        if abs(total_weight - 100.0) > 0.01:
+            st.warning(f"⚠️ Total weight is {total_weight:.2f}% (should be 100%)")
+        else:
+            st.success(f"✅ Total weight: {total_weight:.2f}%")
+    
+    with col2:
+        st.markdown("**Portfolio Settings:**")
+        initial_capital = st.number_input(
+            "Initial Capital ($):",
+            min_value=1000,
+            max_value=10000000,
+            value=100000,
+            step=1000
+        )
+        
+        risk_free_rate = st.number_input(
+            "Risk-Free Rate (%):",
+            min_value=0.0,
+            max_value=10.0,
+            value=4.0,
+            step=0.1
+        ) / 100  # Convertir en décimal
+    
+    # Bouton pour calculer le portefeuille
+    if st.button("📊 Calculate Portfolio Analytics", type="primary"):
+        if abs(total_weight - 100.0) < 0.01:
+            
+            # ========== PRÉPARATION DES DONNÉES ==========
+            
+            # Créer un DataFrame avec tous les prix de clôture alignés
+            portfolio_df = pd.DataFrame()
+            
+            for ticker in selected_displays:
+                df = data_filtered[ticker]
+                portfolio_df[ticker] = df['close']
+            
+            # Supprimer les NaN (pour gérer les dates manquantes)
+            portfolio_df = portfolio_df.dropna()
+            
+            if len(portfolio_df) < 2:
+                st.error("❌ Not enough data to calculate portfolio analytics")
+            else:
+                # ========== CALCULS DU PORTEFEUILLE ==========
+                
+                # Rendements quotidiens
+                returns_df = portfolio_df.pct_change().dropna()
+                
+                # Poids du portefeuille (normalisés)
+                weights_array = np.array([weights[ticker] / 100 for ticker in selected_displays])
+                
+                # Rendements du portefeuille
+                portfolio_returns = (returns_df * weights_array).sum(axis=1)
+                
+                # Valeur du portefeuille au fil du temps
+                portfolio_value = initial_capital * (1 + portfolio_returns).cumprod()
+                portfolio_value = pd.concat([pd.Series([initial_capital], index=[portfolio_df.index[0]]), portfolio_value])
+                
+                # ========== STATISTIQUES DE PERFORMANCE ==========
+                
+                total_return = (portfolio_value.iloc[-1] - initial_capital) / initial_capital
+                total_return_pct = total_return * 100
+                
+                # Annualiser les rendements (environ 252 jours de trading par an, mais ici H4 donc ~1560 périodes/an)
+                # Pour H4: 6 périodes par jour * 252 jours = 1512 périodes/an
+                periods_per_year = 1512
+                n_periods = len(portfolio_returns)
+                years = n_periods / periods_per_year
+                
+                cagr = (portfolio_value.iloc[-1] / initial_capital) ** (1 / years) - 1 if years > 0 else 0
+                
+                # Volatilité annualisée
+                volatility = portfolio_returns.std() * np.sqrt(periods_per_year)
+                
+                # Sharpe Ratio
+                excess_returns = portfolio_returns - risk_free_rate / periods_per_year
+                sharpe_ratio = np.sqrt(periods_per_year) * excess_returns.mean() / portfolio_returns.std() if portfolio_returns.std() > 0 else 0
+                
+                # Sortino Ratio (seulement la volatilité des pertes)
+                downside_returns = portfolio_returns[portfolio_returns < 0]
+                downside_std = downside_returns.std() * np.sqrt(periods_per_year)
+                sortino_ratio = (portfolio_returns.mean() * periods_per_year - risk_free_rate) / downside_std if downside_std > 0 else 0
+                
+                # Maximum Drawdown
+                cumulative = (1 + portfolio_returns).cumprod()
+                running_max = cumulative.expanding().max()
+                drawdown = (cumulative - running_max) / running_max
+                max_drawdown = drawdown.min()
+                max_drawdown_pct = max_drawdown * 100
+                
+                # Calmar Ratio
+                calmar_ratio = cagr / abs(max_drawdown) if max_drawdown != 0 else 0
+                
+                # Win Rate
+                win_rate = (portfolio_returns > 0).sum() / len(portfolio_returns) * 100
+                
+                # Best & Worst periods
+                best_return = portfolio_returns.max()
+                worst_return = portfolio_returns.min()
+                
+                # VaR et CVaR (95%)
+                var_95 = portfolio_returns.quantile(0.05)
+                cvar_95 = portfolio_returns[portfolio_returns <= var_95].mean()
+                
+                # ========== AFFICHAGE DES MÉTRIQUES ==========
+                
+                st.divider()
+                st.subheader("📈 Portfolio Performance Metrics")
+                
+                # Ligne 1: Métriques principales
+                col1, col2, col3, col4, col5 = st.columns(5)
+                
+                with col1:
+                    st.metric(
+                        "Total Return",
+                        f"{total_return_pct:+.2f}%",
+                        f"${portfolio_value.iloc[-1] - initial_capital:+,.2f}"
+                    )
+                
+                with col2:
+                    st.metric(
+                        "CAGR",
+                        f"{cagr * 100:.2f}%",
+                        f"{years:.1f} years"
+                    )
+                
+                with col3:
+                    st.metric(
+                        "Sharpe Ratio",
+                        f"{sharpe_ratio:.2f}",
+                        "Higher is better"
+                    )
+                
+                with col4:
+                    st.metric(
+                        "Sortino Ratio",
+                        f"{sortino_ratio:.2f}",
+                        "Higher is better"
+                    )
+                
+                with col5:
+                    st.metric(
+                        "Max Drawdown",
+                        f"{max_drawdown_pct:.2f}%",
+                        "Lower is better"
+                    )
+                
+                # Ligne 2: Métriques secondaires
+                col1, col2, col3, col4, col5 = st.columns(5)
+                
+                with col1:
+                    st.metric("Volatility (Ann.)", f"{volatility * 100:.2f}%")
+                
+                with col2:
+                    st.metric("Calmar Ratio", f"{calmar_ratio:.2f}")
+                
+                with col3:
+                    st.metric("Win Rate", f"{win_rate:.1f}%")
+                
+                with col4:
+                    st.metric("VaR (95%)", f"{var_95 * 100:.2f}%")
+                
+                with col5:
+                    st.metric("CVaR (95%)", f"{cvar_95 * 100:.2f}%")
+                
+                # Ligne 3: Best/Worst
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    st.metric("Best Period", f"{best_return * 100:+.2f}%")
+                
+                with col2:
+                    st.metric("Worst Period", f"{worst_return * 100:.2f}%")
+                
+                with col3:
+                    st.metric("Final Value", f"${portfolio_value.iloc[-1]:,.2f}")
+                
+                with col4:
+                    profit_loss = portfolio_value.iloc[-1] - initial_capital
+                    st.metric("Profit/Loss", f"${profit_loss:+,.2f}")
+                
+                # ========== GRAPHIQUES ==========
+                
+                st.divider()
+                st.subheader("📊 Portfolio Visualizations")
+                
+                # Graphique 1: Évolution du portefeuille
+                fig1, ax1 = plt.subplots(figsize=(16, 8), facecolor='#000000')
+                ax1.set_facecolor('#0a0a0a')
+                
+                ax1.plot(portfolio_value.index, portfolio_value.values, 
+                        linewidth=2.5, color='#00FF00', label='Portfolio Value', zorder=5)
+                
+                # Ligne de capital initial
+                ax1.axhline(y=initial_capital, color='#FF8C00', linestyle='--', 
+                           linewidth=1.5, alpha=0.5, label=f'Initial Capital (${initial_capital:,.0f})')
+                
+                ax1.set_title('Portfolio Value Evolution', 
+                             fontsize=18, fontweight='bold', color='#FF8C00', pad=20)
+                ax1.set_ylabel('Portfolio Value ($)', fontsize=12, color='#FF8C00', fontweight='bold')
+                ax1.set_xlabel('Date', fontsize=12, color='#FF8C00', fontweight='bold')
+                ax1.grid(True, alpha=0.2, color='#333333', linestyle='-', linewidth=0.5)
+                ax1.legend(loc='upper left', facecolor='#1a1a1a', edgecolor='#FF8C00', 
+                          fontsize=10, labelcolor='#FF8C00')
+                ax1.tick_params(colors='#FFFFFF', labelsize=10)
+                ax1.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+                plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45, ha='right')
+                
+                # Format des valeurs en K ou M
+                ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'${x/1e6:.1f}M' if x >= 1e6 else f'${x/1e3:.0f}K'))
+                
+                fig1.tight_layout()
+                st.pyplot(fig1)
+                
+                # Graphique 2: Drawdown
+                fig2, ax2 = plt.subplots(figsize=(16, 6), facecolor='#000000')
+                ax2.set_facecolor('#0a0a0a')
+                
+                ax2.fill_between(drawdown.index, drawdown.values * 100, 0, 
+                                color='#FF4500', alpha=0.6, label='Drawdown')
+                ax2.plot(drawdown.index, drawdown.values * 100, 
+                        color='#FF0000', linewidth=1.5, alpha=0.8)
+                
+                ax2.set_title('Portfolio Drawdown', 
+                             fontsize=18, fontweight='bold', color='#FF8C00', pad=20)
+                ax2.set_ylabel('Drawdown (%)', fontsize=12, color='#FF8C00', fontweight='bold')
+                ax2.set_xlabel('Date', fontsize=12, color='#FF8C00', fontweight='bold')
+                ax2.grid(True, alpha=0.2, color='#333333', linestyle='-', linewidth=0.5)
+                ax2.legend(loc='lower left', facecolor='#1a1a1a', edgecolor='#FF8C00', 
+                          fontsize=10, labelcolor='#FF8C00')
+                ax2.tick_params(colors='#FFFFFF', labelsize=10)
+                ax2.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+                plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45, ha='right')
+                
+                fig2.tight_layout()
+                st.pyplot(fig2)
+                
+                # Graphique 3: Distribution des rendements
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    fig3, ax3 = plt.subplots(figsize=(8, 6), facecolor='#000000')
+                    ax3.set_facecolor('#0a0a0a')
+                    
+                    ax3.hist(portfolio_returns * 100, bins=50, color='#4169E1', 
+                            alpha=0.7, edgecolor='#00D9FF', linewidth=1.2)
+                    ax3.axvline(x=0, color='#FF8C00', linestyle='--', linewidth=2, alpha=0.7)
+                    
+                    ax3.set_title('Returns Distribution', 
+                                 fontsize=16, fontweight='bold', color='#FF8C00', pad=15)
+                    ax3.set_xlabel('Returns (%)', fontsize=11, color='#FF8C00', fontweight='bold')
+                    ax3.set_ylabel('Frequency', fontsize=11, color='#FF8C00', fontweight='bold')
+                    ax3.grid(True, alpha=0.2, color='#333333', linestyle='-', linewidth=0.5)
+                    ax3.tick_params(colors='#FFFFFF', labelsize=9)
+                    
+                    fig3.tight_layout()
+                    st.pyplot(fig3)
+                
+                with col2:
+                    fig4, ax4 = plt.subplots(figsize=(8, 6), facecolor='#000000')
+                    ax4.set_facecolor('#0a0a0a')
+                    
+                    # Pie chart des poids
+                    colors_pie = ['#00D9FF', '#FF1493', '#00FF00', '#FFD700', '#FF4500', 
+                                 '#9370DB', '#FF69B4', '#00CED1', '#FFA500', '#7FFF00']
+                    
+                    wedges, texts, autotexts = ax4.pie(
+                        [weights[ticker] for ticker in selected_displays],
+                        labels=selected_displays,
+                        autopct='%1.1f%%',
+                        colors=colors_pie[:len(selected_displays)],
+                        startangle=90,
+                        textprops={'fontsize': 10, 'color': '#FFFFFF', 'fontweight': 'bold'}
+                    )
+                    
+                    ax4.set_title('Portfolio Allocation', 
+                                 fontsize=16, fontweight='bold', color='#FF8C00', pad=15)
+                    
+                    fig4.tight_layout()
+                    st.pyplot(fig4)
+                
+                # ========== MATRICE DE CORRÉLATION ==========
+                
+                st.divider()
+                st.subheader("🔗 Correlation Matrix")
+                
+                correlation_matrix = returns_df.corr()
+                
+                fig5, ax5 = plt.subplots(figsize=(10, 8), facecolor='#000000')
+                ax5.set_facecolor('#0a0a0a')
+                
+                # Heatmap
+                im = ax5.imshow(correlation_matrix, cmap='RdYlGn', aspect='auto', 
+                               vmin=-1, vmax=1, interpolation='nearest')
+                
+                # Configurer les ticks
+                ax5.set_xticks(np.arange(len(selected_displays)))
+                ax5.set_yticks(np.arange(len(selected_displays)))
+                ax5.set_xticklabels(selected_displays, rotation=45, ha='right', color='#FFFFFF')
+                ax5.set_yticklabels(selected_displays, color='#FFFFFF')
+                
+                # Ajouter les valeurs dans les cellules
+                for i in range(len(selected_displays)):
+                    for j in range(len(selected_displays)):
+                        text = ax5.text(j, i, f'{correlation_matrix.iloc[i, j]:.2f}',
+                                       ha='center', va='center', color='#000000', 
+                                       fontweight='bold', fontsize=10)
+                
+                # Colorbar
+                cbar = plt.colorbar(im, ax=ax5)
+                cbar.set_label('Correlation', rotation=270, labelpad=20, 
+                              color='#FF8C00', fontweight='bold')
+                cbar.ax.tick_params(colors='#FFFFFF')
+                
+                ax5.set_title('Asset Correlation Matrix', 
+                             fontsize=16, fontweight='bold', color='#FF8C00', pad=15)
+                
+                fig5.tight_layout()
+                st.pyplot(fig5)
+                
+                # ========== TABLEAU RÉCAPITULATIF ==========
+                
+                st.divider()
+                st.subheader("📋 Detailed Statistics")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    stats_data_1 = {
+                        'Metric': [
+                            'Initial Capital',
+                            'Final Value',
+                            'Total Return ($)',
+                            'Total Return (%)',
+                            'CAGR',
+                            'Annualized Volatility',
+                            'Sharpe Ratio',
+                            'Sortino Ratio',
+                            'Calmar Ratio'
+                        ],
+                        'Value': [
+                            f'${initial_capital:,.2f}',
+                            f'${portfolio_value.iloc[-1]:,.2f}',
+                            f'${portfolio_value.iloc[-1] - initial_capital:+,.2f}',
+                            f'{total_return_pct:+.2f}%',
+                            f'{cagr * 100:.2f}%',
+                            f'{volatility * 100:.2f}%',
+                            f'{sharpe_ratio:.3f}',
+                            f'{sortino_ratio:.3f}',
+                            f'{calmar_ratio:.3f}'
+                        ]
+                    }
+                    st.dataframe(pd.DataFrame(stats_data_1), use_container_width=True, hide_index=True)
+                
+                with col2:
+                    stats_data_2 = {
+                        'Metric': [
+                            'Maximum Drawdown',
+                            'Win Rate',
+                            'Best Period Return',
+                            'Worst Period Return',
+                            'VaR (95%)',
+                            'CVaR (95%)',
+                            'Number of Periods',
+                            'Time Horizon (Years)',
+                            'Risk-Free Rate'
+                        ],
+                        'Value': [
+                            f'{max_drawdown_pct:.2f}%',
+                            f'{win_rate:.2f}%',
+                            f'{best_return * 100:+.2f}%',
+                            f'{worst_return * 100:.2f}%',
+                            f'{var_95 * 100:.2f}%',
+                            f'{cvar_95 * 100:.2f}%',
+                            f'{n_periods:,}',
+                            f'{years:.2f}',
+                            f'{risk_free_rate * 100:.2f}%'
+                        ]
+                    }
+                    st.dataframe(pd.DataFrame(stats_data_2), use_container_width=True, hide_index=True)
+                
+                # ========== STATISTIQUES PAR ACTIF ==========
+                
+                st.divider()
+                st.subheader("📊 Individual Asset Statistics")
+                
+                asset_stats = []
+                for ticker in selected_displays:
+                    ticker_returns = returns_df[ticker]
+                    ticker_weight = weights[ticker]
+                    
+                    asset_stats.append({
+                        'Ticker': ticker,
+                        'Weight': f'{ticker_weight:.1f}%',
+                        'Mean Return': f'{ticker_returns.mean() * 100:.3f}%',
+                        'Volatility': f'{ticker_returns.std() * 100:.2f}%',
+                        'Sharpe': f'{(ticker_returns.mean() / ticker_returns.std() * np.sqrt(periods_per_year)):.2f}' if ticker_returns.std() > 0 else 'N/A',
+                        'Best': f'{ticker_returns.max() * 100:+.2f}%',
+                        'Worst': f'{ticker_returns.min() * 100:.2f}%',
+                        'Win Rate': f'{(ticker_returns > 0).sum() / len(ticker_returns) * 100:.1f}%'
+                    })
+                
+                asset_stats_df = pd.DataFrame(asset_stats)
+                st.dataframe(asset_stats_df, use_container_width=True, hide_index=True)
+        
+        else:
+            st.error("⚠️ Please adjust weights to total 100% before calculating portfolio analytics")
 
 # Footer
 st.markdown("---")
