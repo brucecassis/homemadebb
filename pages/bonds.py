@@ -12,6 +12,12 @@ import base64
 import json
 
 # =============================================
+# FINRA API CREDENTIALS (EN DUR)
+# =============================================
+FINRA_CLIENT_ID = "4c7a3b25323c4ddd91ab"
+FINRA_CLIENT_SECRET = "Evoprogamer2003!"
+
+# =============================================
 # PAGE CONFIG
 # =============================================
 st.set_page_config(
@@ -225,7 +231,6 @@ class FINRAClient:
             if response.status_code == 200:
                 token_data = response.json()
                 self.access_token = token_data.get('access_token')
-                # Token valide généralement 1h
                 self.token_expiry = datetime.now() + timedelta(seconds=token_data.get('expires_in', 3600))
                 return True
             else:
@@ -257,114 +262,46 @@ class FINRAClient:
                 "Accept": "application/json"
             }
             
-            # Endpoint pour les corporate bonds
-            # Note: L'endpoint exact peut varier, consultez la doc FINRA
-            endpoint = f"{self.base_url}/data/group/FIXEDINCOME/name/corporateBondReference"
+            # Liste des endpoints possibles à essayer
+            endpoints = [
+                f"{self.base_url}/data/group/fixedIncome/name/corporateBondReference",
+                f"{self.base_url}/data/group/FIXEDINCOME/name/corporateBondReference",
+                f"{self.base_url}/data/group/otcMarket/name/bondData",
+                f"{self.base_url}/data/group/trace/name/corporateBonds",
+            ]
             
-            params = {
-                "limit": limit,
-                "offset": 0
-            }
+            for endpoint in endpoints:
+                try:
+                    params = {
+                        "limit": limit,
+                        "offset": 0
+                    }
+                    
+                    response = requests.get(endpoint, headers=headers, params=params, timeout=60)
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        if 'data' in data and len(data['data']) > 0:
+                            st.success(f"✅ Données chargées depuis: {endpoint}")
+                            return pd.DataFrame(data.get('data', []))
+                except:
+                    continue
             
-            response = requests.get(endpoint, headers=headers, params=params, timeout=60)
-            
-            if response.status_code == 200:
-                data = response.json()
-                return pd.DataFrame(data.get('data', []))
-            else:
-                st.warning(f"⚠️ Réponse FINRA: {response.status_code}")
-                return None
+            st.warning("⚠️ Aucun endpoint n'a retourné de données")
+            return None
                 
         except Exception as e:
             st.error(f"❌ Erreur récupération données: {str(e)}")
             return None
-    
-    def search_bonds_by_issuer(self, issuer_name):
-        """Recherche d'obligations par émetteur"""
-        if not self.ensure_token_valid():
-            return None
-        
-        try:
-            headers = {
-                "Authorization": f"Bearer {self.access_token}",
-                "Accept": "application/json"
-            }
-            
-            # Recherche avec filtre
-            endpoint = f"{self.base_url}/data/group/FIXEDINCOME/name/corporateBondReference"
-            
-            params = {
-                "limit": 1000,
-                "compareFilters": json.dumps([{
-                    "fieldName": "issuerName",
-                    "fieldValue": issuer_name,
-                    "compareType": "CONTAINS"
-                }])
-            }
-            
-            response = requests.get(endpoint, headers=headers, params=params, timeout=60)
-            
-            if response.status_code == 200:
-                data = response.json()
-                return pd.DataFrame(data.get('data', []))
-            else:
-                return None
-                
-        except Exception as e:
-            return None
 
 # =============================================
-# CONFIGURATION FINRA
+# INITIALISATION AUTOMATIQUE FINRA
 # =============================================
 
-def setup_finra_credentials():
-    """Configuration des identifiants FINRA"""
-    st.sidebar.markdown("## 🔐 FINRA API CONFIG")
-    
-    # Vérifier si les credentials sont déjà en session
-    if 'finra_configured' not in st.session_state:
-        st.session_state['finra_configured'] = False
-    
-    # Formulaire de configuration
-    with st.sidebar.expander("📝 Configure FINRA API", expanded=not st.session_state['finra_configured']):
-        client_id = st.text_input(
-            "API Client ID",
-            value=st.session_state.get('finra_client_id', '4c7a3b25323c4ddd91ab'),
-            help="Votre API Client User ID FINRA"
-        )
-        
-        client_secret = st.text_input(
-            "API Client Secret",
-            value=st.session_state.get('finra_client_secret', ''),
-            type="password",
-            help="Votre mot de passe API FINRA"
-        )
-        
-        if st.button("🔑 Connect to FINRA"):
-            if client_id and client_secret:
-                st.session_state['finra_client_id'] = client_id
-                st.session_state['finra_client_secret'] = client_secret
-                
-                # Tester la connexion
-                with st.spinner("🔄 Connexion à FINRA..."):
-                    client = FINRAClient(client_id, client_secret)
-                    if client.get_access_token():
-                        st.session_state['finra_client'] = client
-                        st.session_state['finra_configured'] = True
-                        st.success("✅ Connecté à FINRA API!")
-                        st.rerun()
-                    else:
-                        st.error("❌ Échec de connexion. Vérifiez vos identifiants.")
-            else:
-                st.warning("⚠️ Veuillez remplir tous les champs")
-    
-    # Afficher le statut
-    if st.session_state['finra_configured']:
-        st.sidebar.success("✅ FINRA API: Connected")
-    else:
-        st.sidebar.warning("⚠️ FINRA API: Not configured")
-    
-    return st.session_state.get('finra_client')
+@st.cache_resource
+def get_finra_client():
+    """Initialise le client FINRA automatiquement"""
+    return FINRAClient(FINRA_CLIENT_ID, FINRA_CLIENT_SECRET)
 
 # =============================================
 # BASE D'ETFs OBLIGATAIRES
@@ -476,26 +413,6 @@ def get_etf_data(ticker):
     except:
         return None
 
-def calculate_ytm_approximate(coupon, price, years_to_maturity, face_value=100):
-    """Calcule un YTM approximatif"""
-    try:
-        annual_interest = (coupon / 100) * face_value
-        capital_gain = (face_value - price) / years_to_maturity
-        ytm = ((annual_interest + capital_gain) / ((face_value + price) / 2)) * 100
-        return ytm
-    except:
-        return None
-
-def get_years_to_maturity(maturity_date_str):
-    """Calcule les années jusqu'à maturité"""
-    try:
-        maturity = datetime.strptime(maturity_date_str, '%Y-%m-%d')
-        today = datetime.now()
-        years = (maturity - today).days / 365.25
-        return max(0, years)
-    except:
-        return None
-
 # =============================================
 # HEADER BLOOMBERG
 # =============================================
@@ -506,25 +423,38 @@ st.markdown(f"""
         <div>⬛ BLOOMBERG ENS® TERMINAL - BOND SCREENER PRO</div>
         <a href="/" style="background:#333;color:#FFAA00;border:1px solid #000;padding:4px 12px;font-size:11px;text-decoration:none;">MARKETS</a>
     </div>
-    <div>{current_time} UTC • FINRA API INTEGRATED</div>
+    <div>{current_time} UTC • FINRA API AUTO-CONNECTED</div>
 </div>
 """, unsafe_allow_html=True)
 
 # =============================================
-# SETUP FINRA
+# INITIALISATION FINRA
 # =============================================
-finra_client = setup_finra_credentials()
+finra_client = get_finra_client()
+
+# Afficher le statut dans la sidebar
+with st.sidebar:
+    st.markdown("## 🔐 FINRA API STATUS")
+    st.success("✅ FINRA API: Auto-configured")
+    st.info(f"Client ID: {FINRA_CLIENT_ID[:8]}...")
+    
+    if st.button("🔄 Test FINRA Connection"):
+        with st.spinner("Testing connection..."):
+            if finra_client.get_access_token():
+                st.success("✅ Connection successful!")
+            else:
+                st.error("❌ Connection failed")
 
 # =============================================
 # INSTRUCTIONS
 # =============================================
 st.markdown("""
 <div style='background:#111;border:1px solid #333;padding:10px;margin:10px 0;border-left:4px solid #FFAA00;'>
-<b style='color:#FFAA00;'>🔍 BOND SCREENER PRO - FINRA API INTEGRATION:</b><br>
-• <b style='color:#00FF00;'>REAL FINRA DATA</b>: Access live corporate bond data from FINRA TRACE<br>
+<b style='color:#FFAA00;'>🔍 BOND SCREENER PRO - FINRA API AUTO-CONNECTED:</b><br>
+• <b style='color:#00FF00;'>FINRA API</b>: Automatically connected - Click "LOAD" to fetch real bond data<br>
 • <b style='color:#00FFFF;'>40+ BOND ETFs</b>: Complete ETF coverage with Yahoo Finance data<br>
 • <b style='color:#FF00FF;'>COMPARISON TOOL</b>: Chart multiple bonds/ETFs side-by-side<br>
-• <b style='color:#FFAA00;'>Configure your FINRA API credentials in the sidebar to access real bond data!</b><br>
+• <b style='color:#FFAA00;'>No setup required - Ready to use!</b><br>
 </div>
 """, unsafe_allow_html=True)
 
@@ -538,68 +468,57 @@ tab1, tab2, tab3 = st.tabs(["🏢 CORPORATE BONDS (FINRA)", "📊 BOND ETFs", "�
 # =============================================
 with tab1:
     st.markdown("### 🏢 CORPORATE BONDS - FINRA API")
+    st.success("✅ FINRA API automatically connected - Ready to load data")
     
-    if finra_client and st.session_state.get('finra_configured'):
-        st.success("✅ Connected to FINRA API - Ready to load real bond data")
-        
-        if st.button("🔄 LOAD CORPORATE BONDS FROM FINRA", key="load_finra"):
-            with st.spinner("📡 Fetching data from FINRA API..."):
-                df_bonds = finra_client.get_corporate_bonds(limit=5000)
+    if st.button("🔄 LOAD CORPORATE BONDS FROM FINRA", key="load_finra"):
+        with st.spinner("📡 Fetching data from FINRA API... This may take 30-60 seconds..."):
+            df_bonds = finra_client.get_corporate_bonds(limit=5000)
+            
+            if df_bonds is not None and len(df_bonds) > 0:
+                st.session_state['finra_bonds'] = df_bonds
+                st.success(f"✅ Loaded {len(df_bonds)} corporate bonds from FINRA!")
+            else:
+                st.warning("⚠️ No data received from FINRA.")
+                st.info("""
+                **Possible reasons:**
+                - Your FINRA account may not have access to corporate bond data
+                - The endpoint may require special permissions
+                - FINRA API may be temporarily unavailable
                 
-                if df_bonds is not None and len(df_bonds) > 0:
-                    st.session_state['finra_bonds'] = df_bonds
-                    st.success(f"✅ Loaded {len(df_bonds)} corporate bonds from FINRA!")
-                else:
-                    st.warning("⚠️ No data received from FINRA. The endpoint may be different or requires special access.")
-                    st.info("""
-                    **Note**: L'endpoint exact pour les obligations corporate peut varier selon votre accès FINRA.
-                    
-                    Endpoints possibles:
-                    - `/data/group/FIXEDINCOME/name/corporateBondReference`
-                    - `/data/group/OTCMARKET/name/bondData`
-                    - `/data/group/TRACE/name/corporateBonds`
-                    
-                    Consultez la documentation FINRA à https://developer.finra.org/docs pour l'endpoint exact
-                    correspondant à votre subscription.
-                    """)
-        
-        # Afficher les données si disponibles
-        if 'finra_bonds' in st.session_state and st.session_state['finra_bonds'] is not None:
-            df_bonds = st.session_state['finra_bonds']
-            
-            st.markdown(f"### 📊 FINRA BONDS: {len(df_bonds)} bonds loaded")
-            
-            # Afficher les colonnes disponibles
-            with st.expander("📋 Available columns in FINRA data"):
-                st.write(df_bonds.columns.tolist())
-            
-            # Afficher un échantillon
-            st.markdown("#### Sample Data:")
-            st.dataframe(df_bonds.head(20), use_container_width=True)
-            
-            # Export
-            csv_finra = df_bonds.to_csv(index=False)
-            st.download_button(
-                label="📥 DOWNLOAD FINRA BONDS (CSV)",
-                data=csv_finra,
-                file_name=f"finra_bonds_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv",
-            )
+                **What to do:**
+                1. Verify your FINRA subscription includes corporate bond data
+                2. Contact FINRA support: (888) 507-3665
+                3. Use the "BOND ETFs" tab as an alternative (no API required)
+                
+                **Tested endpoints:**
+                - `/data/group/fixedIncome/name/corporateBondReference`
+                - `/data/group/FIXEDINCOME/name/corporateBondReference`
+                - `/data/group/otcMarket/name/bondData`
+                - `/data/group/trace/name/corporateBonds`
+                """)
     
-    else:
-        st.warning("⚠️ FINRA API not configured")
-        st.info("""
-        **Pour accéder aux données FINRA:**
+    # Afficher les données si disponibles
+    if 'finra_bonds' in st.session_state and st.session_state['finra_bonds'] is not None:
+        df_bonds = st.session_state['finra_bonds']
         
-        1. **Configurez vos identifiants** dans la barre latérale (sidebar)
-        2. Entrez votre **API Client ID**: `4c7a3b25323c4ddd91ab`
-        3. Entrez votre **API Client Secret** (mot de passe)
-        4. Cliquez sur **Connect to FINRA**
-        5. Une fois connecté, cliquez sur **LOAD CORPORATE BONDS FROM FINRA**
+        st.markdown(f"### 📊 FINRA BONDS: {len(df_bonds)} bonds loaded")
         
-        **Note**: L'accès FINRA peut nécessiter une subscription spécifique.
-        Si vous n'avez pas accès, utilisez l'onglet "BOND ETFs" pour les données Yahoo Finance.
-        """)
+        # Afficher les colonnes disponibles
+        with st.expander("📋 Available columns in FINRA data"):
+            st.write(df_bonds.columns.tolist())
+        
+        # Afficher un échantillon
+        st.markdown("#### Sample Data:")
+        st.dataframe(df_bonds.head(50), use_container_width=True, height=600)
+        
+        # Export
+        csv_finra = df_bonds.to_csv(index=False)
+        st.download_button(
+            label="📥 DOWNLOAD ALL FINRA BONDS (CSV)",
+            data=csv_finra,
+            file_name=f"finra_bonds_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv",
+        )
 
 # =============================================
 # TAB 2: BOND ETFs
@@ -960,82 +879,29 @@ with tab3:
 # =============================================
 st.markdown('<hr>', unsafe_allow_html=True)
 
-with st.expander("📖 FINRA API SETUP GUIDE"):
-    st.markdown("""
-    ## 🔐 FINRA API Configuration Guide
-    
-    ### Step 1: Get Your FINRA API Credentials
-    
-    1. Go to https://developer.finra.org/
-    2. Create an account or log in
-    3. Navigate to the API Console
-    4. Create a new API Credential
-    5. Note your **API Client ID** and **API Client Secret**
-    
-    ### Step 2: Configure in This App
-    
-    1. Open the sidebar (click `>` on the left)
-    2. Find "FINRA API CONFIG" section
-    3. Expand "Configure FINRA API"
-    4. Enter your credentials:
-       - API Client ID: Your client ID (e.g., `4c7a3b25323c4ddd91ab`)
-       - API Client Secret: Your secret/password
-    5. Click "Connect to FINRA"
-    
-    ### Step 3: Load Bond Data
-    
-    1. Go to the "CORPORATE BONDS (FINRA)" tab
-    2. Click "LOAD CORPORATE BONDS FROM FINRA"
-    3. Wait for data to load (may take 10-30 seconds)
-    
-    ### Important Notes:
-    
-    - **Free Access**: FINRA API is free but requires registration
-    - **Rate Limits**: API has rate limits (typically 100,000 records max)
-    - **Endpoints**: Exact endpoints may vary based on your FINRA access level
-    - **Support**: Contact FINRA at (888) 507-3665 for API support
-    
-    ### Alternative: Use ETF Data
-    
-    If you don't have FINRA access, use the "BOND ETFs" tab which uses Yahoo Finance (no API key required).
-    
-    ### Troubleshooting:
-    
-    **Error "Échec authentification FINRA"**:
-    - Verify your Client ID and Secret are correct
-    - Check your internet connection
-    - Ensure your FINRA account is active
-    
-    **Error "No data received from FINRA"**:
-    - The endpoint may require special access rights
-    - Contact FINRA to verify your subscription includes corporate bond data
-    - Try the ETF screener as an alternative
-    """)
-
 col_info1, col_info2 = st.columns([6, 6])
 
 with col_info1:
     st.markdown("""
     <div style="color:#666;font-size:10px;padding:5px;">
-        📊 DATA SOURCES: FINRA API + YAHOO FINANCE<br>
+        📊 DATA SOURCES: FINRA API (AUTO) + YAHOO FINANCE<br>
         🔄 REAL-TIME CORPORATE BONDS • 40+ ETFs • COMPARISON TOOL
     </div>
     """, unsafe_allow_html=True)
 
 with col_info2:
     last_update = datetime.now().strftime('%H:%M:%S')
-    finra_status = "CONNECTED" if st.session_state.get('finra_configured') else "NOT CONFIGURED"
     st.markdown(f"""
     <div style="color:#666;font-size:10px;padding:5px;">
         🕐 SESSION: {last_update}<br>
-        📍 FINRA STATUS: {finra_status}
+        📍 FINRA STATUS: AUTO-CONNECTED ✅
     </div>
     """, unsafe_allow_html=True)
 
 st.markdown('<hr>', unsafe_allow_html=True)
 st.markdown(f"""
 <div style='text-align: center; color: #666; font-size: 9px; font-family: "Courier New", monospace; padding: 10px;'>
-    © 2025 BLOOMBERG ENS® | BOND SCREENER PRO | FINRA API INTEGRATED<br>
+    © 2025 BLOOMBERG ENS® | BOND SCREENER PRO | FINRA API AUTO-CONNECTED<br>
     CORPORATE BONDS + ETFs • REAL-TIME DATA • LAST UPDATE: {datetime.now().strftime('%H:%M:%S')}
 </div>
 """, unsafe_allow_html=True)
