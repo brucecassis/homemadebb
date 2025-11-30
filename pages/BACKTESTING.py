@@ -2149,7 +2149,7 @@ with tab3:
                 # Option 2: Entrée manuelle
                 table1 = st.text_input(
                     "TABLE NAME 1",
-                    value="exxon_mobil_prices",
+                    value="ms_h4_data",
                     key="table1_input",
                     help="Enter the exact table name from your Supabase database"
                 )
@@ -2179,7 +2179,7 @@ with tab3:
             else:
                 table2 = st.text_input(
                     "TABLE NAME 2",
-                    value="chevron_prices",
+                    value="bac_h4_data",
                     key="table2_input",
                     help="Enter the exact table name from your Supabase database"
                 )
