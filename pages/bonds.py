@@ -231,7 +231,11 @@ class FINRAClient:
             if response.status_code == 200:
                 token_data = response.json()
                 self.access_token = token_data.get('access_token')
-                self.token_expiry = datetime.now() + timedelta(seconds=token_data.get('expires_in', 3600))
+                # Convertir expires_in en int au cas où ce serait une string
+                expires_in = token_data.get('expires_in', 3600)
+                if isinstance(expires_in, str):
+                    expires_in = int(expires_in)
+                self.token_expiry = datetime.now() + timedelta(seconds=expires_in)
                 return True
             else:
                 st.error(f"❌ Échec authentification FINRA: {response.status_code}")
