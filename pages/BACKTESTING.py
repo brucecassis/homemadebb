@@ -2019,12 +2019,28 @@ with pairs_tab1:
         """, unsafe_allow_html=True)
         st.stop()
     
-    # Fonction pour lister les tables disponibles
+        # Fonction pour charger les données d'une table
     @st.cache_data(ttl=300)
-    def get_available_tables():
+    def load_table_data(table_name: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:
         supabase = get_supabase_client()
         if supabase is None:
-            return []
+            return pd.DataFrame()
+        
+        try:
+            # Récupérer toutes les données de la table avec filtres optionnels
+            query = supabase.table(table_name).select('*')
+            
+            if start_date:
+                query = query.gte('date', start_date)
+            if end_date:
+                query = query.lte('date', end_date)
+            
+            response = query.order('date').execute()# Fonction pour lister les tables disponibles
+        @st.cache_data(ttl=300)
+        def get_available_tables():
+            supabase = get_supabase_client()
+            if supabase is None:
+                return []
         
         try:
             # Supposons que vous avez une table "stock_tables" qui liste toutes vos tables de prix
@@ -2183,6 +2199,41 @@ with pairs_tab1:
             key="price_column",
             help="Column name containing the price (usually 'close')"
         )
+
+    # NOUVEAU: Contrôles de période
+    st.markdown("---")
+    col_period1, col_period2 = st.columns(2)
+    
+    with col_period1:
+        use_custom_period = st.checkbox(
+            "📅 USE CUSTOM DATE RANGE",
+            value=False,
+            key="use_custom_period_coint"
+        )
+        
+        if use_custom_period:
+            start_date_coint = st.date_input(
+                "START DATE",
+                value=datetime(2015, 1, 1),
+                key="start_date_coint"
+            )
+        else:
+            start_date_coint = None
+    
+    with col_period2:
+        if use_custom_period:
+            end_date_coint = st.date_input(
+                "END DATE",
+                value=datetime.now(),
+                key="end_date_coint"
+            )
+        else:
+            end_date_coint = None
+    
+    # Afficher le nombre de jours
+    if use_custom_period and start_date_coint and end_date_coint:
+        days_diff = (end_date_coint - start_date_coint).days
+        st.caption(f"📊 Selected period: {days_diff} days (~{days_diff/252:.1f} trading years)")
     
     # Paramètres avancés
     with st.expander("⚙️ ADVANCED PARAMETERS"):
@@ -2243,6 +2294,31 @@ with pairs_tab1:
                     help="Enter SHORT when Residual > this value",
                     key="short_thresh_supabase"
                 )
+
+        # Présets de périodes populaires
+        if not use_custom_period:
+            period_preset = st.selectbox(
+                "📅 SELECT PERIOD PRESET",
+                options=[
+                    "All Available Data",
+                    "Last 1 Year",
+                    "Last 2 Years",
+                    "Last 3 Years",
+                    "Last 5 Years",
+                    "Last 10 Years"
+                ],
+                key="period_preset_coint"
+            )
+            
+            # Calculer les dates selon le preset
+            if period_preset == "All Available Data":
+                start_str = None
+                end_str = None
+            else:
+                years = int(period_preset.split()[1])
+                start_str = (datetime.now() - timedelta(days=years*365)).strftime('%Y-%m-%d')
+                end_str = datetime.now().strftime('%Y-%m-%d')
+                st.caption(f"📊 Period: {start_str} to {end_str}")
     
     # Bouton pour lancer le test
     if st.button("🔬 RUN COINTEGRATION TEST", use_container_width=True, key="run_coint_supabase"):
@@ -2252,8 +2328,17 @@ with pairs_tab1:
                     # Télécharger les données
                     st.markdown("##### 📥 LOADING DATA FROM DATABASE...")
                     
-                    df1 = load_table_data(table1)
-                    df2 = load_table_data(table2)
+                    # Convertir les dates si custom period
+                    start_str = start_date_coint.strftime('%Y-%m-%d') if use_custom_period and start_date_coint else None
+                    end_str = end_date_coint.strftime('%Y-%m-%d') if use_custom_period and end_date_coint else None
+                    
+                    # Charger avec filtres
+                    df1 = load_table_data(table1, start_date=start_str, end_date=end_str)
+                    df2 = load_table_data(table2, start_date=start_str, end_date=end_str)
+                    
+                    # Message de confirmation
+                    if df1 is not None and df2 is not None:
+                        st.info(f"📊 Data loaded: {table1} ({len(df1)} rows), {table2} ({len(df2)} rows)")
                     
                     if df1.empty or df2.empty:
                         st.error(f"❌ Could not load data from {table1} or {table2}")
