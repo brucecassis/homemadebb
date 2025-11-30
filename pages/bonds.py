@@ -540,6 +540,126 @@ def get_years_to_maturity(maturity_date_str):
     except:
         return None
 
+def calculate_bond_price(face_value, coupon_rate, ytm, years_to_maturity, frequency=2):
+    """
+    Calcule le prix d'une obligation
+    
+    Parameters:
+    - face_value: Valeur nominale (généralement 100)
+    - coupon_rate: Taux de coupon annuel (%)
+    - ytm: Yield to Maturity (%)
+    - years_to_maturity: Années jusqu'à maturité
+    - frequency: Fréquence des paiements par an (2 = semestriel, 1 = annuel)
+    """
+    try:
+        periods = int(years_to_maturity * frequency)
+        coupon_payment = (coupon_rate / 100) * face_value / frequency
+        ytm_per_period = (ytm / 100) / frequency
+        
+        # Prix des coupons (annuité)
+        if ytm_per_period == 0:
+            pv_coupons = coupon_payment * periods
+        else:
+            pv_coupons = coupon_payment * ((1 - (1 + ytm_per_period) ** -periods) / ytm_per_period)
+        
+        # Prix de la valeur nominale
+        pv_face = face_value / ((1 + ytm_per_period) ** periods)
+        
+        # Prix total
+        bond_price = pv_coupons + pv_face
+        
+        return bond_price
+    except:
+        return None
+
+def calculate_ytm_precise(face_value, coupon_rate, price, years_to_maturity, frequency=2):
+    """
+    Calcule le YTM exact par approximation successive (Newton-Raphson)
+    
+    Parameters:
+    - face_value: Valeur nominale
+    - coupon_rate: Taux de coupon annuel (%)
+    - price: Prix actuel de l'obligation
+    - years_to_maturity: Années jusqu'à maturité
+    - frequency: Fréquence des paiements par an
+    """
+    try:
+        periods = int(years_to_maturity * frequency)
+        coupon_payment = (coupon_rate / 100) * face_value / frequency
+        
+        # Approximation initiale
+        ytm = coupon_rate / 100
+        
+        # Newton-Raphson
+        for _ in range(100):
+            ytm_per_period = ytm / frequency
+            
+            # Calculer le prix avec le YTM actuel
+            if ytm_per_period == 0:
+                calc_price = coupon_payment * periods + face_value
+            else:
+                pv_coupons = coupon_payment * ((1 - (1 + ytm_per_period) ** -periods) / ytm_per_period)
+                pv_face = face_value / ((1 + ytm_per_period) ** periods)
+                calc_price = pv_coupons + pv_face
+            
+            # Vérifier la convergence
+            if abs(calc_price - price) < 0.01:
+                return ytm * 100
+            
+            # Calculer la dérivée (duration modifiée)
+            d_price = 0
+            for t in range(1, periods + 1):
+                d_price += -t * coupon_payment / ((1 + ytm_per_period) ** (t + 1))
+            d_price += -periods * face_value / ((1 + ytm_per_period) ** (periods + 1))
+            d_price = d_price / frequency
+            
+            # Mise à jour du YTM
+            if d_price != 0:
+                ytm = ytm - (calc_price - price) / d_price
+            else:
+                break
+        
+        return ytm * 100
+    except:
+        return None
+
+def calculate_duration_convexity(face_value, coupon_rate, ytm, years_to_maturity, frequency=2):
+    """
+    Calcule la duration de Macaulay, la duration modifiée et la convexité
+    """
+    try:
+        periods = int(years_to_maturity * frequency)
+        coupon_payment = (coupon_rate / 100) * face_value / frequency
+        ytm_per_period = (ytm / 100) / frequency
+        
+        # Calculer le prix
+        bond_price = calculate_bond_price(face_value, coupon_rate, ytm, years_to_maturity, frequency)
+        
+        if bond_price is None:
+            return None, None, None
+        
+        # Duration de Macaulay
+        weighted_cf = 0
+        convexity_sum = 0
+        
+        for t in range(1, periods + 1):
+            pv_cf = coupon_payment / ((1 + ytm_per_period) ** t)
+            weighted_cf += (t / frequency) * pv_cf
+            convexity_sum += (t * (t + 1)) * pv_cf
+        
+        # Ajouter la valeur nominale
+        pv_face = face_value / ((1 + ytm_per_period) ** periods)
+        weighted_cf += (periods / frequency) * pv_face
+        convexity_sum += (periods * (periods + 1)) * pv_face
+        
+        macaulay_duration = weighted_cf / bond_price
+        modified_duration = macaulay_duration / (1 + ytm_per_period)
+        convexity = convexity_sum / (bond_price * (frequency ** 2) * ((1 + ytm_per_period) ** 2))
+        
+        return macaulay_duration, modified_duration, convexity
+    except:
+        return None, None, None
+
 # =============================================
 # HEADER BLOOMBERG
 # =============================================
@@ -550,7 +670,7 @@ st.markdown(f"""
         <div>⬛ BLOOMBERG ENS® TERMINAL - BOND SCREENER PRO</div>
         <a href="/" style="background:#333;color:#FFAA00;border:1px solid #000;padding:4px 12px;font-size:11px;text-decoration:none;">MARKETS</a>
     </div>
-    <div>{current_time} UTC • 150+ BONDS + 40+ ETFS</div>
+    <div>{current_time} UTC • 150+ BONDS + 40+ ETFS + PRICER</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -563,6 +683,7 @@ st.markdown("""
 • <b style='color:#00FF00;'>150+ CORPORATE BONDS</b>: Major US companies across all sectors<br>
 • <b style='color:#00FFFF;'>40+ BOND ETFs</b>: Complete coverage - Treasuries to High Yield<br>
 • <b style='color:#FF00FF;'>COMPARISON TOOL</b>: Chart multiple bonds/ETFs side-by-side<br>
+• <b style='color:#FFA500;'>BOND PRICER</b>: Calculate price, YTM, duration & convexity<br>
 • <b style='color:#FFAA00;'>100% FREE DATA</b>: Yahoo Finance - No API keys required<br>
 </div>
 """, unsafe_allow_html=True)
@@ -570,7 +691,7 @@ st.markdown("""
 # =============================================
 # TABS
 # =============================================
-tab1, tab2, tab3 = st.tabs(["🏢 CORPORATE BONDS", "📊 BOND ETFs", "📈 COMPARISON TOOL"])
+tab1, tab2, tab3, tab4 = st.tabs(["🏢 CORPORATE BONDS", "📊 BOND ETFs", "📈 COMPARISON TOOL", "🧮 BOND PRICER"])
 
 # =============================================
 # TAB 1: CORPORATE BONDS
@@ -1136,6 +1257,387 @@ with tab3:
     
     else:
         st.info("👆 Select bond ETFs above to compare their performance")
+
+# =============================================
+# TAB 4: BOND PRICER
+# =============================================
+with tab4:
+    st.markdown("### 🧮 BOND PRICING CALCULATOR")
+    st.markdown("**Calculate bond prices, YTM, duration, and convexity**")
+    
+    st.markdown('<hr>', unsafe_allow_html=True)
+    
+    # Choix du mode
+    calc_mode = st.radio(
+        "Calculation Mode:",
+        options=["Calculate Price (from YTM)", "Calculate YTM (from Price)"],
+        horizontal=True
+    )
+    
+    st.markdown('<hr>', unsafe_allow_html=True)
+    
+    col_input1, col_input2 = st.columns(2)
+    
+    with col_input1:
+        st.markdown("#### 📋 BOND PARAMETERS")
+        
+        face_value = st.number_input(
+            "Face Value ($)",
+            min_value=1.0,
+            max_value=1000000.0,
+            value=100.0,
+            step=10.0,
+            help="Valeur nominale de l'obligation (généralement 100 ou 1000)"
+        )
+        
+        coupon_rate = st.number_input(
+            "Coupon Rate (%)",
+            min_value=0.0,
+            max_value=20.0,
+            value=5.0,
+            step=0.25,
+            help="Taux de coupon annuel"
+        )
+        
+        years_to_mat = st.number_input(
+            "Years to Maturity",
+            min_value=0.1,
+            max_value=50.0,
+            value=10.0,
+            step=0.5,
+            help="Nombre d'années jusqu'à l'échéance"
+        )
+        
+        payment_freq = st.selectbox(
+            "Payment Frequency",
+            options=[1, 2, 4, 12],
+            index=1,
+            format_func=lambda x: {1: "Annual", 2: "Semi-Annual", 4: "Quarterly", 12: "Monthly"}[x],
+            help="Fréquence des paiements de coupons"
+        )
+    
+    with col_input2:
+        st.markdown("#### 💰 PRICING INPUTS")
+        
+        if calc_mode == "Calculate Price (from YTM)":
+            ytm_input = st.number_input(
+                "Yield to Maturity - YTM (%)",
+                min_value=0.0,
+                max_value=20.0,
+                value=4.5,
+                step=0.25,
+                help="Rendement à maturité (taux de marché)"
+            )
+            
+            st.markdown("---")
+            
+            if st.button("🔢 CALCULATE BOND PRICE", use_container_width=True):
+                with st.spinner("Calculating..."):
+                    bond_price = calculate_bond_price(face_value, coupon_rate, ytm_input, years_to_mat, payment_freq)
+                    
+                    if bond_price is not None:
+                        st.session_state['pricer_results'] = {
+                            'mode': 'price',
+                            'price': bond_price,
+                            'ytm': ytm_input,
+                            'face_value': face_value,
+                            'coupon_rate': coupon_rate,
+                            'years_to_maturity': years_to_mat,
+                            'frequency': payment_freq
+                        }
+                        st.success("✅ Calculation complete!")
+                    else:
+                        st.error("❌ Calculation error")
+        
+        else:  # Calculate YTM from Price
+            price_input = st.number_input(
+                "Current Price ($)",
+                min_value=1.0,
+                max_value=200.0,
+                value=95.0,
+                step=1.0,
+                help="Prix actuel de l'obligation sur le marché"
+            )
+            
+            st.markdown("---")
+            
+            if st.button("🔢 CALCULATE YTM", use_container_width=True):
+                with st.spinner("Calculating..."):
+                    ytm_calc = calculate_ytm_precise(face_value, coupon_rate, price_input, years_to_mat, payment_freq)
+                    
+                    if ytm_calc is not None:
+                        st.session_state['pricer_results'] = {
+                            'mode': 'ytm',
+                            'price': price_input,
+                            'ytm': ytm_calc,
+                            'face_value': face_value,
+                            'coupon_rate': coupon_rate,
+                            'years_to_maturity': years_to_mat,
+                            'frequency': payment_freq
+                        }
+                        st.success("✅ Calculation complete!")
+                    else:
+                        st.error("❌ Calculation error")
+    
+    # Afficher les résultats
+    if 'pricer_results' in st.session_state:
+        results = st.session_state['pricer_results']
+        
+        st.markdown('<hr>', unsafe_allow_html=True)
+        st.markdown("### 📊 CALCULATION RESULTS")
+        
+        col_res1, col_res2, col_res3, col_res4 = st.columns(4)
+        
+        with col_res1:
+            st.metric(
+                "Bond Price",
+                f"${results['price']:.2f}",
+                delta=f"{((results['price'] / results['face_value']) - 1) * 100:.2f}% vs Par"
+            )
+        
+        with col_res2:
+            st.metric(
+                "Yield to Maturity",
+                f"{results['ytm']:.3f}%"
+            )
+        
+        with col_res3:
+            annual_coupon = results['coupon_rate'] * results['face_value'] / 100
+            st.metric(
+                "Annual Coupon",
+                f"${annual_coupon:.2f}"
+            )
+        
+        with col_res4:
+            total_coupons = annual_coupon * results['years_to_maturity']
+            st.metric(
+                "Total Coupons",
+                f"${total_coupons:.2f}"
+            )
+        
+        # Calculer duration et convexity
+        st.markdown('<hr>', unsafe_allow_html=True)
+        st.markdown("### 📏 DURATION & CONVEXITY")
+        
+        mac_dur, mod_dur, convex = calculate_duration_convexity(
+            results['face_value'],
+            results['coupon_rate'],
+            results['ytm'],
+            results['years_to_maturity'],
+            results['frequency']
+        )
+        
+        col_dur1, col_dur2, col_dur3 = st.columns(3)
+        
+        with col_dur1:
+            if mac_dur is not None:
+                st.metric(
+                    "Macaulay Duration",
+                    f"{mac_dur:.3f} years",
+                    help="Durée moyenne pondérée des flux de trésorerie"
+                )
+            else:
+                st.metric("Macaulay Duration", "N/A")
+        
+        with col_dur2:
+            if mod_dur is not None:
+                st.metric(
+                    "Modified Duration",
+                    f"{mod_dur:.3f}",
+                    help="Sensibilité du prix aux variations de taux (-ΔP/P / ΔY)"
+                )
+            else:
+                st.metric("Modified Duration", "N/A")
+        
+        with col_dur3:
+            if convex is not None:
+                st.metric(
+                    "Convexity",
+                    f"{convex:.3f}",
+                    help="Courbure de la relation prix-rendement"
+                )
+            else:
+                st.metric("Convexity", "N/A")
+        
+        # Analyse de sensibilité
+        st.markdown('<hr>', unsafe_allow_html=True)
+        st.markdown("### 📈 SENSITIVITY ANALYSIS")
+        
+        # Créer une plage de YTM
+        ytm_range = np.linspace(max(0.1, results['ytm'] - 3), results['ytm'] + 3, 50)
+        prices = []
+        
+        for ytm_test in ytm_range:
+            price_test = calculate_bond_price(
+                results['face_value'],
+                results['coupon_rate'],
+                ytm_test,
+                results['years_to_maturity'],
+                results['frequency']
+            )
+            if price_test is not None:
+                prices.append(price_test)
+            else:
+                prices.append(None)
+        
+        # Graphique de sensibilité
+        fig_sens = go.Figure()
+        
+        fig_sens.add_trace(go.Scatter(
+            x=ytm_range,
+            y=prices,
+            mode='lines',
+            name='Price-Yield Curve',
+            line=dict(color='#00FFFF', width=3),
+        ))
+        
+        # Point actuel
+        fig_sens.add_trace(go.Scatter(
+            x=[results['ytm']],
+            y=[results['price']],
+            mode='markers',
+            name='Current Position',
+            marker=dict(color='#FF0000', size=15, symbol='star'),
+        ))
+        
+        fig_sens.update_layout(
+            title="Bond Price vs Yield to Maturity",
+            paper_bgcolor='#000',
+            plot_bgcolor='#111',
+            font=dict(color='#FFAA00', size=10),
+            xaxis=dict(
+                gridcolor='#333',
+                showgrid=True,
+                title="Yield to Maturity (%)",
+                zeroline=True
+            ),
+            yaxis=dict(
+                gridcolor='#333',
+                showgrid=True,
+                title="Bond Price ($)",
+                zeroline=False
+            ),
+            hovermode='x unified',
+            height=500
+        )
+        
+        st.plotly_chart(fig_sens, use_container_width=True)
+        
+        # Tableau de sensibilité
+        st.markdown("#### 📋 Price Sensitivity Table")
+        
+        sensitivity_data = []
+        ytm_changes = [-2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0]
+        
+        for change in ytm_changes:
+            new_ytm = results['ytm'] + change
+            new_price = calculate_bond_price(
+                results['face_value'],
+                results['coupon_rate'],
+                new_ytm,
+                results['years_to_maturity'],
+                results['frequency']
+            )
+            
+            if new_price is not None:
+                price_change = new_price - results['price']
+                price_change_pct = (price_change / results['price']) * 100
+                
+                sensitivity_data.append({
+                    'YTM Change': f"{change:+.2f}%",
+                    'New YTM': f"{new_ytm:.3f}%",
+                    'New Price': f"${new_price:.2f}",
+                    'Price Change': f"${price_change:+.2f}",
+                    'Price Change %': f"{price_change_pct:+.2f}%"
+                })
+        
+        df_sens = pd.DataFrame(sensitivity_data)
+        st.dataframe(df_sens, use_container_width=True, hide_index=True)
+        
+        # Informations supplémentaires
+        st.markdown('<hr>', unsafe_allow_html=True)
+        st.markdown("### 📝 BOND DETAILS")
+        
+        col_det1, col_det2 = st.columns(2)
+        
+        with col_det1:
+            st.markdown(f"""
+            <div style='background:#111;border:1px solid #333;padding:15px;border-left:4px solid #FFAA00;'>
+            <b style='color:#FFAA00;'>BASIC INFORMATION:</b><br>
+            • Face Value: ${results['face_value']:.2f}<br>
+            • Coupon Rate: {results['coupon_rate']:.2f}%<br>
+            • Years to Maturity: {results['years_to_maturity']:.1f} years<br>
+            • Payment Frequency: {results['frequency']}x per year<br>
+            • Current Price: ${results['price']:.2f}<br>
+            • Current YTM: {results['ytm']:.3f}%<br>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col_det2:
+            # Premium/Discount status
+            if results['price'] > results['face_value']:
+                status = "PREMIUM BOND"
+                status_color = "#00FF00"
+                status_desc = "Trading above par value"
+            elif results['price'] < results['face_value']:
+                status = "DISCOUNT BOND"
+                status_color = "#FF0000"
+                status_desc = "Trading below par value"
+            else:
+                status = "PAR BOND"
+                status_color = "#FFAA00"
+                status_desc = "Trading at par value"
+            
+            # Coupon vs YTM comparison
+            if results['coupon_rate'] > results['ytm']:
+                yield_status = "Coupon > YTM"
+            elif results['coupon_rate'] < results['ytm']:
+                yield_status = "Coupon < YTM"
+            else:
+                yield_status = "Coupon = YTM"
+            
+            st.markdown(f"""
+            <div style='background:#111;border:1px solid #333;padding:15px;border-left:4px solid {status_color};'>
+            <b style='color:{status_color};'>BOND STATUS:</b><br>
+            • Type: <b>{status}</b><br>
+            • Status: {status_desc}<br>
+            • Premium/Discount: {((results['price'] / results['face_value']) - 1) * 100:+.2f}%<br>
+            • Yield Comparison: {yield_status}<br>
+            • Modified Duration: {mod_dur:.3f} years<br>
+            • Convexity: {convex:.3f}<br>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    else:
+        st.info("👆 Enter bond parameters and click 'CALCULATE' to price the bond")
+        
+        st.markdown('<hr>', unsafe_allow_html=True)
+        st.markdown("""
+        ### 📖 BOND PRICING GUIDE
+        
+        **How to use this calculator:**
+        
+        1. **Choose Calculation Mode:**
+           - **Calculate Price**: Enter YTM to find the bond price
+           - **Calculate YTM**: Enter the current price to find the yield
+        
+        2. **Enter Bond Parameters:**
+           - **Face Value**: Nominal value (usually $100 or $1,000)
+           - **Coupon Rate**: Annual interest rate (%)
+           - **Years to Maturity**: Time until the bond matures
+           - **Payment Frequency**: How often coupons are paid
+        
+        3. **Key Metrics Explained:**
+           - **YTM**: Total return if held to maturity
+           - **Macaulay Duration**: Weighted average time to receive cash flows
+           - **Modified Duration**: Price sensitivity to yield changes
+           - **Convexity**: Curvature of price-yield relationship
+        
+        4. **Bond Types:**
+           - **Premium Bond**: Price > Face Value (Coupon > YTM)
+           - **Discount Bond**: Price < Face Value (Coupon < YTM)
+           - **Par Bond**: Price = Face Value (Coupon = YTM)
+        """)
 
 # =============================================
 # FOOTER
