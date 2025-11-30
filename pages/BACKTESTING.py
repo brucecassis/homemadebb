@@ -1969,333 +1969,263 @@ with tab3:
     ])
 
     # ===== PAIRS TAB 1: COINTEGRATION TEST (SUPABASE VERSION) =====
-with pairs_tab1:
-    st.markdown("#### 🔬 COINTEGRATION ANALYSIS")
-    
-    # Fonction pour se connecter à Supabase en utilisant les secrets
-    @st.cache_resource
-    def get_supabase_client():
-        try:
-            from supabase import create_client, Client
-            
-            # Récupérer les credentials depuis les secrets Streamlit
-            url = st.secrets["SUPABASE_URL"]
-            key = st.secrets["SUPABASE_KEY"]
-            
-            supabase: Client = create_client(url, key)
-            return supabase
-        except KeyError as e:
-            st.error(f"❌ Missing Supabase credentials in secrets: {e}")
-            st.info("Please add SUPABASE_URL and SUPABASE_KEY to your Streamlit secrets")
-            return None
-        except Exception as e:
-            st.error(f"❌ Error connecting to Supabase: {e}")
-            return None
-    
-    # Vérifier la connexion et afficher le statut
-    supabase_client = get_supabase_client()
-    
-    if supabase_client:
-        st.markdown("""
-        <div style="background-color: #0a1a0a; border-left: 3px solid #00FF00; padding: 10px; margin: 10px 0;">
-            <p style="margin: 0; font-size: 10px; color: #00FF00; font-weight: bold;">
-            ✅ CONNECTED TO SUPABASE
-            </p>
-            <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
-            Ready to access stock price data from your database.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        st.markdown("""
-        <div style="background-color: #1a0a0a; border-left: 3px solid #FF0000; padding: 10px; margin: 10px 0;">
-            <p style="margin: 0; font-size: 10px; color: #FF0000; font-weight: bold;">
-            ❌ SUPABASE CONNECTION FAILED
-            </p>
-            <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
-            Please check your Streamlit secrets configuration.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-        st.stop()
-    
-        # Fonction pour charger les données d'une table
-    @st.cache_data(ttl=300)
-    def load_table_data(table_name: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:
-        supabase = get_supabase_client()
-        if supabase is None:
-            return pd.DataFrame()
+    with pairs_tab1:
+        st.markdown("#### 🔬 COINTEGRATION ANALYSIS")
         
-        try:
-            # Récupérer toutes les données de la table avec filtres optionnels
-            query = supabase.table(table_name).select('*')
-            
-            if start_date:
-                query = query.gte('date', start_date)
-            if end_date:
-                query = query.lte('date', end_date)
-            
-            response = query.order('date').execute()# Fonction pour lister les tables disponibles
+        # Fonction pour se connecter à Supabase en utilisant les secrets
+        @st.cache_resource
+        def get_supabase_client():
+            try:
+                from supabase import create_client, Client
+                
+                # Récupérer les credentials depuis les secrets Streamlit
+                url = st.secrets["SUPABASE_URL"]
+                key = st.secrets["SUPABASE_KEY"]
+                
+                supabase: Client = create_client(url, key)
+                return supabase
+            except KeyError as e:
+                st.error(f"❌ Missing Supabase credentials in secrets: {e}")
+                st.info("Please add SUPABASE_URL and SUPABASE_KEY to your Streamlit secrets")
+                return None
+            except Exception as e:
+                st.error(f"❌ Error connecting to Supabase: {e}")
+                return None
+        
+        # Vérifier la connexion et afficher le statut
+        supabase_client = get_supabase_client()
+        
+        if supabase_client:
+            st.markdown("""
+            <div style="background-color: #0a1a0a; border-left: 3px solid #00FF00; padding: 10px; margin: 10px 0;">
+                <p style="margin: 0; font-size: 10px; color: #00FF00; font-weight: bold;">
+                ✅ CONNECTED TO SUPABASE
+                </p>
+                <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
+                Ready to access stock price data from your database.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div style="background-color: #1a0a0a; border-left: 3px solid #FF0000; padding: 10px; margin: 10px 0;">
+                <p style="margin: 0; font-size: 10px; color: #FF0000; font-weight: bold;">
+                ❌ SUPABASE CONNECTION FAILED
+                </p>
+                <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
+                Please check your Streamlit secrets configuration.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            st.stop()
+        
+        # Fonction pour lister les tables disponibles
         @st.cache_data(ttl=300)
         def get_available_tables():
             supabase = get_supabase_client()
             if supabase is None:
                 return []
-        
-        try:
-            # Supposons que vous avez une table "stock_tables" qui liste toutes vos tables de prix
-            response = supabase.table('stock_tables').select('*').execute()
             
-            if response.data:
-                return [row['table_name'] for row in response.data]
-            else:
+            try:
+                # Supposons que vous avez une table "stock_tables" qui liste toutes vos tables de prix
+                response = supabase.table('stock_tables').select('*').execute()
+                
+                if response.data:
+                    return [row['table_name'] for row in response.data]
+                else:
+                    return []
+            except Exception as e:
+                # Si la table stock_tables n'existe pas, retourner une liste vide
+                # L'utilisateur devra entrer manuellement les noms de tables
                 return []
-        except Exception as e:
-            # Si la table stock_tables n'existe pas, retourner une liste vide
-            # L'utilisateur devra entrer manuellement les noms de tables
-            return []
-    
-    # Fonction pour charger les données d'une table
-    @st.cache_data(ttl=300)
-    def load_table_data(table_name: str) -> pd.DataFrame:
-        supabase = get_supabase_client()
-        if supabase is None:
-            return pd.DataFrame()
         
-        try:
-            # Récupérer toutes les données de la table
-            response = supabase.table(table_name).select('*').order('date').execute()
+        # Fonction pour charger les données d'une table - MODIFIÉE
+        @st.cache_data(ttl=300)
+        def load_table_data(table_name: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:
+            supabase = get_supabase_client()
+            if supabase is None:
+                return pd.DataFrame()
             
-            if response.data:
-                df = pd.DataFrame(response.data)
+            try:
+                # Récupérer toutes les données de la table avec filtres optionnels
+                query = supabase.table(table_name).select('*')
                 
-                # S'assurer que les colonnes sont en minuscules
-                df.columns = df.columns.str.lower()
+                if start_date:
+                    query = query.gte('date', start_date)
+                if end_date:
+                    query = query.lte('date', end_date)
                 
-                # Convertir la date en datetime
-                if 'date' in df.columns:
-                    df['date'] = pd.to_datetime(df['date'])
-                    df.set_index('date', inplace=True)
+                response = query.order('date').execute()
                 
-                return df
-            else:
+                if response.data:
+                    df = pd.DataFrame(response.data)
+                    
+                    # S'assurer que les colonnes sont en minuscules
+                    df.columns = df.columns.str.lower()
+                    
+                    # Convertir la date en datetime
+                    if 'date' in df.columns:
+                        df['date'] = pd.to_datetime(df['date'])
+                        df.set_index('date', inplace=True)
+                    
+                    return df
+                else:
+                    return pd.DataFrame()
+            
+            except Exception as e:
+                st.error(f"❌ Error loading table {table_name}: {e}")
                 return pd.DataFrame()
         
-        except Exception as e:
-            st.error(f"❌ Error loading table {table_name}: {e}")
-            return pd.DataFrame()
-    
-    # Fonction de nettoyage des données
-    def nettoyer_donnees(df: pd.DataFrame, nom_colonne: str) -> pd.DataFrame:
-        df = df.copy()
-        
-        # Supprimer les doublons d'index
-        df = df[~df.index.duplicated(keep='first')]
-        
-        # Supprimer les valeurs <= 0
-        df = df[df[nom_colonne] > 0]
-        
-        # Supprimer les NaN
-        df = df.dropna(subset=[nom_colonne])
-        
-        # Calculer les returns pour détecter les outliers
-        df["returns"] = np.log(df[nom_colonne] / df[nom_colonne].shift(1))
-        mean_ret = df["returns"].mean()
-        std_ret = df["returns"].std()
-        seuil = 4
-        
-        # Filtrer les outliers (au-delà de 4 écarts-types)
-        df = df[(df["returns"] > mean_ret - seuil * std_ret) & 
-               (df["returns"] < mean_ret + seuil * std_ret)]
-        
-        # Supprimer la colonne returns temporaire
-        df.drop(columns=["returns"], inplace=True)
-        
-        return df
-    
-    # Fonction de test de stationnarité
-    def test_stationnarite_et_integration(serie: pd.Series, nom_serie: str) -> int:
-        """
-        Retourne:
-        - 0 si la série est I(0) (stationnaire en niveau)
-        - 1 si la série est I(1) (stationnaire en différence)
-        - -1 si la série n'est pas I(1)
-        """
-        # Test ADF en niveau
-        result_niveau = adfuller(serie.dropna(), maxlag=1, regression='c')
-        
-        if result_niveau[1] < 0.05:
-            # Stationnaire en niveau → I(0) → pas adaptée
-            return 0
-        else:
-            # Non stationnaire en niveau, tester la différence
-            diff_serie = serie.diff().dropna()
-            result_diff = adfuller(diff_serie, maxlag=1, regression='c')
+        # Fonction de nettoyage des données
+        def nettoyer_donnees(df: pd.DataFrame, nom_colonne: str) -> pd.DataFrame:
+            df = df.copy()
             
-            if result_diff[1] < 0.05:
-                # Stationnaire en différence → I(1) → OK
-                return 1
+            # Supprimer les doublons d'index
+            df = df[~df.index.duplicated(keep='first')]
+            
+            # Supprimer les valeurs <= 0
+            df = df[df[nom_colonne] > 0]
+            
+            # Supprimer les NaN
+            df = df.dropna(subset=[nom_colonne])
+            
+            # Calculer les returns pour détecter les outliers
+            df["returns"] = np.log(df[nom_colonne] / df[nom_colonne].shift(1))
+            mean_ret = df["returns"].mean()
+            std_ret = df["returns"].std()
+            seuil = 4
+            
+            # Filtrer les outliers (au-delà de 4 écarts-types)
+            df = df[(df["returns"] > mean_ret - seuil * std_ret) & 
+                   (df["returns"] < mean_ret + seuil * std_ret)]
+            
+            # Supprimer la colonne returns temporaire
+            df.drop(columns=["returns"], inplace=True)
+            
+            return df
+        
+        # Fonction de test de stationnarité
+        def test_stationnarite_et_integration(serie: pd.Series, nom_serie: str) -> int:
+            """
+            Retourne:
+            - 0 si la série est I(0) (stationnaire en niveau)
+            - 1 si la série est I(1) (stationnaire en différence)
+            - -1 si la série n'est pas I(1)
+            """
+            # Test ADF en niveau
+            result_niveau = adfuller(serie.dropna(), maxlag=1, regression='c')
+            
+            if result_niveau[1] < 0.05:
+                # Stationnaire en niveau → I(0) → pas adaptée
+                return 0
             else:
-                # Pas stationnaire même en différence
-                return -1
-    
-    # Interface principale
-    col_pair1, col_pair2 = st.columns(2)
-    
-    with col_pair1:
-        st.markdown("**ASSET 1 (X - Independent)**")
-        
-        # Option 1: Auto-détection des tables
-        auto_tables = get_available_tables()
-        
-        if auto_tables:
-            table1 = st.selectbox(
-                "SELECT TABLE 1",
-                options=auto_tables,
-                key="table1_select"
-            )
-        else:
-            # Option 2: Entrée manuelle
-            table1 = st.text_input(
-                "TABLE NAME 1",
-                value="exxon_mobil_prices",
-                key="table1_input",
-                help="Enter the exact table name from your Supabase database"
-            )
-        
-        # Suggestions de paires connues
-        st.markdown("**💡 Suggested Pairs:**")
-        suggested_pairs = {
-            "Energy": "exxon_mobil / chevron",
-            "Tech": "microsoft / apple",
-            "Banks": "jpmorgan / goldman_sachs, bofa / morgan_stanley",
-            "Auto": "ford / gm",
-            "Consumer": "pepsi / coca_cola",
-            "Oil": "shell / bp"
-        }
-        for sector, pairs in suggested_pairs.items():
-            st.caption(f"• {sector}: {pairs}")
-    
-    with col_pair2:
-        st.markdown("**ASSET 2 (Y - Dependent)**")
-        
-        if auto_tables:
-            table2 = st.selectbox(
-                "SELECT TABLE 2",
-                options=auto_tables,
-                key="table2_select"
-            )
-        else:
-            table2 = st.text_input(
-                "TABLE NAME 2",
-                value="chevron_prices",
-                key="table2_input",
-                help="Enter the exact table name from your Supabase database"
-            )
-        
-        price_column = st.text_input(
-            "PRICE COLUMN NAME",
-            value="close",
-            key="price_column",
-            help="Column name containing the price (usually 'close')"
-        )
-
-    # NOUVEAU: Contrôles de période
-    st.markdown("---")
-    col_period1, col_period2 = st.columns(2)
-    
-    with col_period1:
-        use_custom_period = st.checkbox(
-            "📅 USE CUSTOM DATE RANGE",
-            value=False,
-            key="use_custom_period_coint"
-        )
-        
-        if use_custom_period:
-            start_date_coint = st.date_input(
-                "START DATE",
-                value=datetime(2015, 1, 1),
-                key="start_date_coint"
-            )
-        else:
-            start_date_coint = None
-    
-    with col_period2:
-        if use_custom_period:
-            end_date_coint = st.date_input(
-                "END DATE",
-                value=datetime.now(),
-                key="end_date_coint"
-            )
-        else:
-            end_date_coint = None
-    
-    # Afficher le nombre de jours
-    if use_custom_period and start_date_coint and end_date_coint:
-        days_diff = (end_date_coint - start_date_coint).days
-        st.caption(f"📊 Selected period: {days_diff} days (~{days_diff/252:.1f} trading years)")
-    
-    # Paramètres avancés
-    with st.expander("⚙️ ADVANCED PARAMETERS"):
-        col_adv1, col_adv2 = st.columns(2)
-        
-        with col_adv1:
-            adf_significance = st.selectbox(
-                "ADF SIGNIFICANCE LEVEL",
-                options=["1%", "5%", "10%"],
-                index=1,
-                key="adf_sig_supabase"
-            )
-            
-            outlier_threshold = st.slider(
-                "OUTLIER THRESHOLD (σ)",
-                min_value=2.0, max_value=6.0, value=4.0, step=0.5,
-                help="Remove returns > X standard deviations",
-                key="outlier_thresh_supabase"
-            )
-        
-        with col_adv2:
-            use_zscore = st.checkbox(
-                "USE Z-SCORE FOR SIGNALS",
-                value=True,
-                help="Normalize residuals to z-score",
-                key="use_zscore_supabase"
-            )
-            
-            if use_zscore:
-                st.caption("📊 Z-Score mode: thresholds in standard deviations")
+                # Non stationnaire en niveau, tester la différence
+                diff_serie = serie.diff().dropna()
+                result_diff = adfuller(diff_serie, maxlag=1, regression='c')
                 
-                long_threshold = st.slider(
-                    "🟢 LONG THRESHOLD (Z-Score)",
-                    min_value=-4.0, max_value=0.0, value=-2.0, step=0.1,
-                    help="Enter LONG when Z-Score < this value",
-                    key="long_thresh_supabase"
-                )
-                
-                short_threshold = st.slider(
-                    "🔴 SHORT THRESHOLD (Z-Score)",
-                    min_value=0.0, max_value=4.0, value=2.0, step=0.1,
-                    help="Enter SHORT when Z-Score > this value",
-                    key="short_thresh_supabase"
+                if result_diff[1] < 0.05:
+                    # Stationnaire en différence → I(1) → OK
+                    return 1
+                else:
+                    # Pas stationnaire même en différence
+                    return -1
+        
+        # Interface principale
+        col_pair1, col_pair2 = st.columns(2)
+        
+        with col_pair1:
+            st.markdown("**ASSET 1 (X - Independent)**")
+            
+            # Option 1: Auto-détection des tables
+            auto_tables = get_available_tables()
+            
+            if auto_tables:
+                table1 = st.selectbox(
+                    "SELECT TABLE 1",
+                    options=auto_tables,
+                    key="table1_select"
                 )
             else:
-                st.caption("📊 Residual mode: thresholds in absolute values")
-                
-                long_threshold = st.slider(
-                    "🟢 LONG THRESHOLD (Residual)",
-                    min_value=-20.0, max_value=0.0, value=-5.0, step=0.5,
-                    help="Enter LONG when Residual < this value",
-                    key="long_thresh_supabase"
+                # Option 2: Entrée manuelle
+                table1 = st.text_input(
+                    "TABLE NAME 1",
+                    value="exxon_mobil_prices",
+                    key="table1_input",
+                    help="Enter the exact table name from your Supabase database"
+                )
+            
+            # Suggestions de paires connues
+            st.markdown("**💡 Suggested Pairs:**")
+            suggested_pairs = {
+                "Energy": "exxon_mobil / chevron",
+                "Tech": "microsoft / apple",
+                "Banks": "jpmorgan / goldman_sachs, bofa / morgan_stanley",
+                "Auto": "ford / gm",
+                "Consumer": "pepsi / coca_cola",
+                "Oil": "shell / bp"
+            }
+            for sector, pairs in suggested_pairs.items():
+                st.caption(f"• {sector}: {pairs}")
+        
+        with col_pair2:
+            st.markdown("**ASSET 2 (Y - Dependent)**")
+            
+            if auto_tables:
+                table2 = st.selectbox(
+                    "SELECT TABLE 2",
+                    options=auto_tables,
+                    key="table2_select"
+                )
+            else:
+                table2 = st.text_input(
+                    "TABLE NAME 2",
+                    value="chevron_prices",
+                    key="table2_input",
+                    help="Enter the exact table name from your Supabase database"
+                )
+            
+            price_column = st.text_input(
+                "PRICE COLUMN NAME",
+                value="close",
+                key="price_column",
+                help="Column name containing the price (usually 'close')"
+            )
+        
+        # NOUVEAU: Contrôles de période
+        st.markdown("---")
+        st.markdown("#### 📅 DATA PERIOD SELECTION")
+        
+        col_period1, col_period2 = st.columns(2)
+        
+        with col_period1:
+            use_custom_period = st.checkbox(
+                "📅 USE CUSTOM DATE RANGE",
+                value=False,
+                key="use_custom_period_coint",
+                help="Check to select specific start and end dates"
+            )
+            
+            if use_custom_period:
+                start_date_coint = st.date_input(
+                    "START DATE",
+                    value=datetime(2015, 1, 1),
+                    key="start_date_coint"
+                )
+        
+        with col_period2:
+            if use_custom_period:
+                end_date_coint = st.date_input(
+                    "END DATE",
+                    value=datetime.now(),
+                    key="end_date_coint"
                 )
                 
-                short_threshold = st.slider(
-                    "🔴 SHORT THRESHOLD (Residual)",
-                    min_value=0.0, max_value=20.0, value=5.0, step=0.5,
-                    help="Enter SHORT when Residual > this value",
-                    key="short_thresh_supabase"
-                )
-
-        # Présets de périodes populaires
+                # Afficher le nombre de jours
+                if start_date_coint and end_date_coint:
+                    days_diff = (end_date_coint - start_date_coint).days
+                    st.caption(f"📊 Selected period: {days_diff} days (~{days_diff/252:.1f} trading years)")
+        
+        # Présets de périodes si pas en mode custom
         if not use_custom_period:
             period_preset = st.selectbox(
                 "📅 SELECT PERIOD PRESET",
@@ -2307,336 +2237,442 @@ with pairs_tab1:
                     "Last 5 Years",
                     "Last 10 Years"
                 ],
-                key="period_preset_coint"
+                key="period_preset_coint",
+                help="Quick selection of common time periods"
             )
             
-            # Calculer les dates selon le preset
-            if period_preset == "All Available Data":
-                start_str = None
-                end_str = None
-            else:
+            # Info sur le preset sélectionné
+            if period_preset != "All Available Data":
                 years = int(period_preset.split()[1])
-                start_str = (datetime.now() - timedelta(days=years*365)).strftime('%Y-%m-%d')
-                end_str = datetime.now().strftime('%Y-%m-%d')
-                st.caption(f"📊 Period: {start_str} to {end_str}")
-    
-    # Bouton pour lancer le test
-    if st.button("🔬 RUN COINTEGRATION TEST", use_container_width=True, key="run_coint_supabase"):
-        if table1 and table2:
-            with st.spinner(f"Analyzing cointegration between {table1} and {table2}..."):
-                try:
-                    # Télécharger les données
-                    st.markdown("##### 📥 LOADING DATA FROM DATABASE...")
+                preset_start = (datetime.now() - timedelta(days=years*365)).strftime('%Y-%m-%d')
+                preset_end = datetime.now().strftime('%Y-%m-%d')
+                st.caption(f"📊 Preset period: {preset_start} to {preset_end} (~{years} years)")
+        
+        # Paramètres avancés
+        with st.expander("⚙️ ADVANCED PARAMETERS"):
+            col_adv1, col_adv2 = st.columns(2)
+            
+            with col_adv1:
+                adf_significance = st.selectbox(
+                    "ADF SIGNIFICANCE LEVEL",
+                    options=["1%", "5%", "10%"],
+                    index=1,
+                    key="adf_sig_supabase"
+                )
+                
+                outlier_threshold = st.slider(
+                    "OUTLIER THRESHOLD (σ)",
+                    min_value=2.0, max_value=6.0, value=4.0, step=0.5,
+                    help="Remove returns > X standard deviations",
+                    key="outlier_thresh_supabase"
+                )
+            
+            with col_adv2:
+                use_zscore = st.checkbox(
+                    "USE Z-SCORE FOR SIGNALS",
+                    value=True,
+                    help="Normalize residuals to z-score",
+                    key="use_zscore_supabase"
+                )
+                
+                if use_zscore:
+                    st.caption("📊 Z-Score mode: thresholds in standard deviations")
                     
-                    # Convertir les dates si custom period
-                    start_str = start_date_coint.strftime('%Y-%m-%d') if use_custom_period and start_date_coint else None
-                    end_str = end_date_coint.strftime('%Y-%m-%d') if use_custom_period and end_date_coint else None
+                    long_threshold = st.slider(
+                        "🟢 LONG THRESHOLD (Z-Score)",
+                        min_value=-4.0, max_value=0.0, value=-2.0, step=0.1,
+                        help="Enter LONG when Z-Score < this value",
+                        key="long_thresh_supabase"
+                    )
                     
-                    # Charger avec filtres
-                    df1 = load_table_data(table1, start_date=start_str, end_date=end_str)
-                    df2 = load_table_data(table2, start_date=start_str, end_date=end_str)
+                    short_threshold = st.slider(
+                        "🔴 SHORT THRESHOLD (Z-Score)",
+                        min_value=0.0, max_value=4.0, value=2.0, step=0.1,
+                        help="Enter SHORT when Z-Score > this value",
+                        key="short_thresh_supabase"
+                    )
+                else:
+                    st.caption("📊 Residual mode: thresholds in absolute values")
                     
-                    # Message de confirmation
-                    if df1 is not None and df2 is not None:
-                        st.info(f"📊 Data loaded: {table1} ({len(df1)} rows), {table2} ({len(df2)} rows)")
+                    long_threshold = st.slider(
+                        "🟢 LONG THRESHOLD (Residual)",
+                        min_value=-20.0, max_value=0.0, value=-5.0, step=0.5,
+                        help="Enter LONG when Residual < this value",
+                        key="long_thresh_supabase"
+                    )
                     
-                    if df1.empty or df2.empty:
-                        st.error(f"❌ Could not load data from {table1} or {table2}")
-                        st.info("💡 Make sure the table names are correct and contain data")
-                    else:
-                        # Vérifier que la colonne de prix existe
-                        if price_column not in df1.columns or price_column not in df2.columns:
-                            st.error(f"❌ Column '{price_column}' not found in one or both tables")
-                            st.info(f"📊 Available columns in {table1}: {', '.join(df1.columns)}")
-                            st.info(f"📊 Available columns in {table2}: {', '.join(df2.columns)}")
+                    short_threshold = st.slider(
+                        "🔴 SHORT THRESHOLD (Residual)",
+                        min_value=0.0, max_value=20.0, value=5.0, step=0.5,
+                        help="Enter SHORT when Residual > this value",
+                        key="short_thresh_supabase"
+                    )
+        
+        # Bouton pour lancer le test
+        if st.button("🔬 RUN COINTEGRATION TEST", use_container_width=True, key="run_coint_supabase"):
+            if table1 and table2:
+                with st.spinner(f"Analyzing cointegration between {table1} and {table2}..."):
+                    try:
+                        # Télécharger les données
+                        st.markdown("##### 📥 LOADING DATA FROM DATABASE...")
+                        
+                        # NOUVEAU: Déterminer les dates selon le mode (custom ou preset)
+                        if use_custom_period:
+                            # Mode personnalisé : utiliser les dates sélectionnées
+                            start_str = start_date_coint.strftime('%Y-%m-%d') if start_date_coint else None
+                            end_str = end_date_coint.strftime('%Y-%m-%d') if end_date_coint else None
                         else:
-                            # Nettoyer les données
-                            df1_clean = nettoyer_donnees(df1[[price_column]], price_column)
-                            df2_clean = nettoyer_donnees(df2[[price_column]], price_column)
+                            # Mode preset : calculer selon le choix
+                            if period_preset == "All Available Data":
+                                start_str = None
+                                end_str = None
+                            else:
+                                years = int(period_preset.split()[1])
+                                start_str = (datetime.now() - timedelta(days=years*365)).strftime('%Y-%m-%d')
+                                end_str = datetime.now().strftime('%Y-%m-%d')
+                        
+                        # Charger avec filtres
+                        df1 = load_table_data(table1, start_date=start_str, end_date=end_str)
+                        df2 = load_table_data(table2, start_date=start_str, end_date=end_str)
+                        
+                        # Confirmation du chargement
+                        if df1 is not None and df2 is not None and not df1.empty and not df2.empty:
+                            date_info = ""
+                            if start_str and end_str:
+                                date_info = f" | Period: {start_str} to {end_str}"
+                            elif start_str:
+                                date_info = f" | From: {start_str}"
+                            elif end_str:
+                                date_info = f" | Until: {end_str}"
                             
-                            # Renommer les colonnes avec les noms des tables
-                            df1_clean.columns = [table1]
-                            df2_clean.columns = [table2]
-                            
-                            # Merger les données
-                            df_merged = pd.merge(df1_clean, df2_clean, left_index=True, right_index=True, how='inner')
-                            
-                            st.success(f"✅ Data aligned: {len(df_merged)} observations")
-                            
-                            # ===== GRAPHIQUE DES PRIX NORMALISÉS =====
-                            st.markdown("##### 📈 NORMALIZED PRICE EVOLUTION")
-                            
-                            df_pct = df_merged / df_merged.iloc[0] * 100
-                            
-                            fig_prices = go.Figure()
-                            
-                            fig_prices.add_trace(go.Scatter(
-                                x=df_pct.index,
-                                y=df_pct[table1],
-                                mode='lines',
-                                name=table1,
-                                line=dict(color='#FFAA00', width=2)
-                            ))
-                            
-                            fig_prices.add_trace(go.Scatter(
-                                x=df_pct.index,
-                                y=df_pct[table2],
-                                mode='lines',
-                                name=table2,
-                                line=dict(color='#00FFFF', width=2)
-                            ))
-                            
-                            fig_prices.update_layout(
-                                title=f"Normalized Prices: {table1} vs {table2} (Base 100)",
-                                paper_bgcolor='#000',
-                                plot_bgcolor='#111',
-                                font=dict(color='#FFAA00', size=10),
-                                xaxis=dict(gridcolor='#333', title="Date"),
-                                yaxis=dict(gridcolor='#333', title="Normalized Price (%)"),
-                                height=350,
-                                hovermode='x unified'
-                            )
-                            
-                            st.plotly_chart(fig_prices, use_container_width=True)
-                            
-                            # ===== TEST DE STATIONNARITÉ =====
-                            st.markdown("##### 🧪 STATIONARITY TESTS (ADF)")
-                            
-                            test1_order = test_stationnarite_et_integration(df_merged[table1], table1)
-                            test2_order = test_stationnarite_et_integration(df_merged[table2], table2)
-                            
-                            # Calculer les statistiques ADF pour affichage
-                            adf1_level = adfuller(df_merged[table1].dropna(), maxlag=1, regression='c')
-                            adf2_level = adfuller(df_merged[table2].dropna(), maxlag=1, regression='c')
-                            
-                            col_test1, col_test2 = st.columns(2)
-                            
-                            with col_test1:
-                                if test1_order == 1:
-                                    status1 = "✅ I(1) - Suitable"
-                                    color1 = "#00FF00"
-                                    adf1_diff = adfuller(df_merged[table1].diff().dropna(), maxlag=1, regression='c')
-                                else:
-                                    status1 = "❌ Not I(1)" if test1_order == -1 else "❌ I(0) - Not suitable"
-                                    color1 = "#FF0000"
-                                    adf1_diff = None
+                            st.success(f"✅ Loaded: {table1} ({len(df1)} rows), {table2} ({len(df2)} rows){date_info}")
+                        
+                        if df1.empty or df2.empty:
+                            st.error(f"❌ Could not load data from {table1} or {table2}")
+                            st.info("💡 Make sure the table names are correct and contain data")
+                        else:
+                            # Vérifier que la colonne de prix existe
+                            if price_column not in df1.columns or price_column not in df2.columns:
+                                st.error(f"❌ Column '{price_column}' not found in one or both tables")
+                                st.info(f"📊 Available columns in {table1}: {', '.join(df1.columns)}")
+                                st.info(f"📊 Available columns in {table2}: {', '.join(df2.columns)}")
+                            else:
+                                # Nettoyer les données
+                                df1_clean = nettoyer_donnees(df1[[price_column]], price_column)
+                                df2_clean = nettoyer_donnees(df2[[price_column]], price_column)
                                 
-                                st.markdown(f"""
-                                <div style="background: #111; border: 1px solid {color1}; padding: 10px; border-radius: 5px;">
-                                    <p style="color: #FFAA00; font-weight: bold; margin: 0;">{table1}</p>
-                                    <p style="color: #999; margin: 5px 0; font-size: 10px;">
-                                        Level ADF: {adf1_level[0]:.4f} (p={adf1_level[1]:.4f})
-                                    </p>
-                                    {f'<p style="color: #999; margin: 5px 0; font-size: 10px;">Diff ADF: {adf1_diff[0]:.4f} (p={adf1_diff[1]:.4f})</p>' if adf1_diff else ''}
-                                    <p style="color: {color1}; margin: 5px 0; font-weight: bold;">{status1}</p>
-                                </div>
-                                """, unsafe_allow_html=True)
-                            
-                            with col_test2:
-                                if test2_order == 1:
-                                    status2 = "✅ I(1) - Suitable"
-                                    color2 = "#00FF00"
-                                    adf2_diff = adfuller(df_merged[table2].diff().dropna(), maxlag=1, regression='c')
-                                else:
-                                    status2 = "❌ Not I(1)" if test2_order == -1 else "❌ I(0) - Not suitable"
-                                    color2 = "#FF0000"
-                                    adf2_diff = None
+                                # Renommer les colonnes avec les noms des tables
+                                df1_clean.columns = [table1]
+                                df2_clean.columns = [table2]
                                 
-                                st.markdown(f"""
-                                <div style="background: #111; border: 1px solid {color2}; padding: 10px; border-radius: 5px;">
-                                    <p style="color: #FFAA00; font-weight: bold; margin: 0;">{table2}</p>
-                                    <p style="color: #999; margin: 5px 0; font-size: 10px;">
-                                        Level ADF: {adf2_level[0]:.4f} (p={adf2_level[1]:.4f})
-                                    </p>
-                                    {f'<p style="color: #999; margin: 5px 0; font-size: 10px;">Diff ADF: {adf2_diff[0]:.4f} (p={adf2_diff[1]:.4f})</p>' if adf2_diff else ''}
-                                    <p style="color: {color2}; margin: 5px 0; font-weight: bold;">{status2}</p>
-                                </div>
-                                """, unsafe_allow_html=True)
-                            
-                            # ===== TEST DE COINTEGRATION =====
-                            if test1_order == 1 and test2_order == 1:
-                                st.markdown("##### 🔗 COINTEGRATION REGRESSION")
+                                # Merger les données
+                                df_merged = pd.merge(df1_clean, df2_clean, left_index=True, right_index=True, how='inner')
                                 
-                                # Régression OLS: Y = α + βX + ε
-                                X = sm.add_constant(df_merged[table1])
-                                model = sm.OLS(df_merged[table2], X).fit()
+                                # NOUVEAU: Diagnostic détaillé
+                                st.markdown("##### 📊 DATA QUALITY CHECK")
                                 
-                                # Coefficients
-                                alpha = model.params['const']
-                                beta = model.params[table1]
-                                r_squared = model.rsquared
+                                col_diag1, col_diag2, col_diag3 = st.columns(3)
                                 
-                                col_reg1, col_reg2, col_reg3 = st.columns(3)
+                                with col_diag1:
+                                    st.metric("TABLE 1 ROWS", len(df1_clean))
+                                    st.caption(f"Date range: {df1_clean.index.min().date()} to {df1_clean.index.max().date()}")
                                 
-                                with col_reg1:
-                                    st.metric("ALPHA (α)", f"{alpha:.4f}")
+                                with col_diag2:
+                                    st.metric("TABLE 2 ROWS", len(df2_clean))
+                                    st.caption(f"Date range: {df2_clean.index.min().date()} to {df2_clean.index.max().date()}")
                                 
-                                with col_reg2:
-                                    st.metric("BETA (β)", f"{beta:.4f}")
+                                with col_diag3:
+                                    st.metric("MERGED ROWS", len(df_merged))
+                                    overlap_pct = len(df_merged) / min(len(df1_clean), len(df2_clean)) * 100
+                                    st.caption(f"Overlap: {overlap_pct:.1f}%")
                                 
-                                with col_reg3:
-                                    st.metric("R-SQUARED", f"{r_squared:.4f}")
+                                # Warning si peu de données
+                                if len(df_merged) < 252:
+                                    st.warning(f"⚠️ Only {len(df_merged)} observations ({len(df_merged)/252:.1f} years). Consider extending the period for more robust results.")
+                                elif len(df_merged) < 60:
+                                    st.error(f"❌ Insufficient data: {len(df_merged)} observations. Need at least 60 days for reliable cointegration test.")
+                                    st.stop()
                                 
-                                # Résidus
-                                df_merged['residuals'] = model.resid
+                                # ===== GRAPHIQUE DES PRIX NORMALISÉS =====
+                                st.markdown("##### 📈 NORMALIZED PRICE EVOLUTION")
                                 
-                                # Z-score des résidus
-                                if use_zscore:
-                                    df_merged['zscore'] = (df_merged['residuals'] - df_merged['residuals'].mean()) / df_merged['residuals'].std()
-                                    signal_col = 'zscore'
-                                else:
-                                    signal_col = 'residuals'
+                                df_pct = df_merged / df_merged.iloc[0] * 100
                                 
-                                # Test ADF sur résidus
-                                st.markdown("##### 🧪 RESIDUALS STATIONARITY TEST")
+                                fig_prices = go.Figure()
                                 
-                                adf_residuals = adfuller(df_merged['residuals'].dropna())
-                                
-                                sig_map = {"1%": 0.01, "5%": 0.05, "10%": 0.10}
-                                sig_level = sig_map[adf_significance]
-                                
-                                is_cointegrated = adf_residuals[1] < sig_level
-                                
-                                coint_color = "#00FF00" if is_cointegrated else "#FF0000"
-                                coint_status = "✅ COINTEGRATED" if is_cointegrated else "❌ NOT COINTEGRATED"
-                                
-                                st.markdown(f"""
-                                <div style="background: #111; border: 2px solid {coint_color}; padding: 15px; border-radius: 5px; text-align: center;">
-                                    <p style="color: {coint_color}; font-size: 24px; font-weight: bold; margin: 0;">{coint_status}</p>
-                                    <p style="color: #999; margin: 10px 0; font-size: 12px;">
-                                        ADF Statistic: {adf_residuals[0]:.4f} | p-value: {adf_residuals[1]:.4f}
-                                    </p>
-                                    <p style="color: #666; margin: 0; font-size: 10px;">
-                                        Critical values: 1%: {adf_residuals[4]['1%']:.4f} | 5%: {adf_residuals[4]['5%']:.4f} | 10%: {adf_residuals[4]['10%']:.4f}
-                                    </p>
-                                </div>
-                                """, unsafe_allow_html=True)
-                                
-                                # Graphique des résidus
-                                st.markdown("##### 📊 RESIDUALS / Z-SCORE")
-                                
-                                fig_resid = make_subplots(
-                                    rows=2, cols=1,
-                                    row_heights=[0.6, 0.4],
-                                    shared_xaxes=True,
-                                    vertical_spacing=0.05,
-                                    subplot_titles=('Residuals / Z-Score', 'Spread Ratio')
-                                )
-                                
-                                # Plot résidus ou z-score
-                                fig_resid.add_trace(go.Scatter(
-                                    x=df_merged.index,
-                                    y=df_merged[signal_col],
+                                fig_prices.add_trace(go.Scatter(
+                                    x=df_pct.index,
+                                    y=df_pct[table1],
                                     mode='lines',
-                                    name='Residuals' if not use_zscore else 'Z-Score',
-                                    line=dict(color='#FFAA00', width=1)
-                                ), row=1, col=1)
+                                    name=table1,
+                                    line=dict(color='#FFAA00', width=2)
+                                ))
                                 
-                                # Lignes de seuil
-                                fig_resid.add_hline(y=short_threshold, line_dash="dash", line_color="#FF0000", 
-                                                   annotation_text=f"Short Signal ({short_threshold})", row=1, col=1)
-                                fig_resid.add_hline(y=long_threshold, line_dash="dash", line_color="#00FF00",
-                                                   annotation_text=f"Long Signal ({long_threshold})", row=1, col=1)
-                                fig_resid.add_hline(y=0, line_dash="solid", line_color="#666", row=1, col=1)
-                                
-                                # Spread ratio
-                                df_merged['spread_ratio'] = df_merged[table2] / df_merged[table1]
-                                
-                                fig_resid.add_trace(go.Scatter(
-                                    x=df_merged.index,
-                                    y=df_merged['spread_ratio'],
+                                fig_prices.add_trace(go.Scatter(
+                                    x=df_pct.index,
+                                    y=df_pct[table2],
                                     mode='lines',
-                                    name='Spread Ratio',
-                                    line=dict(color='#00FFFF', width=1)
-                                ), row=2, col=1)
+                                    name=table2,
+                                    line=dict(color='#00FFFF', width=2)
+                                ))
                                 
-                                fig_resid.update_layout(
+                                fig_prices.update_layout(
+                                    title=f"Normalized Prices: {table1} vs {table2} (Base 100)",
                                     paper_bgcolor='#000',
                                     plot_bgcolor='#111',
                                     font=dict(color='#FFAA00', size=10),
-                                    height=500,
-                                    showlegend=False,
+                                    xaxis=dict(gridcolor='#333', title="Date"),
+                                    yaxis=dict(gridcolor='#333', title="Normalized Price (%)"),
+                                    height=350,
                                     hovermode='x unified'
                                 )
                                 
-                                fig_resid.update_xaxes(gridcolor='#333')
-                                fig_resid.update_yaxes(gridcolor='#333')
+                                st.plotly_chart(fig_prices, use_container_width=True)
                                 
-                                st.plotly_chart(fig_resid, use_container_width=True)
+                                # ===== TEST DE STATIONNARITÉ =====
+                                st.markdown("##### 🧪 STATIONARITY TESTS (ADF)")
                                 
-                                # Signaux de trading
-                                st.markdown("##### 🎯 TRADING SIGNALS")
+                                test1_order = test_stationnarite_et_integration(df_merged[table1], table1)
+                                test2_order = test_stationnarite_et_integration(df_merged[table2], table2)
                                 
-                                # Appliquer les seuils
-                                df_merged['signal'] = 0
-                                df_merged.loc[df_merged[signal_col] > short_threshold, 'signal'] = -1  # Short spread
-                                df_merged.loc[df_merged[signal_col] < long_threshold, 'signal'] = 1   # Long spread
+                                # Calculer les statistiques ADF pour affichage
+                                adf1_level = adfuller(df_merged[table1].dropna(), maxlag=1, regression='c')
+                                adf2_level = adfuller(df_merged[table2].dropna(), maxlag=1, regression='c')
                                 
-                                # Compter les signaux
-                                n_long = (df_merged['signal'] == 1).sum()
-                                n_short = (df_merged['signal'] == -1).sum()
-                                n_neutral = (df_merged['signal'] == 0).sum()
+                                col_test1, col_test2 = st.columns(2)
                                 
-                                st.markdown(f"""
-                                <div style="background-color: #0a0a0a; border: 1px solid #333; padding: 10px; margin: 10px 0;">
-                                    <p style="color: #FFAA00; font-size: 10px; margin: 0;">
-                                    📊 SIGNAL DISTRIBUTION (Long threshold: {long_threshold:.1f} | Short threshold: {short_threshold:.1f}): 
-                                    <span style="color: #00FF00;">🟢 LONG: {n_long} days ({n_long/len(df_merged)*100:.1f}%)</span> | 
-                                    <span style="color: #FF0000;">🔴 SHORT: {n_short} days ({n_short/len(df_merged)*100:.1f}%)</span> | 
-                                    <span style="color: #FFAA00;">⚪ NEUTRAL: {n_neutral} days ({n_neutral/len(df_merged)*100:.1f}%)</span>
-                                    </p>
-                                </div>
-                                """, unsafe_allow_html=True)
+                                with col_test1:
+                                    if test1_order == 1:
+                                        status1 = "✅ I(1) - Suitable"
+                                        color1 = "#00FF00"
+                                        adf1_diff = adfuller(df_merged[table1].diff().dropna(), maxlag=1, regression='c')
+                                    else:
+                                        status1 = "❌ Not I(1)" if test1_order == -1 else "❌ I(0) - Not suitable"
+                                        color1 = "#FF0000"
+                                        adf1_diff = None
+                                    
+                                    st.markdown(f"""
+                                    <div style="background: #111; border: 1px solid {color1}; padding: 10px; border-radius: 5px;">
+                                        <p style="color: #FFAA00; font-weight: bold; margin: 0;">{table1}</p>
+                                        <p style="color: #999; margin: 5px 0; font-size: 10px;">
+                                            Level ADF: {adf1_level[0]:.4f} (p={adf1_level[1]:.4f})
+                                        </p>
+                                        {f'<p style="color: #999; margin: 5px 0; font-size: 10px;">Diff ADF: {adf1_diff[0]:.4f} (p={adf1_diff[1]:.4f})</p>' if adf1_diff else ''}
+                                        <p style="color: {color1}; margin: 5px 0; font-weight: bold;">{status1}</p>
+                                    </div>
+                                    """, unsafe_allow_html=True)
                                 
-                                current_signal = df_merged['signal'].iloc[-1]
-                                current_zscore = df_merged[signal_col].iloc[-1]
+                                with col_test2:
+                                    if test2_order == 1:
+                                        status2 = "✅ I(1) - Suitable"
+                                        color2 = "#00FF00"
+                                        adf2_diff = adfuller(df_merged[table2].diff().dropna(), maxlag=1, regression='c')
+                                    else:
+                                        status2 = "❌ Not I(1)" if test2_order == -1 else "❌ I(0) - Not suitable"
+                                        color2 = "#FF0000"
+                                        adf2_diff = None
+                                    
+                                    st.markdown(f"""
+                                    <div style="background: #111; border: 1px solid {color2}; padding: 10px; border-radius: 5px;">
+                                        <p style="color: #FFAA00; font-weight: bold; margin: 0;">{table2}</p>
+                                        <p style="color: #999; margin: 5px 0; font-size: 10px;">
+                                            Level ADF: {adf2_level[0]:.4f} (p={adf2_level[1]:.4f})
+                                        </p>
+                                        {f'<p style="color: #999; margin: 5px 0; font-size: 10px;">Diff ADF: {adf2_diff[0]:.4f} (p={adf2_diff[1]:.4f})</p>' if adf2_diff else ''}
+                                        <p style="color: {color2}; margin: 5px 0; font-weight: bold;">{status2}</p>
+                                    </div>
+                                    """, unsafe_allow_html=True)
                                 
-                                if current_signal == 1:
-                                    signal_text = "🟢 LONG SPREAD"
-                                    signal_desc = f"BUY {table2}, SHORT {table1}"
-                                    signal_color = "#00FF00"
-                                elif current_signal == -1:
-                                    signal_text = "🔴 SHORT SPREAD"
-                                    signal_desc = f"SHORT {table2}, BUY {table1}"
-                                    signal_color = "#FF0000"
+                                # ===== TEST DE COINTEGRATION =====
+                                if test1_order == 1 and test2_order == 1:
+                                    st.markdown("##### 🔗 COINTEGRATION REGRESSION")
+                                    
+                                    # Régression OLS: Y = α + βX + ε
+                                    X = sm.add_constant(df_merged[table1])
+                                    model = sm.OLS(df_merged[table2], X).fit()
+                                    
+                                    # Coefficients
+                                    alpha = model.params['const']
+                                    beta = model.params[table1]
+                                    r_squared = model.rsquared
+                                    
+                                    col_reg1, col_reg2, col_reg3 = st.columns(3)
+                                    
+                                    with col_reg1:
+                                        st.metric("ALPHA (α)", f"{alpha:.4f}")
+                                    
+                                    with col_reg2:
+                                        st.metric("BETA (β)", f"{beta:.4f}")
+                                    
+                                    with col_reg3:
+                                        st.metric("R-SQUARED", f"{r_squared:.4f}")
+                                    
+                                    # Résidus
+                                    df_merged['residuals'] = model.resid
+                                    
+                                    # Z-score des résidus
+                                    if use_zscore:
+                                        df_merged['zscore'] = (df_merged['residuals'] - df_merged['residuals'].mean()) / df_merged['residuals'].std()
+                                        signal_col = 'zscore'
+                                    else:
+                                        signal_col = 'residuals'
+                                    
+                                    # Test ADF sur résidus
+                                    st.markdown("##### 🧪 RESIDUALS STATIONARITY TEST")
+                                    
+                                    adf_residuals = adfuller(df_merged['residuals'].dropna())
+                                    
+                                    sig_map = {"1%": 0.01, "5%": 0.05, "10%": 0.10}
+                                    sig_level = sig_map[adf_significance]
+                                    
+                                    is_cointegrated = adf_residuals[1] < sig_level
+                                    
+                                    coint_color = "#00FF00" if is_cointegrated else "#FF0000"
+                                    coint_status = "✅ COINTEGRATED" if is_cointegrated else "❌ NOT COINTEGRATED"
+                                    
+                                    st.markdown(f"""
+                                    <div style="background: #111; border: 2px solid {coint_color}; padding: 15px; border-radius: 5px; text-align: center;">
+                                        <p style="color: {coint_color}; font-size: 24px; font-weight: bold; margin: 0;">{coint_status}</p>
+                                        <p style="color: #999; margin: 10px 0; font-size: 12px;">
+                                            ADF Statistic: {adf_residuals[0]:.4f} | p-value: {adf_residuals[1]:.4f}
+                                        </p>
+                                        <p style="color: #666; margin: 0; font-size: 10px;">
+                                            Critical values: 1%: {adf_residuals[4]['1%']:.4f} | 5%: {adf_residuals[4]['5%']:.4f} | 10%: {adf_residuals[4]['10%']:.4f}
+                                        </p>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    
+                                    # Graphique des résidus
+                                    st.markdown("##### 📊 RESIDUALS / Z-SCORE")
+                                    
+                                    fig_resid = make_subplots(
+                                        rows=2, cols=1,
+                                        row_heights=[0.6, 0.4],
+                                        shared_xaxes=True,
+                                        vertical_spacing=0.05,
+                                        subplot_titles=('Residuals / Z-Score', 'Spread Ratio')
+                                    )
+                                    
+                                    # Plot résidus ou z-score
+                                    fig_resid.add_trace(go.Scatter(
+                                        x=df_merged.index,
+                                        y=df_merged[signal_col],
+                                        mode='lines',
+                                        name='Residuals' if not use_zscore else 'Z-Score',
+                                        line=dict(color='#FFAA00', width=1)
+                                    ), row=1, col=1)
+                                    
+                                    # Lignes de seuil
+                                    fig_resid.add_hline(y=short_threshold, line_dash="dash", line_color="#FF0000", 
+                                                       annotation_text=f"Short Signal ({short_threshold})", row=1, col=1)
+                                    fig_resid.add_hline(y=long_threshold, line_dash="dash", line_color="#00FF00",
+                                                       annotation_text=f"Long Signal ({long_threshold})", row=1, col=1)
+                                    fig_resid.add_hline(y=0, line_dash="solid", line_color="#666", row=1, col=1)
+                                    
+                                    # Spread ratio
+                                    df_merged['spread_ratio'] = df_merged[table2] / df_merged[table1]
+                                    
+                                    fig_resid.add_trace(go.Scatter(
+                                        x=df_merged.index,
+                                        y=df_merged['spread_ratio'],
+                                        mode='lines',
+                                        name='Spread Ratio',
+                                        line=dict(color='#00FFFF', width=1)
+                                    ), row=2, col=1)
+                                    
+                                    fig_resid.update_layout(
+                                        paper_bgcolor='#000',
+                                        plot_bgcolor='#111',
+                                        font=dict(color='#FFAA00', size=10),
+                                        height=500,
+                                        showlegend=False,
+                                        hovermode='x unified'
+                                    )
+                                    
+                                    fig_resid.update_xaxes(gridcolor='#333')
+                                    fig_resid.update_yaxes(gridcolor='#333')
+                                    
+                                    st.plotly_chart(fig_resid, use_container_width=True)
+                                    
+                                    # Signaux de trading
+                                    st.markdown("##### 🎯 TRADING SIGNALS")
+                                    
+                                    # Appliquer les seuils
+                                    df_merged['signal'] = 0
+                                    df_merged.loc[df_merged[signal_col] > short_threshold, 'signal'] = -1  # Short spread
+                                    df_merged.loc[df_merged[signal_col] < long_threshold, 'signal'] = 1   # Long spread
+                                    
+                                    # Compter les signaux
+                                    n_long = (df_merged['signal'] == 1).sum()
+                                    n_short = (df_merged['signal'] == -1).sum()
+                                    n_neutral = (df_merged['signal'] == 0).sum()
+                                    
+                                    st.markdown(f"""
+                                    <div style="background-color: #0a0a0a; border: 1px solid #333; padding: 10px; margin: 10px 0;">
+                                        <p style="color: #FFAA00; font-size: 10px; margin: 0;">
+                                        📊 SIGNAL DISTRIBUTION (Long threshold: {long_threshold:.1f} | Short threshold: {short_threshold:.1f}): 
+                                        <span style="color: #00FF00;">🟢 LONG: {n_long} days ({n_long/len(df_merged)*100:.1f}%)</span> | 
+                                        <span style="color: #FF0000;">🔴 SHORT: {n_short} days ({n_short/len(df_merged)*100:.1f}%)</span> | 
+                                        <span style="color: #FFAA00;">⚪ NEUTRAL: {n_neutral} days ({n_neutral/len(df_merged)*100:.1f}%)</span>
+                                        </p>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    
+                                    current_signal = df_merged['signal'].iloc[-1]
+                                    current_zscore = df_merged[signal_col].iloc[-1]
+                                    
+                                    if current_signal == 1:
+                                        signal_text = "🟢 LONG SPREAD"
+                                        signal_desc = f"BUY {table2}, SHORT {table1}"
+                                        signal_color = "#00FF00"
+                                    elif current_signal == -1:
+                                        signal_text = "🔴 SHORT SPREAD"
+                                        signal_desc = f"SHORT {table2}, BUY {table1}"
+                                        signal_color = "#FF0000"
+                                    else:
+                                        signal_text = "⚪ NEUTRAL"
+                                        signal_desc = "No position"
+                                        signal_color = "#FFAA00"
+                                    
+                                    st.markdown(f"""
+                                    <div style="background: #111; border: 2px solid {signal_color}; padding: 15px; border-radius: 5px;">
+                                        <p style="color: {signal_color}; font-size: 20px; font-weight: bold; margin: 0;">{signal_text}</p>
+                                        <p style="color: #999; margin: 5px 0;">{signal_desc}</p>
+                                        <p style="color: #666; margin: 0; font-size: 10px;">
+                                            Current {'Z-Score' if use_zscore else 'Residual'}: {current_zscore:.4f} | Long: {long_threshold:.1f} | Short: {short_threshold:.1f}
+                                        </p>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    
+                                    # Stocker les données pour le backtest - MODIFIÉ
+                                    st.session_state['coint_data'] = df_merged
+                                    st.session_state['coint_ticker1'] = table1
+                                    st.session_state['coint_ticker2'] = table2
+                                    st.session_state['coint_long_threshold'] = long_threshold
+                                    st.session_state['coint_short_threshold'] = short_threshold
+                                    st.session_state['coint_signal_col'] = signal_col
+                                    st.session_state['coint_beta'] = beta
+                                    st.session_state['coint_alpha'] = alpha
+                                    st.session_state['coint_period_info'] = {
+                                        'start': df_merged.index.min().strftime('%Y-%m-%d'),
+                                        'end': df_merged.index.max().strftime('%Y-%m-%d'),
+                                        'n_obs': len(df_merged),
+                                        'n_years': len(df_merged) / 252
+                                    }
+                                    
+                                    st.success("✅ Data saved for backtest. Go to 'BACKTEST STRATEGY' tab.")
+                                    
                                 else:
-                                    signal_text = "⚪ NEUTRAL"
-                                    signal_desc = "No position"
-                                    signal_color = "#FFAA00"
-                                
-                                st.markdown(f"""
-                                <div style="background: #111; border: 2px solid {signal_color}; padding: 15px; border-radius: 5px;">
-                                    <p style="color: {signal_color}; font-size: 20px; font-weight: bold; margin: 0;">{signal_text}</p>
-                                    <p style="color: #999; margin: 5px 0;">{signal_desc}</p>
-                                    <p style="color: #666; margin: 0; font-size: 10px;">
-                                        Current {'Z-Score' if use_zscore else 'Residual'}: {current_zscore:.4f} | Long: {long_threshold:.1f} | Short: {short_threshold:.1f}
-                                    </p>
-                                </div>
-                                """, unsafe_allow_html=True)
-                                
-                                # Stocker les données pour le backtest
-                                st.session_state['coint_data'] = df_merged
-                                st.session_state['coint_ticker1'] = table1
-                                st.session_state['coint_ticker2'] = table2
-                                st.session_state['coint_long_threshold'] = long_threshold
-                                st.session_state['coint_short_threshold'] = short_threshold
-                                st.session_state['coint_signal_col'] = signal_col
-                                st.session_state['coint_beta'] = beta
-                                st.session_state['coint_alpha'] = alpha
-                                
-                                st.success("✅ Data saved for backtest. Go to 'BACKTEST STRATEGY' tab.")
-                                
-                            else:
-                                st.error("⛔️ Both series must be I(1) for cointegration test. Cannot proceed.")
-                
-                except Exception as e:
-                    st.error(f"❌ Error: {e}")
-                    import traceback
-                    st.code(traceback.format_exc())
-        else:
-            st.warning("⚠️ Please enter both table names")
+                                    st.error("⛔️ Both series must be I(1) for cointegration test. Cannot proceed.")
+                    
+                    except Exception as e:
+                        st.error(f"❌ Error: {e}")
+                        import traceback
+                        st.code(traceback.format_exc())
+            else:
+                st.warning("⚠️ Please enter both table names")
     
-    # ===== PAIRS TAB 2: BACKTEST =====
+    # ===== PAIRS TAB 2: BACKTEST - MODIFIÉ =====
     with pairs_tab2:
         st.markdown("#### 📊 PAIRS TRADING BACKTEST")
         
@@ -2649,8 +2685,22 @@ with pairs_tab1:
             long_threshold = st.session_state['coint_long_threshold']
             short_threshold = st.session_state['coint_short_threshold']
             signal_col = st.session_state['coint_signal_col']
+            period_info = st.session_state.get('coint_period_info', {})
             
-            st.markdown(f"**Pair:** {ticker1} / {ticker2} | **Long:** {long_threshold} | **Short:** {short_threshold}")
+            # NOUVEAU: Afficher les infos de période
+            st.markdown(f"""
+            <div style="background-color: #0a1a0a; border-left: 3px solid #00FFFF; padding: 10px; margin: 10px 0;">
+                <p style="margin: 0; font-size: 10px; color: #00FFFF; font-weight: bold;">
+                📊 BACKTEST DATA INFO
+                </p>
+                <p style="margin: 5px 0 0 0; font-size: 9px; color: #999;">
+                Pair: {ticker1} / {ticker2} | Observations: {period_info.get('n_obs', len(df_bt))} | 
+                Period: {period_info.get('start', df_bt.index.min().date())} to {period_info.get('end', df_bt.index.max().date())} 
+                (~{period_info.get('n_years', len(df_bt)/252):.1f} years) | 
+                Thresholds: Long={long_threshold:.1f}, Short={short_threshold:.1f}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
             
             col_bt1, col_bt2 = st.columns(2)
             
@@ -2892,7 +2942,7 @@ with pairs_tab1:
                         )
                     
                     else:
-                        st.warning("⚠️ No trades executed with current parameters. Try adjusting the threshold.")
+                        st.warning("⚠️ No trades executed with current parameters. Try adjusting the thresholds.")
     
     # ===== PAIRS TAB 3: LIVE SIGNALS =====
     with pairs_tab3:
@@ -2993,7 +3043,6 @@ with pairs_tab1:
                         """, unsafe_allow_html=True)
                 else:
                     st.info("No actionable signals at the moment.")
-
 # ===== TAB 4: DATA INTEGRATION =====
 with tab4:
     st.markdown("### 🔗 DATA INTEGRATION & ENRICHMENT")
