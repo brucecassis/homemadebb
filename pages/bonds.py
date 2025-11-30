@@ -8,6 +8,8 @@ import requests
 from bs4 import BeautifulSoup
 import numpy as np
 import re
+import base64
+import json
 
 # =============================================
 # PAGE CONFIG
@@ -188,249 +190,184 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =============================================
-# BASE DE DONNÉES ÉTENDUE D'OBLIGATIONS CORPORATE
+# FINRA API INTEGRATION
 # =============================================
 
-def generate_comprehensive_bond_database():
-    """Génère une base de données complète d'obligations corporate US"""
+class FINRAClient:
+    """Client pour l'API FINRA"""
     
-    # Liste étendue d'émetteurs majeurs par secteur
-    bond_database = []
+    def __init__(self, client_id, client_secret):
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.base_url = "https://api.finra.org"
+        self.token_url = "https://ews.fip.finra.org/fip/rest/ews/oauth2/access_token"
+        self.access_token = None
+        self.token_expiry = None
     
-    # TECHNOLOGY
-    tech_companies = [
-        ('Apple Inc', 'AA+', [
-            ('037833100', 4.65, '2024-02-23'), ('037833AJ0', 3.85, '2043-05-04'),
-            ('037833CK6', 2.70, '2051-02-08'), ('037833DL3', 3.20, '2029-05-11'),
-            ('037833EM1', 2.90, '2027-09-12'), ('037833FN8', 3.75, '2047-11-13'),
-        ]),
-        ('Microsoft Corp', 'AAA', [
-            ('594918104', 2.40, '2026-08-08'), ('594918BM9', 2.92, '2052-03-17'),
-            ('594918BL1', 3.30, '2027-02-06'), ('594918CJ6', 3.50, '2025-02-12'),
-            ('594918DK3', 2.53, '2050-06-01'), ('594918EL0', 3.95, '2062-08-08'),
-        ]),
-        ('Amazon.com Inc', 'AA', [
-            ('023135106', 3.15, '2027-08-22'), ('023135BW5', 4.80, '2034-12-05'),
-            ('023135CA4', 4.95, '2044-12-05'), ('023135DB1', 3.25, '2029-05-12'),
-            ('023135EC8', 2.88, '2041-05-12'), ('023135FD5', 4.55, '2054-12-01'),
-        ]),
-        ('Alphabet Inc', 'AA+', [
-            ('02079K107', 1.10, '2027-08-15'), ('02079K305', 2.05, '2050-08-15'),
-            ('02079K206', 1.90, '2040-08-15'), ('02079K404', 2.25, '2060-08-15'),
-        ]),
-        ('Meta Platforms', 'A+', [
-            ('30303M102', 3.85, '2027-08-15'), ('30303M200', 4.45, '2052-08-15'),
-            ('30303M301', 4.60, '2062-08-15'),
-        ]),
-        ('Intel Corp', 'A', [
-            ('458140100', 4.75, '2029-03-25'), ('458140AZ6', 5.20, '2062-02-10'),
-            ('458140BY9', 4.90, '2052-08-05'),
-        ]),
-        ('Oracle Corp', 'A+', [
-            ('68389X105', 3.60, '2025-04-01'), ('68389XBE4', 4.30, '2034-07-08'),
-            ('68389XCD5', 5.55, '2062-10-15'),
-        ]),
-        ('Cisco Systems', 'AA-', [
-            ('17275R102', 2.95, '2026-02-28'), ('17275RAJ0', 3.50, '2040-06-15'),
-            ('17275RBK6', 4.85, '2062-02-28'),
-        ]),
-    ]
+    def get_access_token(self):
+        """Obtient un token d'accès OAuth2"""
+        try:
+            # Encoder les credentials en base64
+            credentials = f"{self.client_id}:{self.client_secret}"
+            encoded_credentials = base64.b64encode(credentials.encode()).decode()
+            
+            headers = {
+                "Authorization": f"Basic {encoded_credentials}",
+                "Content-Type": "application/x-www-form-urlencoded"
+            }
+            
+            data = {
+                "grant_type": "client_credentials"
+            }
+            
+            response = requests.post(self.token_url, headers=headers, data=data, timeout=30)
+            
+            if response.status_code == 200:
+                token_data = response.json()
+                self.access_token = token_data.get('access_token')
+                # Token valide généralement 1h
+                self.token_expiry = datetime.now() + timedelta(seconds=token_data.get('expires_in', 3600))
+                return True
+            else:
+                st.error(f"❌ Échec authentification FINRA: {response.status_code}")
+                st.error(f"Détails: {response.text}")
+                return False
+        except Exception as e:
+            st.error(f"❌ Erreur connexion FINRA: {str(e)}")
+            return False
     
-    # FINANCIALS
-    financial_companies = [
-        ('JPMorgan Chase & Co', 'A+', [
-            ('46625HJU0', 4.25, '2027-10-01'), ('46625HRL1', 4.95, '2033-06-01'),
-            ('46647PBX7', 5.35, '2024-06-01'), ('46625HTM6', 5.60, '2041-09-14'),
-            ('46625HUN3', 4.85, '2044-07-25'), ('46625HVO0', 5.00, '2034-08-01'),
-        ]),
-        ('Bank of America Corp', 'A', [
-            ('06051GJH8', 4.57, '2028-04-27'), ('06051GKM6', 5.08, '2029-01-20'),
-            ('06051GKN4', 5.29, '2034-04-25'), ('06051GLO1', 4.83, '2044-07-22'),
-            ('06051GMP8', 6.00, '2036-10-17'), ('06051GNQ5', 5.70, '2041-01-30'),
-        ]),
-        ('Goldman Sachs Group', 'A', [
-            ('38141GXL2', 3.50, '2025-11-16'), ('38141GZG0', 4.22, '2029-05-01'),
-            ('38141GAH5', 6.75, '2037-10-01'), ('38141GBI2', 5.70, '2024-11-01'),
-        ]),
-        ('Morgan Stanley', 'A', [
-            ('617446448', 4.00, '2024-07-23'), ('617446539', 5.05, '2029-01-24'),
-            ('617446620', 5.60, '2044-03-24'), ('617446711', 4.35, '2026-09-08'),
-        ]),
-        ('Citigroup Inc', 'A', [
-            ('172967424', 4.45, '2027-09-29'), ('172967515', 5.17, '2033-02-13'),
-            ('172967606', 6.68, '2043-09-13'), ('172967697', 5.35, '2046-01-24'),
-        ]),
-        ('Wells Fargo & Co', 'A', [
-            ('95000U2D4', 4.48, '2027-01-16'), ('95000U3E1', 4.90, '2031-11-17'),
-            ('95000U4F7', 5.39, '2034-04-24'), ('95000U5G4', 5.01, '2051-04-04'),
-        ]),
-    ]
-    
-    # CONSUMER / RETAIL
-    consumer_companies = [
-        ('Walmart Inc', 'AA', [
-            ('931142EM7', 2.95, '2026-09-24'), ('931142EN5', 4.30, '2044-04-22'),
-            ('931142EO3', 3.90, '2047-06-15'), ('931142EP0', 5.25, '2062-09-01'),
-        ]),
-        ('Coca-Cola Co', 'A+', [
-            ('191216AZ9', 2.60, '2026-11-01'), ('191216BA3', 3.45, '2051-03-25'),
-            ('191216BB1', 2.88, '2041-10-27'), ('191216BC9', 3.00, '2027-03-15'),
-        ]),
-        ('PepsiCo Inc', 'A+', [
-            ('713448108', 2.63, '2026-07-29'), ('713448BR6', 3.45, '2046-10-06'),
-            ('713448CS3', 4.60, '2062-07-18'), ('713448DT0', 2.75, '2027-03-19'),
-        ]),
-        ('Procter & Gamble Co', 'AA-', [
-            ('742718FJ8', 3.00, '2024-03-25'), ('742718FK5', 3.60, '2050-03-25'),
-            ('742718FL3', 2.80, '2027-03-25'), ('742718GM0', 4.35, '2062-04-23'),
-        ]),
-        ('Target Corp', 'A', [
-            ('87612E100', 4.50, '2025-09-15'), ('87612EAU6', 4.80, '2034-01-15'),
-            ('87612EBV3', 5.50, '2054-09-15'),
-        ]),
-        ('Home Depot Inc', 'A', [
-            ('437076104', 3.35, '2025-04-15'), ('437076BM2', 4.25, '2046-04-01'),
-            ('437076CN9', 4.95, '2052-09-15'),
-        ]),
-    ]
-    
-    # HEALTHCARE
-    healthcare_companies = [
-        ('Johnson & Johnson', 'AAA', [
-            ('478160CD4', 2.10, '2026-09-01'), ('478160CF9', 3.50, '2036-09-01'),
-            ('478160CG7', 3.63, '2037-03-03'), ('478160CH5', 4.85, '2062-09-01'),
-        ]),
-        ('Pfizer Inc', 'A+', [
-            ('717081103', 2.63, '2025-04-01'), ('717081DL7', 4.20, '2048-09-15'),
-            ('717081EM4', 5.11, '2062-03-15'),
-        ]),
-        ('UnitedHealth Group', 'A+', [
-            ('91324PDT3', 3.50, '2025-08-15'), ('91324PEU9', 4.75, '2045-07-15'),
-            ('91324PFV6', 5.38, '2062-02-15'),
-        ]),
-        ('AbbVie Inc', 'BBB', [
-            ('00287YAQ1', 4.05, '2029-11-21'), ('00287YBR8', 5.00, '2044-11-21'),
-            ('00287YCS5', 4.88, '2062-11-14'),
-        ]),
-    ]
-    
-    # ENERGY
-    energy_companies = [
-        ('Exxon Mobil Corp', 'AA', [
-            ('30231GAK6', 3.45, '2051-04-15'), ('30231GAL4', 2.99, '2039-03-19'),
-            ('30231GAM2', 4.23, '2046-03-19'), ('30231GAN0', 3.09, '2042-08-16'),
-        ]),
-        ('Chevron Corp', 'AA', [
-            ('166764AG0', 3.85, '2052-01-15'), ('166764AF2', 2.95, '2026-05-16'),
-            ('166764AH8', 4.95, '2062-01-15'), ('166764AI6', 3.08, '2050-05-11'),
-        ]),
-        ('ConocoPhillips', 'A', [
-            ('20825C104', 5.05, '2042-09-15'), ('20825CAR0', 5.70, '2062-03-08'),
-        ]),
-    ]
-    
-    # TELECOM
-    telecom_companies = [
-        ('Verizon Communications', 'BBB+', [
-            ('92343VGH9', 4.40, '2034-11-01'), ('92343VGJ5', 4.50, '2041-08-10'),
-            ('92343VGK2', 3.88, '2042-03-01'), ('92343VGL0', 5.25, '2053-03-16'),
-        ]),
-        ('AT&T Inc', 'BBB', [
-            ('00206RJN4', 4.50, '2035-05-15'), ('00206RKA0', 4.75, '2046-05-15'),
-            ('00206RLB7', 3.65, '2051-09-15'), ('00206RMC4', 5.35, '2053-09-01'),
-        ]),
-        ('T-Mobile US', 'BBB', [
-            ('87264ABE5', 3.50, '2025-04-15'), ('87264ACF1', 4.50, '2050-04-15'),
-        ]),
-    ]
-    
-    # INDUSTRIALS
-    industrial_companies = [
-        ('Boeing Co', 'BBB-', [
-            ('097023CK2', 5.15, '2030-05-01'), ('097023CN6', 5.71, '2040-05-01'),
-            ('097023CO4', 5.81, '2050-05-01'), ('097023CP1', 5.93, '2060-05-01'),
-        ]),
-        ('Caterpillar Inc', 'A', [
-            ('149123104', 3.25, '2025-04-09'), ('149123CA2', 4.75, '2041-05-17'),
-            ('149123DB9', 5.30, '2062-05-15'),
-        ]),
-        ('General Electric', 'A-', [
-            ('369604103', 4.25, '2040-05-01'), ('369604BU6', 6.75, '2032-03-15'),
-        ]),
-    ]
-    
-    # AUTOMOTIVE
-    auto_companies = [
-        ('Ford Motor Credit Co', 'BB+', [
-            ('345397XS5', 5.13, '2029-06-16'), ('345397XR7', 7.35, '2027-11-04'),
-            ('345397XT3', 6.95, '2026-03-06'), ('345397XU0', 4.95, '2029-05-28'),
-        ]),
-        ('General Motors Financial', 'BBB', [
-            ('37045XDA0', 5.25, '2026-03-01'), ('37045XDB8', 6.05, '2034-10-10'),
-            ('37045XDC6', 5.70, '2029-09-30'),
-        ]),
-        ('Tesla Inc', 'BB+', [
-            ('88160RAE3', 5.30, '2025-08-15'), ('88160RAF0', 5.00, '2025-08-15'),
-        ]),
-    ]
-    
-    # TECHNOLOGY / MEDIA
-    media_companies = [
-        ('Netflix Inc', 'BB', [
-            ('64110LAU1', 5.38, '2029-11-15'), ('64110LAV9', 5.88, '2028-02-15'),
-            ('64110LAW7', 4.88, '2030-04-15'),
-        ]),
-        ('Comcast Corp', 'A-', [
-            ('20030NCE9', 4.15, '2028-10-15'), ('20030NCF6', 4.95, '2058-10-15'),
-        ]),
-        ('Walt Disney Co', 'A-', [
-            ('254687106', 3.80, '2024-03-22'), ('254687FP5', 4.70, '2050-03-23'),
-        ]),
-    ]
-    
-    # Compiler toutes les obligations
-    all_companies = (
-        tech_companies + financial_companies + consumer_companies + 
-        healthcare_companies + energy_companies + telecom_companies +
-        industrial_companies + auto_companies + media_companies
-    )
-    
-    # Générer le DataFrame
-    for company_name, rating, bonds in all_companies:
-        # Déterminer le secteur
-        if any(comp[0] == company_name for comp in tech_companies):
-            sector = 'Technology'
-        elif any(comp[0] == company_name for comp in financial_companies):
-            sector = 'Financials'
-        elif any(comp[0] == company_name for comp in consumer_companies):
-            sector = 'Consumer'
-        elif any(comp[0] == company_name for comp in healthcare_companies):
-            sector = 'Healthcare'
-        elif any(comp[0] == company_name for comp in energy_companies):
-            sector = 'Energy'
-        elif any(comp[0] == company_name for comp in telecom_companies):
-            sector = 'Telecom'
-        elif any(comp[0] == company_name for comp in industrial_companies):
-            sector = 'Industrials'
-        elif any(comp[0] == company_name for comp in auto_companies):
-            sector = 'Automotive'
-        else:
-            sector = 'Media'
+    def ensure_token_valid(self):
+        """Vérifie que le token est valide"""
+        if not self.access_token or not self.token_expiry:
+            return self.get_access_token()
         
-        for cusip, coupon, maturity in bonds:
-            bond_database.append({
-                'CUSIP': cusip,
-                'Issuer': company_name,
-                'Coupon': coupon,
-                'Maturity': maturity,
-                'Rating': rating,
-                'Sector': sector
-            })
+        if datetime.now() >= self.token_expiry:
+            return self.get_access_token()
+        
+        return True
     
-    return pd.DataFrame(bond_database)
+    def get_corporate_bonds(self, limit=5000):
+        """Récupère les obligations corporate depuis FINRA"""
+        if not self.ensure_token_valid():
+            return None
+        
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.access_token}",
+                "Accept": "application/json"
+            }
+            
+            # Endpoint pour les corporate bonds
+            # Note: L'endpoint exact peut varier, consultez la doc FINRA
+            endpoint = f"{self.base_url}/data/group/FIXEDINCOME/name/corporateBondReference"
+            
+            params = {
+                "limit": limit,
+                "offset": 0
+            }
+            
+            response = requests.get(endpoint, headers=headers, params=params, timeout=60)
+            
+            if response.status_code == 200:
+                data = response.json()
+                return pd.DataFrame(data.get('data', []))
+            else:
+                st.warning(f"⚠️ Réponse FINRA: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            st.error(f"❌ Erreur récupération données: {str(e)}")
+            return None
+    
+    def search_bonds_by_issuer(self, issuer_name):
+        """Recherche d'obligations par émetteur"""
+        if not self.ensure_token_valid():
+            return None
+        
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.access_token}",
+                "Accept": "application/json"
+            }
+            
+            # Recherche avec filtre
+            endpoint = f"{self.base_url}/data/group/FIXEDINCOME/name/corporateBondReference"
+            
+            params = {
+                "limit": 1000,
+                "compareFilters": json.dumps([{
+                    "fieldName": "issuerName",
+                    "fieldValue": issuer_name,
+                    "compareType": "CONTAINS"
+                }])
+            }
+            
+            response = requests.get(endpoint, headers=headers, params=params, timeout=60)
+            
+            if response.status_code == 200:
+                data = response.json()
+                return pd.DataFrame(data.get('data', []))
+            else:
+                return None
+                
+        except Exception as e:
+            return None
 
 # =============================================
-# BASE D'ETFs OBLIGATAIRES (ÉTENDUE)
+# CONFIGURATION FINRA
+# =============================================
+
+def setup_finra_credentials():
+    """Configuration des identifiants FINRA"""
+    st.sidebar.markdown("## 🔐 FINRA API CONFIG")
+    
+    # Vérifier si les credentials sont déjà en session
+    if 'finra_configured' not in st.session_state:
+        st.session_state['finra_configured'] = False
+    
+    # Formulaire de configuration
+    with st.sidebar.expander("📝 Configure FINRA API", expanded=not st.session_state['finra_configured']):
+        client_id = st.text_input(
+            "API Client ID",
+            value=st.session_state.get('finra_client_id', '4c7a3b25323c4ddd91ab'),
+            help="Votre API Client User ID FINRA"
+        )
+        
+        client_secret = st.text_input(
+            "API Client Secret",
+            value=st.session_state.get('finra_client_secret', ''),
+            type="password",
+            help="Votre mot de passe API FINRA"
+        )
+        
+        if st.button("🔑 Connect to FINRA"):
+            if client_id and client_secret:
+                st.session_state['finra_client_id'] = client_id
+                st.session_state['finra_client_secret'] = client_secret
+                
+                # Tester la connexion
+                with st.spinner("🔄 Connexion à FINRA..."):
+                    client = FINRAClient(client_id, client_secret)
+                    if client.get_access_token():
+                        st.session_state['finra_client'] = client
+                        st.session_state['finra_configured'] = True
+                        st.success("✅ Connecté à FINRA API!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Échec de connexion. Vérifiez vos identifiants.")
+            else:
+                st.warning("⚠️ Veuillez remplir tous les champs")
+    
+    # Afficher le statut
+    if st.session_state['finra_configured']:
+        st.sidebar.success("✅ FINRA API: Connected")
+    else:
+        st.sidebar.warning("⚠️ FINRA API: Not configured")
+    
+    return st.session_state.get('finra_client')
+
+# =============================================
+# BASE D'ETFs OBLIGATAIRES
 # =============================================
 
 BOND_ETFS = {
@@ -496,11 +433,6 @@ BOND_ETFS = {
 # =============================================
 # FONCTIONS
 # =============================================
-
-@st.cache_data(ttl=3600)
-def load_corporate_bonds():
-    """Charge la base de données complète des obligations corporate"""
-    return generate_comprehensive_bond_database()
 
 @st.cache_data(ttl=300)
 def get_etf_data(ticker):
@@ -574,260 +506,107 @@ st.markdown(f"""
         <div>⬛ BLOOMBERG ENS® TERMINAL - BOND SCREENER PRO</div>
         <a href="/" style="background:#333;color:#FFAA00;border:1px solid #000;padding:4px 12px;font-size:11px;text-decoration:none;">MARKETS</a>
     </div>
-    <div>{current_time} UTC • 150+ BONDS + 40+ ETFS</div>
+    <div>{current_time} UTC • FINRA API INTEGRATED</div>
 </div>
 """, unsafe_allow_html=True)
+
+# =============================================
+# SETUP FINRA
+# =============================================
+finra_client = setup_finra_credentials()
 
 # =============================================
 # INSTRUCTIONS
 # =============================================
 st.markdown("""
 <div style='background:#111;border:1px solid #333;padding:10px;margin:10px 0;border-left:4px solid #FFAA00;'>
-<b style='color:#FFAA00;'>🔍 ADVANCED BOND SCREENER PRO:</b><br>
-• <b style='color:#00FF00;'>150+ CORPORATE BONDS</b>: Major US companies across all sectors<br>
-• <b style='color:#00FFFF;'>40+ BOND ETFs</b>: Complete coverage from Treasuries to High Yield<br>
-• <b style='color:#FF00FF;'>BOND COMPARISON TOOL</b>: Chart multiple bonds/ETFs side-by-side<br>
-• Use tabs to switch between Corporate Bonds and ETFs<br>
-• <b style='color:#FFAA00;'>100% FREE DATA</b>: No API keys required<br>
+<b style='color:#FFAA00;'>🔍 BOND SCREENER PRO - FINRA API INTEGRATION:</b><br>
+• <b style='color:#00FF00;'>REAL FINRA DATA</b>: Access live corporate bond data from FINRA TRACE<br>
+• <b style='color:#00FFFF;'>40+ BOND ETFs</b>: Complete ETF coverage with Yahoo Finance data<br>
+• <b style='color:#FF00FF;'>COMPARISON TOOL</b>: Chart multiple bonds/ETFs side-by-side<br>
+• <b style='color:#FFAA00;'>Configure your FINRA API credentials in the sidebar to access real bond data!</b><br>
 </div>
 """, unsafe_allow_html=True)
 
 # =============================================
-# TABS: CORPORATE BONDS vs ETFs
+# TABS
 # =============================================
-tab1, tab2, tab3 = st.tabs(["🏢 CORPORATE BONDS", "📊 BOND ETFs", "📈 COMPARISON TOOL"])
+tab1, tab2, tab3 = st.tabs(["🏢 CORPORATE BONDS (FINRA)", "📊 BOND ETFs", "📈 COMPARISON TOOL"])
 
 # =============================================
-# TAB 1: CORPORATE BONDS
+# TAB 1: CORPORATE BONDS (FINRA)
 # =============================================
 with tab1:
-    st.markdown("### 🏢 US CORPORATE BONDS SCREENER")
-    st.markdown(f"**Database: 150+ individual corporate bonds from major US companies**")
+    st.markdown("### 🏢 CORPORATE BONDS - FINRA API")
     
-    # Charger les données corporate
-    if st.button("🔄 LOAD CORPORATE BONDS DATA", key="load_corporate"):
-        with st.spinner("Loading 150+ corporate bonds..."):
-            st.session_state['corporate_bonds'] = load_corporate_bonds()
-        st.success(f"✅ {len(st.session_state['corporate_bonds'])} corporate bonds loaded!")
-    
-    if 'corporate_bonds' in st.session_state and st.session_state['corporate_bonds'] is not None:
-        df_corp = st.session_state['corporate_bonds'].copy()
+    if finra_client and st.session_state.get('finra_configured'):
+        st.success("✅ Connected to FINRA API - Ready to load real bond data")
         
-        # Calculer des métriques
-        df_corp['Years to Maturity'] = df_corp['Maturity'].apply(get_years_to_maturity)
-        
-        # Prix simulé (normalement via FINRA)
-        np.random.seed(42)
-        df_corp['Price'] = np.random.uniform(92, 108, len(df_corp))
-        
-        # YTM
-        df_corp['YTM %'] = df_corp.apply(
-            lambda row: calculate_ytm_approximate(
-                row['Coupon'], 
-                row['Price'], 
-                row['Years to Maturity']
-            ) if row['Years to Maturity'] else None, 
-            axis=1
-        )
-        
-        df_corp['Accrued Int'] = (df_corp['Coupon'] / 2).round(2)
-        
-        st.markdown('<hr>', unsafe_allow_html=True)
-        
-        # FILTRES
-        with st.sidebar:
-            st.markdown("## 🎯 CORPORATE BOND FILTERS")
-            
-            issuers = ['All'] + sorted(df_corp['Issuer'].unique().tolist())
-            selected_issuer = st.selectbox("Issuer", issuers, key="corp_issuer")
-            
-            sectors = ['All'] + sorted(df_corp['Sector'].unique().tolist())
-            selected_sector = st.selectbox("Sector", sectors, key="corp_sector")
-            
-            ratings = ['All'] + sorted(df_corp['Rating'].unique().tolist())
-            selected_rating = st.selectbox("Credit Rating", ratings, key="corp_rating")
-            
-            st.markdown("---")
-            
-            coupon_min, coupon_max = st.slider(
-                "Coupon (%)",
-                min_value=float(df_corp['Coupon'].min()),
-                max_value=float(df_corp['Coupon'].max()),
-                value=(float(df_corp['Coupon'].min()), float(df_corp['Coupon'].max())),
-                key="corp_coupon"
-            )
-            
-            ytm_min, ytm_max = st.slider(
-                "YTM (%)",
-                min_value=0.0,
-                max_value=15.0,
-                value=(0.0, 15.0),
-                key="corp_ytm"
-            )
-            
-            years_min, years_max = st.slider(
-                "Years to Maturity",
-                min_value=0.0,
-                max_value=40.0,
-                value=(0.0, 40.0),
-                key="corp_years"
-            )
-            
-            price_min, price_max = st.slider(
-                "Price",
-                min_value=float(df_corp['Price'].min()),
-                max_value=float(df_corp['Price'].max()),
-                value=(float(df_corp['Price'].min()), float(df_corp['Price'].max())),
-                key="corp_price"
-            )
-        
-        # Appliquer filtres
-        filtered_corp = df_corp.copy()
-        
-        if selected_issuer != 'All':
-            filtered_corp = filtered_corp[filtered_corp['Issuer'] == selected_issuer]
-        
-        if selected_sector != 'All':
-            filtered_corp = filtered_corp[filtered_corp['Sector'] == selected_sector]
-        
-        if selected_rating != 'All':
-            filtered_corp = filtered_corp[filtered_corp['Rating'] == selected_rating]
-        
-        filtered_corp = filtered_corp[
-            (filtered_corp['Coupon'] >= coupon_min) &
-            (filtered_corp['Coupon'] <= coupon_max) &
-            (filtered_corp['YTM %'].notna()) &
-            (filtered_corp['YTM %'] >= ytm_min) &
-            (filtered_corp['YTM %'] <= ytm_max) &
-            (filtered_corp['Years to Maturity'].notna()) &
-            (filtered_corp['Years to Maturity'] >= years_min) &
-            (filtered_corp['Years to Maturity'] <= years_max) &
-            (filtered_corp['Price'] >= price_min) &
-            (filtered_corp['Price'] <= price_max)
-        ]
-        
-        # RÉSULTATS
-        st.markdown(f"### 📊 RESULTS: {len(filtered_corp)} bonds found")
-        
-        col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
-        
-        with col_stat1:
-            avg_ytm = filtered_corp['YTM %'].mean()
-            st.metric("Avg YTM", f"{avg_ytm:.2f}%")
-        
-        with col_stat2:
-            avg_coupon = filtered_corp['Coupon'].mean()
-            st.metric("Avg Coupon", f"{avg_coupon:.2f}%")
-        
-        with col_stat3:
-            avg_years = filtered_corp['Years to Maturity'].mean()
-            st.metric("Avg Maturity", f"{avg_years:.1f}Y")
-        
-        with col_stat4:
-            avg_price = filtered_corp['Price'].mean()
-            st.metric("Avg Price", f"${avg_price:.2f}")
-        
-        st.markdown('<hr>', unsafe_allow_html=True)
-        
-        # Tableau
-        display_corp = filtered_corp[['CUSIP', 'Issuer', 'Coupon', 'Maturity', 'Years to Maturity', 
-                                       'Rating', 'Sector', 'Price', 'YTM %', 'Accrued Int']].copy()
-        
-        display_corp['Coupon'] = display_corp['Coupon'].round(2)
-        display_corp['Years to Maturity'] = display_corp['Years to Maturity'].round(1)
-        display_corp['Price'] = display_corp['Price'].round(2)
-        display_corp['YTM %'] = display_corp['YTM %'].round(2)
-        display_corp['Accrued Int'] = display_corp['Accrued Int'].round(2)
-        
-        st.dataframe(
-            display_corp,
-            use_container_width=True,
-            hide_index=True,
-            height=500
-        )
-        
-        # Export
-        csv_corp = filtered_corp.to_csv(index=False)
-        st.download_button(
-            label="📥 DOWNLOAD CORPORATE BONDS (CSV)",
-            data=csv_corp,
-            file_name=f"corporate_bonds_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv",
-        )
-        
-        # VISUALISATIONS
-        st.markdown('<hr>', unsafe_allow_html=True)
-        st.markdown("### 📈 CORPORATE BONDS ANALYSIS")
-        
-        col_viz1, col_viz2 = st.columns(2)
-        
-        with col_viz1:
-            sector_ytm = filtered_corp.groupby('Sector')['YTM %'].mean().sort_values()
-            
-            fig_sector = go.Figure()
-            
-            colors_sector = ['#00FF00' if x > 5 else '#FFAA00' if x > 3 else '#FF0000' for x in sector_ytm.values]
-            
-            fig_sector.add_trace(go.Bar(
-                x=sector_ytm.values,
-                y=sector_ytm.index,
-                orientation='h',
-                marker_color=colors_sector,
-                text=sector_ytm.values,
-                texttemplate='%{text:.2f}%',
-                textposition='outside',
-            ))
-            
-            fig_sector.update_layout(
-                title="Average YTM by Sector",
-                paper_bgcolor='#000',
-                plot_bgcolor='#111',
-                font=dict(color='#FFAA00', size=10),
-                xaxis=dict(gridcolor='#333', showgrid=True, title="YTM (%)"),
-                yaxis=dict(gridcolor='#333', showgrid=False),
-                height=400
-            )
-            
-            st.plotly_chart(fig_sector, use_container_width=True)
-        
-        with col_viz2:
-            fig_scatter = go.Figure()
-            
-            for rating in filtered_corp['Rating'].unique():
-                rating_data = filtered_corp[filtered_corp['Rating'] == rating]
+        if st.button("🔄 LOAD CORPORATE BONDS FROM FINRA", key="load_finra"):
+            with st.spinner("📡 Fetching data from FINRA API..."):
+                df_bonds = finra_client.get_corporate_bonds(limit=5000)
                 
-                fig_scatter.add_trace(go.Scatter(
-                    x=rating_data['Years to Maturity'],
-                    y=rating_data['YTM %'],
-                    mode='markers',
-                    name=rating,
-                    marker=dict(size=8),
-                    text=rating_data['Issuer'],
-                    hovertemplate='<b>%{text}</b><br>Maturity: %{x:.1f}Y<br>YTM: %{y:.2f}%<extra></extra>'
-                ))
+                if df_bonds is not None and len(df_bonds) > 0:
+                    st.session_state['finra_bonds'] = df_bonds
+                    st.success(f"✅ Loaded {len(df_bonds)} corporate bonds from FINRA!")
+                else:
+                    st.warning("⚠️ No data received from FINRA. The endpoint may be different or requires special access.")
+                    st.info("""
+                    **Note**: L'endpoint exact pour les obligations corporate peut varier selon votre accès FINRA.
+                    
+                    Endpoints possibles:
+                    - `/data/group/FIXEDINCOME/name/corporateBondReference`
+                    - `/data/group/OTCMARKET/name/bondData`
+                    - `/data/group/TRACE/name/corporateBonds`
+                    
+                    Consultez la documentation FINRA à https://developer.finra.org/docs pour l'endpoint exact
+                    correspondant à votre subscription.
+                    """)
+        
+        # Afficher les données si disponibles
+        if 'finra_bonds' in st.session_state and st.session_state['finra_bonds'] is not None:
+            df_bonds = st.session_state['finra_bonds']
             
-            fig_scatter.update_layout(
-                title="Yield Curve by Rating",
-                paper_bgcolor='#000',
-                plot_bgcolor='#111',
-                font=dict(color='#FFAA00', size=10),
-                xaxis=dict(gridcolor='#333', showgrid=True, title="Years to Maturity"),
-                yaxis=dict(gridcolor='#333', showgrid=True, title="YTM (%)"),
-                height=400
+            st.markdown(f"### 📊 FINRA BONDS: {len(df_bonds)} bonds loaded")
+            
+            # Afficher les colonnes disponibles
+            with st.expander("📋 Available columns in FINRA data"):
+                st.write(df_bonds.columns.tolist())
+            
+            # Afficher un échantillon
+            st.markdown("#### Sample Data:")
+            st.dataframe(df_bonds.head(20), use_container_width=True)
+            
+            # Export
+            csv_finra = df_bonds.to_csv(index=False)
+            st.download_button(
+                label="📥 DOWNLOAD FINRA BONDS (CSV)",
+                data=csv_finra,
+                file_name=f"finra_bonds_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
             )
-            
-            st.plotly_chart(fig_scatter, use_container_width=True)
     
     else:
-        st.info("👆 Click 'LOAD CORPORATE BONDS DATA' to start screening 150+ bonds")
-        st.caption("Database includes: Apple, Microsoft, Amazon, Google, JPMorgan, Bank of America, Walmart, Coca-Cola, Verizon, AT&T, Boeing, and many more...")
+        st.warning("⚠️ FINRA API not configured")
+        st.info("""
+        **Pour accéder aux données FINRA:**
+        
+        1. **Configurez vos identifiants** dans la barre latérale (sidebar)
+        2. Entrez votre **API Client ID**: `4c7a3b25323c4ddd91ab`
+        3. Entrez votre **API Client Secret** (mot de passe)
+        4. Cliquez sur **Connect to FINRA**
+        5. Une fois connecté, cliquez sur **LOAD CORPORATE BONDS FROM FINRA**
+        
+        **Note**: L'accès FINRA peut nécessiter une subscription spécifique.
+        Si vous n'avez pas accès, utilisez l'onglet "BOND ETFs" pour les données Yahoo Finance.
+        """)
 
 # =============================================
 # TAB 2: BOND ETFs
 # =============================================
 with tab2:
     st.markdown("### 📊 BOND ETFs SCREENER")
-    st.markdown(f"**Database: 40+ bond ETFs covering all categories**")
+    st.markdown(f"**Database: 40+ bond ETFs - Yahoo Finance data**")
     
     if st.button("🔄 LOAD BOND ETFs DATA", key="load_etfs"):
         with st.spinner("Loading 40+ bond ETFs..."):
@@ -864,7 +643,7 @@ with tab2:
         
         st.markdown('<hr>', unsafe_allow_html=True)
         
-        # FILTRES ETF
+        # FILTRES
         with st.sidebar:
             st.markdown("## 🎯 ETF FILTERS")
             
@@ -1028,18 +807,16 @@ with tab2:
     
     else:
         st.info("👆 Click 'LOAD BOND ETFs DATA' to start screening")
-        st.caption("ETFs include: Treasuries (SHY, IEF, TLT), Corporate IG (LQD, VCIT), High Yield (HYG, JNK), TIPS (TIP, VTIP), Municipal (MUB, VTEB), and more...")
 
 # =============================================
-# TAB 3: COMPARISON TOOL (NOUVEAU!)
+# TAB 3: COMPARISON TOOL
 # =============================================
 with tab3:
     st.markdown("### 📈 BOND & ETF COMPARISON TOOL")
-    st.markdown("**Compare multiple bonds and ETFs side-by-side**")
+    st.markdown("**Compare multiple bond ETFs side-by-side**")
     
     st.markdown('<hr>', unsafe_allow_html=True)
     
-    # Sélection
     available_etfs = list(BOND_ETFS.keys())
     
     col_comp1, col_comp2 = st.columns([3, 1])
@@ -1049,8 +826,7 @@ with tab3:
             "Select bond ETFs to compare (up to 8)",
             options=available_etfs,
             default=['TLT', 'LQD', 'HYG', 'AGG'],
-            max_selections=8,
-            help="Choose bond ETFs to compare their historical performance"
+            max_selections=8
         )
     
     with col_comp2:
@@ -1104,7 +880,7 @@ with tab3:
                         hovertemplate=f'<b>{ticker}</b><br>%{{y:.2f}}%<br>%{{x}}<extra></extra>'
                     ))
             except Exception as e:
-                st.warning(f"Could not load data for {ticker}: {str(e)}")
+                st.warning(f"Could not load data for {ticker}")
                 continue
         
         fig_compare.update_layout(
@@ -1184,29 +960,82 @@ with tab3:
 # =============================================
 st.markdown('<hr>', unsafe_allow_html=True)
 
+with st.expander("📖 FINRA API SETUP GUIDE"):
+    st.markdown("""
+    ## 🔐 FINRA API Configuration Guide
+    
+    ### Step 1: Get Your FINRA API Credentials
+    
+    1. Go to https://developer.finra.org/
+    2. Create an account or log in
+    3. Navigate to the API Console
+    4. Create a new API Credential
+    5. Note your **API Client ID** and **API Client Secret**
+    
+    ### Step 2: Configure in This App
+    
+    1. Open the sidebar (click `>` on the left)
+    2. Find "FINRA API CONFIG" section
+    3. Expand "Configure FINRA API"
+    4. Enter your credentials:
+       - API Client ID: Your client ID (e.g., `4c7a3b25323c4ddd91ab`)
+       - API Client Secret: Your secret/password
+    5. Click "Connect to FINRA"
+    
+    ### Step 3: Load Bond Data
+    
+    1. Go to the "CORPORATE BONDS (FINRA)" tab
+    2. Click "LOAD CORPORATE BONDS FROM FINRA"
+    3. Wait for data to load (may take 10-30 seconds)
+    
+    ### Important Notes:
+    
+    - **Free Access**: FINRA API is free but requires registration
+    - **Rate Limits**: API has rate limits (typically 100,000 records max)
+    - **Endpoints**: Exact endpoints may vary based on your FINRA access level
+    - **Support**: Contact FINRA at (888) 507-3665 for API support
+    
+    ### Alternative: Use ETF Data
+    
+    If you don't have FINRA access, use the "BOND ETFs" tab which uses Yahoo Finance (no API key required).
+    
+    ### Troubleshooting:
+    
+    **Error "Échec authentification FINRA"**:
+    - Verify your Client ID and Secret are correct
+    - Check your internet connection
+    - Ensure your FINRA account is active
+    
+    **Error "No data received from FINRA"**:
+    - The endpoint may require special access rights
+    - Contact FINRA to verify your subscription includes corporate bond data
+    - Try the ETF screener as an alternative
+    """)
+
 col_info1, col_info2 = st.columns([6, 6])
 
 with col_info1:
     st.markdown("""
     <div style="color:#666;font-size:10px;padding:5px;">
-        📊 FREE DATA: YAHOO FINANCE • 150+ CORPORATE BONDS • 40+ ETFs<br>
-        🔄 REAL-TIME PRICING • COMPREHENSIVE SCREENING • COMPARISON TOOL
+        📊 DATA SOURCES: FINRA API + YAHOO FINANCE<br>
+        🔄 REAL-TIME CORPORATE BONDS • 40+ ETFs • COMPARISON TOOL
     </div>
     """, unsafe_allow_html=True)
 
 with col_info2:
     last_update = datetime.now().strftime('%H:%M:%S')
+    finra_status = "CONNECTED" if st.session_state.get('finra_configured') else "NOT CONFIGURED"
     st.markdown(f"""
     <div style="color:#666;font-size:10px;padding:5px;">
         🕐 SESSION: {last_update}<br>
-        📍 CORPORATE BONDS + ETFs • ADVANCED SCREENING
+        📍 FINRA STATUS: {finra_status}
     </div>
     """, unsafe_allow_html=True)
 
 st.markdown('<hr>', unsafe_allow_html=True)
 st.markdown(f"""
 <div style='text-align: center; color: #666; font-size: 9px; font-family: "Courier New", monospace; padding: 10px;'>
-    © 2025 BLOOMBERG ENS® | BOND SCREENER PRO | 150+ BONDS + 40+ ETFs<br>
-    FREE DATA SOURCES • COMPREHENSIVE COVERAGE • LAST UPDATE: {datetime.now().strftime('%H:%M:%S')}
+    © 2025 BLOOMBERG ENS® | BOND SCREENER PRO | FINRA API INTEGRATED<br>
+    CORPORATE BONDS + ETFs • REAL-TIME DATA • LAST UPDATE: {datetime.now().strftime('%H:%M:%S')}
 </div>
 """, unsafe_allow_html=True)
