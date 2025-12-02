@@ -238,11 +238,17 @@ st.markdown("""
 COMMANDS = {
     "EDGAR": "pages/EDGAR.py",
     "NEWS": "pages/NEWS.py",
-    "CHATBOT": "pages/CHATBOT.py",
-    "PRICING": "pages/PRICING.py",
     "PRICE": "pages/PRICING.py",
     "CHAT": "pages/CHATBOT.py",
-    "AI": "pages/CHATBOT.py",
+    "BT": "pages/BACKTESTING.py",
+    "ANA": "pages/COMPANY_ANALYSIS.py",
+    "CRYPTO":"pages/CRYPTO_SCRAPER.py",
+    "ECO":"pages/ECONOMICS.py", 
+    "EU":"pages/EUROPE.py",
+    "SIMU":"pages/PORTFOLIO_SIMU.py",
+    "PY":"pages/PYTHON_EDITOR.py",
+    "SQL":"pages/SQL_EDITOR.py",
+    "BONDS":"pages/BONDS.py",
 }
 
 # Affichage de la barre de commande
@@ -272,9 +278,18 @@ if command_input:
         **📋 COMMANDES DISPONIBLES:**
         - `EDGAR` → SEC Filings & Documents
         - `NEWS` → Market News Feed
-        - `CHATBOT` ou `CHAT` ou `AI` → AI Assistant
-        - `PRICING` ou `PRICE` → Options Pricing
-        - `HELP` ou `H` → Afficher cette aide
+        - `CHAT` → AI Assistant
+        - `PRICE` → Options Pricing
+        - `HELP` → Afficher cette aide
+        - `BT` → Backesting de strategies
+        - `ANA` → Analyse financière de sociétés côtées
+        - `CRYPTO` → Scrapping et backtest de strategies liées aux cryptos
+        - `ECO` → Données économiques
+        - `EU` → Données Européennes
+        - `SIMU` → Simulation de portefeuille
+        - `PY` → Editeur de code python 
+        - `SQL` → Editeur de code SQL
+        - `BONDS` → Screener d'obligation
         """)
     elif cmd in COMMANDS:
         st.switch_page(COMMANDS[cmd])
