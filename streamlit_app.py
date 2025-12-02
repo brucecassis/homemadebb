@@ -213,47 +213,20 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-
-
 import streamlit as st
+import streamlit.components.v1 as components
 
-st.title("Dashboard")
+st.markdown("### 📊 TERMINAL INDICES BOURSIERS")
 
-# URL du fichier HTML sur GitHub
-html_url = "https://brucecassis.github.io/pages_html/HOME.html"
+# Lire le fichier HTML
+html_url = "https://raw.githubusercontent.com/brucecassis/pages_html/main/HOME.html"
 
-# Bouton pour ouvrir le HTML dans un nouvel onglet
-st.markdown(
-    f"""
-    <a href="{html_url}" target="_blank">
-        <button style="
-            background-color:#333;
-            border:2px solid #FFAA00;
-            padding:10px 20px;
-            color:#FFAA00;
-            border-radius:0px;
-            cursor:pointer;
-            font-family:'Courier New', monospace;
-            font-weight:bold;
-            font-size:11px;
-            text-transform:uppercase;
-            letter-spacing:1px;
-            transition: all 0.3s;">
-            ⬛ OUVRIR TERMINAL INDICES
-        </button>
-    </a>
-    <style>
-        button:hover {{
-            background-color:#FFAA00 !important;
-            color:#000 !important;
-            transform: translateY(-2px);
-        }}
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+import requests
+response = requests.get(html_url)
+html_content = response.text
 
-
+# Afficher avec components
+components.html(html_content, height=900, scrolling=True)
 # =============================================
 # BARRE DE COMMANDE BLOOMBERG
 # À ajouter après le header, avant les données de marché
