@@ -542,7 +542,7 @@ with col_chart1:
 with col_chart2:
     timeframe = st.selectbox(
         "Timeframe",
-        options=['1d', '5d', '1mo', '3mo', '6mo', '1y', '5y','10y', '15y', '20y', '25y', 'all'],
+        options=['1d', '5d', '1mo', '3mo', '6mo', '1y', '5y','10y', '15y', '20y', '25y', 'All'],
         index=3,
         help="Période d'analyse"
     )
