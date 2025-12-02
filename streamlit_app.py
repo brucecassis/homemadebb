@@ -219,12 +219,20 @@ import streamlit as st
 
 st.title("Dashboard")
 
-html_url = "https://raw.githubusercontent.com/brucecassis/pages_html/main/HOME.html" 
-            
+# URL du fichier HTML sur GitHub
+html_url = "https://raw.githubusercontent.com/brucecassis/pages_html/main/HOME.html"
+
+# Bouton pour ouvrir le HTML dans un nouvel onglet
 st.markdown(
     f"""
     <a href="{html_url}" target="_blank">
-        <button style="background-color:#333;border:none;padding:10px 20px;color:white;border-radius:5px;">
+        <button style="
+            background-color:#333;
+            border:none;
+            padding:10px 20px;
+            color:white;
+            border-radius:5px;
+            cursor:pointer;">
             Ouvrir le Terminal Indices (HTML)
         </button>
     </a>
@@ -232,7 +240,12 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# Récupération du contenu HTML
+html_content = requests.get(html_url).text
 
+# Affichage direct du HTML dans l'app Streamlit
+st.subheader("Aperçu dans Streamlit :")
+components.html(html_content, height=600, scrolling=True)
 
 # =============================================
 # BARRE DE COMMANDE BLOOMBERG
