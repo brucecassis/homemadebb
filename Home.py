@@ -249,6 +249,7 @@ COMMANDS = {
     "PY":"pages/PYTHON_EDITOR.py",
     "SQL":"pages/SQL_EDITOR.py",
     "BONDS":"pages/BONDS.py",
+    "HOME":"pages/HOME.py",
 }
 
 # Affichage de la barre de commande
@@ -290,6 +291,7 @@ if command_input:
         - `PY` → Editeur de code python 
         - `SQL` → Editeur de code SQL
         - `BONDS` → Screener d'obligation
+        - `HOME` → Menu
         """)
     elif cmd in COMMANDS:
         st.switch_page(COMMANDS[cmd])
