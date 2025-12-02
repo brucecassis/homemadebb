@@ -220,7 +220,7 @@ import streamlit as st
 st.title("Dashboard")
 
 # URL du fichier HTML sur GitHub
-html_url = "https://raw.githubusercontent.com/brucecassis/pages_html/main/HOME.html"
+html_url = "https://brucecassis.github.io/pages_html/HOME.html"
 
 # Bouton pour ouvrir le HTML dans un nouvel onglet
 st.markdown(
