@@ -212,6 +212,28 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+
+
+
+import streamlit as st
+
+st.title("Dashboard")
+
+html_url = "https://raw.githubusercontent.com/brucecassis/pages_html/main/HOME.html"
+
+st.markdown(
+    f"""
+    <a href="{html_url}" target="_blank">
+        <button style="background-color:#333;border:none;padding:10px 20px;color:white;border-radius:5px;">
+            Ouvrir le Terminal Indices (HTML)
+        </button>
+    </a>
+    """,
+    unsafe_allow_html=True
+)
+
+
+
 # =============================================
 # BARRE DE COMMANDE BLOOMBERG
 # À ajouter après le header, avant les données de marché
