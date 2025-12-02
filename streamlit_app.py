@@ -228,14 +228,27 @@ st.markdown(
     <a href="{html_url}" target="_blank">
         <button style="
             background-color:#333;
-            border:none;
+            border:2px solid #FFAA00;
             padding:10px 20px;
-            color:white;
-            border-radius:5px;
-            cursor:pointer;">
-            Ouvrir le Terminal Indices (HTML)
+            color:#FFAA00;
+            border-radius:0px;
+            cursor:pointer;
+            font-family:'Courier New', monospace;
+            font-weight:bold;
+            font-size:11px;
+            text-transform:uppercase;
+            letter-spacing:1px;
+            transition: all 0.3s;">
+            ⬛ OUVRIR TERMINAL INDICES
         </button>
     </a>
+    <style>
+        button:hover {{
+            background-color:#FFAA00 !important;
+            color:#000 !important;
+            transform: translateY(-2px);
+        }}
+    </style>
     """,
     unsafe_allow_html=True
 )
