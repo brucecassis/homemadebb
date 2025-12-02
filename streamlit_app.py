@@ -240,12 +240,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Récupération du contenu HTML
-html_content = requests.get(html_url).text
-
-# Affichage direct du HTML dans l'app Streamlit
-st.subheader("Aperçu dans Streamlit :")
-components.html(html_content, height=600, scrolling=True)
 
 # =============================================
 # BARRE DE COMMANDE BLOOMBERG
