@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bloomberg Terminal - Global Indices Live</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+```
+    body {
+        font-family: 'Courier New', monospace;
+        background: #000;
+        color: #FFAA00;
+        font-size: 12px;
+        overflow-x: hidden;
+    }
+
+    /* Header Bloomberg */
+    .bloomberg-header {
+        background: #FFAA00;
+        padding: 12px 30px;
+        color: #000;
+        font-weight: bold;
+        font-size: 16px;
+        border-bottom: 3px solid #FFAA00;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+    }
+
+    .header-left {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+
+    .header-logo {
+        font-size: 18px;
+        letter-spacing: 2px;
+    }
+
+    .header-nav {
+        background: #333;
+        color: #FFAA00;
+        border: 1px solid #000;
+        padding: 6px 15px;
+        font-size: 12px;
+        text-decoration: none;
+        transition: all 0.3s;
+    }
+
+    .header-nav:hover {
+        background: #000;
+        color: #00FF00;
+    }
+
+    .header-time {
+        font-size: 12px;
+        color: #000;
+    }
+
+    /* Container principal */
+    .container {
+        max-width: 1800px;
+        margin: 0 auto;
+        padding: 30px;
+    }
+
+    /* Titre de section */
+    .section-title {
+        background: #FFAA00;
+        color: #000;
+        padding: 10px 20px;
+        font-weight: bold;
+        font-size: 14px;
+        margin: 30px 0 20px 0;
+        text-transform: uppercase;
+        letter-spacing: 3px;
+        border-left: 5px solid #00FFFF;
+    }
+
+    /* Grille d'indices */
+    .indices-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 20px;
+        margin-bottom: 40px;
+    }
+
+    /* Carte d'indice */
+    .index-card {
+        background: #111;
+        border: 2px solid #333;
+        border-left: 6px solid #FFAA00;
+        padding: 20px;
+        transition: all 0.3s;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .index-card:hover {
+        border-left-color: #00FF00;
+        background: #1a1a1a;
+        transform: translateY(-3px);
+        box-shadow: 0 5px 20px rgba(255, 170, 0, 0.3);
+    }
+
+    .index-card.loading {
+        opacity: 0.6;
+    }
+
+    /* Header de la carte */
+    .index-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 15px;
+    }
+
+    .index-symbol {
+        background: #FFAA00;
+        color: #000;
+        padding: 5px 12px;
+        font-size: 14px;
+        font-weight: bold;
+        letter-spacing: 1px;
+    }
+
+    .index-flag {
+        font-size: 24px;
+    }
+
+    /* Nom de l'indice */
+    .index-name {
+        color: #00FFFF;
+        font-size: 13px;
+        font-weight: bold;
+        margin: 10px 0;
+        text-transform: uppercase;
+    }
+
+    /* Prix principal */
+    .index-price {
+        font-size: 32px;
+        font-weight: bold;
+        color: #FFAA00;
+        margin: 15px 0;
+        font-family: 'Courier New', monospace;
+    }
+
+    /* Variation */
+    .index-change {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        margin: 10px 0;
+    }
+
+    .change-value {
+        font-size: 16px;
+        font-weight: bold;
+        padding: 5px 10px;
+        border-radius: 3px;
+    }
+
+    .change-value.positive {
+        background: #00FF00;
+        color: #000;
+    }
+
+    .change-value.negative {
+        background: #FF0000;
+        color: #FFF;
+    }
+
+    .change-percent {
+        font-size: 16px;
+        font-weight: bold;
+    }
+
+    .change-percent.positive {
+        color: #00FF00;
+    }
+
+    .change-percent.negative {
+        color: #FF0000;
+    }
+
+    /* Métadonnées */
+    .index-meta {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #333;
+    }
+
+    .meta-item {
+        font-size: 10px;
+        color: #888;
+    }
+
+    .meta-label {
+        color: #666;
+        margin-bottom: 3px;
+    }
+
+    .meta-value {
+        color: #FFAA00;
+        font-weight: bold;
+    }
+
+    /* Indicateur de mise à jour */
+    .update-indicator {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #00FF00;
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+    }
+
+    /* Message d'erreur */
+    .error-message {
+        background: #FF0000;
+        color: #FFF;
+        padding: 10px;
+        margin: 10px 0;
+        font-size: 11px;
+        border-left: 4px solid #FFF;
+    }
+
+    /* Statistiques globales */
+    .global-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 30px;
+    }
+
+    .stat-box {
+        background: #0a0a0a;
+        border: 1px solid #333;
+        border-left: 4px solid #00FFFF;
+        padding: 15px;
+        text-align: center;
+    }
+
+    .stat-label {
+        color: #666;
+        font-size: 10px;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+    }
+
+    .stat-value {
+        color: #FFAA00;
+        font-size: 24px;
+        font-weight: bold;
+    }
+
+    .stat-subtext {
+        color: #888;
+        font-size: 9px;
+        margin-top: 5px;
+    }
+
+    /* Footer */
+    .footer {
+        text-align: center;
+        color: #666;
+        font-size: 9px;
+        padding: 20px;
+        border-top: 1px solid #333;
+        margin-top: 40px;
+    }
+
+    /* Spinner de chargement */
+    .spinner {
+        display: inline-block;
+        width: 15px;
+        height: 15px;
+        border: 2px solid #333;
+        border-top: 2px solid #FFAA00;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-left: 10px;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .indices-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .index-price {
+            font-size: 24px;
+        }
+
+        .bloomberg-header {
+            flex-direction: column;
+            gap: 10px;
+        }
+    }
+
+    /* Market Status Indicator */
+    .market-status {
+        display: inline-block;
+        padding: 4px 10px;
+        font-size: 10px;
+        font-weight: bold;
+        border-radius: 3px;
+        margin-left: 10px;
+    }
+
+    .market-status.open {
+        background: #00FF00;
+        color: #000;
+    }
+
+    .market-status.closed {
+        background: #FF0000;
+        color: #FFF;
+    }
+
+    .market-status.pre-market {
+        background: #FFAA00;
+        color: #000;
+    }
+</style>
+```
+
+</head>
+<body>
+
+```
+<!-- Header Bloomberg -->
+<div class="bloomberg-header">
+    <div class="header-left">
+        <div class="header-logo">⬛ BLOOMBERG ENS® | GLOBAL INDICES LIVE</div>
+        <a href="#" class="header-nav">ACCUEIL</a>
+        <a href="#" class="header-nav">NEWS</a>
+        <a href="#" class="header-nav">MARKETS</a>
+    </div>
+    <div class="header-time">
+        <span id="current-time"></span> UTC • YAHOO FINANCE • AUTO-REFRESH: 10s
+    </div>
+</div>
+
+<!-- Container principal -->
+<div class="container">
+    
+    <!-- Statistiques globales -->
+    <div class="global-stats">
+        <div class="stat-box">
+            <div class="stat-label">Indices suivis</div>
+            <div class="stat-value" id="total-indices">11</div>
+            <div class="stat-subtext">Marchés mondiaux</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">En hausse</div>
+            <div class="stat-value" style="color: #00FF00;" id="positive-count">-</div>
+            <div class="stat-subtext">Indices positifs</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">En baisse</div>
+            <div class="stat-value" style="color: #FF0000;" id="negative-count">-</div>
+            <div class="stat-subtext">Indices négatifs</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Dernière MAJ</div>
+            <div class="stat-value" style="font-size: 16px;" id="last-update">--:--:--</div>
+            <div class="stat-subtext">Temps réel</div>
+        </div>
+    </div>
+
+    <!-- Titre de section -->
+    <div class="section-title">
+        🌍 MAJOR GLOBAL INDICES - REAL-TIME QUOTES
+    </div>
+
+    <!-- Grille des indices -->
+    <div class="indices-grid" id="indices-container">
+        <!-- Les cartes seront générées par JavaScript -->
+    </div>
+
+</div>
+
+<!-- Footer -->
+<div class="footer">
+    © 2025 BLOOMBERG ENS® | YAHOO FINANCE API | SYSTÈME OPÉRATIONNEL<br>
+    AUTO-REFRESH: 10 SECONDES • DONNÉES EN TEMPS RÉEL • <span id="footer-time"></span>
+</div>
+
+<script>
+    // Configuration des indices
+    const indices = [
+        { symbol: '^GSPC', name: 'S&P 500', flag: '🇺🇸', market: 'USA' },
+        { symbol: '^DJI', name: 'DOW JONES', flag: '🇺🇸', market: 'USA' },
+        { symbol: '^IXIC', name: 'NASDAQ', flag: '🇺🇸', market: 'USA' },
+        { symbol: '^FTSE', name: 'FTSE 100', flag: '🇬🇧', market: 'UK' },
+        { symbol: '^GDAXI', name: 'DAX', flag: '🇩🇪', market: 'GERMANY' },
+        { symbol: '^FCHI', name: 'CAC 40', flag: '🇫🇷', market: 'FRANCE' },
+        { symbol: '^N225', name: 'NIKKEI 225', flag: '🇯🇵', market: 'JAPAN' },
+        { symbol: '^HSI', name: 'HANG SENG', flag: '🇭🇰', market: 'HONG KONG' },
+        { symbol: '000001.SS', name: 'SSE COMPOSITE', flag: '🇨🇳', market: 'CHINA' },
+        { symbol: '^BSESN', name: 'SENSEX', flag: '🇮🇳', market: 'INDIA' },
+        { symbol: '^AXJO', name: 'ASX 200', flag: '🇦🇺', market: 'AUSTRALIA' }
+    ];
+
+    // État global
+    let lastUpdateTime = new Date();
+    let positiveCount = 0;
+    let negativeCount = 0;
+
+    // Fonction pour formatter les nombres
+    function formatNumber(num) {
+        if (num === null || num === undefined || isNaN(num)) return 'N/A';
+        return parseFloat(num).toLocaleString('en-US', { 
+            minimumFractionDigits: 2, 
+            maximumFractionDigits: 2 
+        });
+    }
+
+    // Fonction pour formatter le volume
+    function formatVolume(vol) {
+        if (!vol || vol === 0) return 'N/A';
+        if (vol >= 1e9) return (vol / 1e9).toFixed(2) + 'B';
+        if (vol >= 1e6) return (vol / 1e6).toFixed(2) + 'M';
+        if (vol >= 1e3) return (vol / 1e3).toFixed(2) + 'K';
+        return vol.toString();
+    }
+
+    // Fonction pour obtenir le statut du marché
+    function getMarketStatus(marketTime) {
+        const now = new Date();
+        const diff = Math.abs(now - new Date(marketTime * 1000));
+        const minutes = Math.floor(diff / 60000);
+        
+        if (minutes < 15) return 'open';
+        if (minutes < 240) return 'closed';
+        return 'closed';
+    }
+
+    // Fonction pour créer une carte d'indice
+    function createIndexCard(index, data) {
+        const change = data.regularMarketChange || 0;
+        const changePercent = data.regularMarketChangePercent || 0;
+        const isPositive = change >= 0;
+        const marketStatus = getMarketStatus(data.regularMarketTime || Date.now() / 1000);
+
+        return `
+            <div class="index-card" id="card-${index.symbol}">
+                <div class="update-indicator"></div>
+                
+                <div class="index-header">
+                    <div>
+                        <div class="index-symbol">${index.symbol}</div>
+                        <div class="index-name">${index.name}</div>
+                    </div>
+                    <div class="index-flag">${index.flag}</div>
+                </div>
+
+                <div class="index-price" id="price-${index.symbol}">
+                    ${formatNumber(data.regularMarketPrice)}
+                </div>
+
+                <div class="index-change">
+                    <div class="change-value ${isPositive ? 'positive' : 'negative'}" id="change-${index.symbol}">
+                        ${isPositive ? '+' : ''}${formatNumber(change)}
+                    </div>
+                    <div class="change-percent ${isPositive ? 'positive' : 'negative'}" id="percent-${index.symbol}">
+                        ${isPositive ? '▲' : '▼'} ${Math.abs(changePercent).toFixed(2)}%
+                    </div>
+                </div>
+
+                <div class="index-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">OPEN</div>
+                        <div class="meta-value">${formatNumber(data.regularMarketOpen)}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">PREVIOUS CLOSE</div>
+                        <div class="meta-value">${formatNumber(data.regularMarketPreviousClose)}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">DAY HIGH</div>
+                        <div class="meta-value">${formatNumber(data.regularMarketDayHigh)}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">DAY LOW</div>
+                        <div class="meta-value">${formatNumber(data.regularMarketDayLow)}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">VOLUME</div>
+                        <div class="meta-value">${formatVolume(data.regularMarketVolume)}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">MARKET</div>
+                        <div class="meta-value">${index.market}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Fonction pour récupérer les données d'un indice via Yahoo Finance
+    async function fetchIndexData(symbol) {
+        try {
+            const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`;
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            if (data.chart && data.chart.result && data.chart.result[0]) {
+                const result = data.chart.result[0];
+                const meta = result.meta;
+                const quote = result.indicators.quote[0];
+                
+                return {
+                    regularMarketPrice: meta.regularMarketPrice,
+                    regularMarketChange: meta.regularMarketPrice - meta.previousClose,
+                    regularMarketChangePercent: ((meta.regularMarketPrice - meta.previousClose) / meta.previousClose) * 100,
+                    regularMarketOpen: quote.open[0],
+                    regularMarketDayHigh: meta.regularMarketDayHigh,
+                    regularMarketDayLow: meta.regularMarketDayLow,
+                    regularMarketVolume: meta.regularMarketVolume,
+                    regularMarketPreviousClose: meta.previousClose,
+                    regularMarketTime: meta.regularMarketTime
+                };
+            }
+            throw new Error('Invalid data structure');
+        } catch (error) {
+            console.error(`Erreur pour ${symbol}:`, error);
+            return {
+                regularMarketPrice: 0,
+                regularMarketChange: 0,
+                regularMarketChangePercent: 0,
+                regularMarketOpen: 0,
+                regularMarketDayHigh: 0,
+                regularMarketDayLow: 0,
+                regularMarketVolume: 0,
+                regularMarketPreviousClose: 0,
+                regularMarketTime: Date.now() / 1000
+            };
+        }
+    }
+
+    // Fonction pour mettre à jour tous les indices
+    async function updateAllIndices() {
+        const container = document.getElementById('indices-container');
+        positiveCount = 0;
+        negativeCount = 0;
+
+        for (const index of indices) {
+            const data = await fetchIndexData(index.symbol);
+            
+            // Compter les positifs/négatifs
+            if (data.regularMarketChange > 0) positiveCount++;
+            if (data.regularMarketChange < 0) negativeCount++;
+
+            // Vérifier si la carte existe déjà
+            const existingCard = document.getElementById(`card-${index.symbol}`);
+            
+            if (existingCard) {
+                // Mettre à jour la carte existante
+                updateExistingCard(index.symbol, data);
+            } else {
+                // Créer une nouvelle carte
+                container.innerHTML += createIndexCard(index, data);
+            }
+        }
+
+        // Mettre à jour les statistiques
+        document.getElementById('positive-count').textContent = positiveCount;
+        document.getElementById('negative-count').textContent = negativeCount;
+        document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+        
+        lastUpdateTime = new Date();
+    }
+
+    // Fonction pour mettre à jour une carte existante
+    function updateExistingCard(symbol, data) {
+        const change = data.regularMarketChange || 0;
+        const changePercent = data.regularMarketChangePercent || 0;
+        const isPositive = change >= 0;
+
+        // Mettre à jour le prix
+        const priceEl = document.getElementById(`price-${symbol}`);
+        if (priceEl) priceEl.textContent = formatNumber(data.regularMarketPrice);
+
+        // Mettre à jour le changement
+        const changeEl = document.getElementById(`change-${symbol}`);
+        if (changeEl) {
+            changeEl.textContent = `${isPositive ? '+' : ''}${formatNumber(change)}`;
+            changeEl.className = `change-value ${isPositive ? 'positive' : 'negative'}`;
+        }
+
+        // Mettre à jour le pourcentage
+        const percentEl = document.getElementById(`percent-${symbol}`);
+        if (percentEl) {
+            percentEl.textContent = `${isPositive ? '▲' : '▼'} ${Math.abs(changePercent).toFixed(2)}%`;
+            percentEl.className = `change-percent ${isPositive ? 'positive' : 'negative'}`;
+        }
+    }
+
+    // Fonction pour mettre à jour l'heure
+    function updateTime() {
+        const now = new Date();
+        const timeString = now.toUTCString().slice(-12, -4);
+        document.getElementById('current-time').textContent = timeString;
+        document.getElementById('footer-time').textContent = now.toLocaleString();
+    }
+
+    // Initialisation
+    document.addEventListener('DOMContentLoaded', async () => {
+        console.log('🚀 Bloomberg Terminal - Initialisation...');
+        
+        // Première mise à jour
+        await updateAllIndices();
+        
+        // Mise à jour de l'heure
+        updateTime();
+        setInterval(updateTime, 1000);
+        
+        // Mise à jour automatique toutes les 10 secondes
+        setInterval(updateAllIndices, 10000);
+        
+        console.log('✅ Système opérationnel');
+    });
+</script>
+```
+
+</body>
+</html>
