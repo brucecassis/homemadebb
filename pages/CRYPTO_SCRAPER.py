@@ -98,6 +98,92 @@ st.markdown(f'''
 </div>
 ''', unsafe_allow_html=True)
 
+# =============================================
+# BARRE DE COMMANDE BLOOMBERG
+# À ajouter après le header, avant les données de marché
+# =============================================
+
+# Style pour la barre de commande
+st.markdown("""
+<style>
+    .command-container {
+        background: #111;
+        border: 2px solid #FFAA00;
+        padding: 10px 15px;
+        margin: 10px 0 20px 0;
+    }
+    .command-prompt {
+        color: #FFAA00;
+        font-weight: bold;
+        font-size: 14px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Dictionnaire des commandes et leurs pages
+COMMANDS = {
+    "EDGAR": "pages/EDGAR.py",
+    "NEWS": "pages/NEWS.py",
+    "PRICE": "pages/PRICING.py",
+    "CHAT": "pages/CHATBOT.py",
+    "BT": "pages/BACKTESTING.py",
+    "ANA": "pages/COMPANY_ANALYSIS.py",
+    "CRYPTO":"pages/CRYPTO_SCRAPER.py",
+    "ECO":"pages/ECONOMICS.py", 
+    "EU":"pages/EUROPE.py",
+    "SIMU":"pages/PORTFOLIO_SIMU.py",
+    "PY":"pages/PYTHON_EDITOR.py",
+    "SQL":"pages/SQL_EDITOR.py",
+    "BONDS":"pages/BONDS.py",
+    "HOME":"pages/HOME.py",
+}
+
+# Affichage de la barre de commande
+st.markdown('<div class="command-container">', unsafe_allow_html=True)
+
+col_prompt, col_input = st.columns([1, 11])
+
+with col_prompt:
+    st.markdown('<span class="command-prompt">BBG&gt;</span>', unsafe_allow_html=True)
+
+with col_input:
+    command_input = st.text_input(
+        "Command",
+        placeholder="Tapez une commande: EDGAR, NEWS, CHATBOT, PRICING, HELP...",
+        label_visibility="collapsed",
+        key="bloomberg_command"
+    )
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+# Traitement de la commande
+if command_input:
+    cmd = command_input.upper().strip()
+    
+    if cmd == "HELP" or cmd == "H":
+        st.info("""
+        **📋 COMMANDES DISPONIBLES:**
+        - `EDGAR` → SEC Filings & Documents
+        - `NEWS` → Market News Feed
+        - `CHAT` → AI Assistant
+        - `PRICE` → Options Pricing
+        - `HELP` → Afficher cette aide
+        - `BT` → Backesting de strategies
+        - `ANA` → Analyse financière de sociétés côtées
+        - `CRYPTO` → Scrapping et backtest de strategies liées aux cryptos
+        - `ECO` → Données économiques
+        - `EU` → Données Européennes
+        - `SIMU` → Simulation de portefeuille
+        - `PY` → Editeur de code python 
+        - `SQL` → Editeur de code SQL
+        - `BONDS` → Screener d'obligation
+        - `HOME` → Menu
+        """)
+    elif cmd in COMMANDS:
+        st.switch_page(COMMANDS[cmd])
+    else:
+        st.warning(f"⚠️ Commande '{cmd}' non reconnue. Tapez HELP pour voir les commandes disponibles.")
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SUPABASE CONNECTION
