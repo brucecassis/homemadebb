@@ -1547,7 +1547,7 @@ with col_chart1:
     'ZM', 'ZNB', 'ZNKUF', 'ZNOG', 'ZNOGW', 'ZNTL', 'ZOMDF', 'ZONE', 'ZOOZ', 'ZOOZW',
     'ZPHYF', 'ZRCN', 'ZS', 'ZSHLY', 'ZSHOF', 'ZSICY', 'ZSL', 'ZSPC', 'ZSSK', 'ZTEK',
     'ZTO', 'ZTOEF', 'ZTR', 'ZTS', 'ZTSTF', 'ZUMZ', 'ZURA', 'ZVIA', 'ZVRA', 'ZVSA',
-    'ZWS', 'ZY', 'ZYBT', 'ZYME', 'ZYXI']
+    'ZWS', 'ZY', 'ZYBT', 'ZYME', 'ZYXI', 'TLT', 'USDU']
     selected_tickers = st.multiselect(
         "Sélectionnez des tickers à comparer",
         options=popular_tickers,
