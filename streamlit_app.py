@@ -1547,7 +1547,31 @@ with col_chart1:
     'ZM', 'ZNB', 'ZNKUF', 'ZNOG', 'ZNOGW', 'ZNTL', 'ZOMDF', 'ZONE', 'ZOOZ', 'ZOOZW',
     'ZPHYF', 'ZRCN', 'ZS', 'ZSHLY', 'ZSHOF', 'ZSICY', 'ZSL', 'ZSPC', 'ZSSK', 'ZTEK',
     'ZTO', 'ZTOEF', 'ZTR', 'ZTS', 'ZTSTF', 'ZUMZ', 'ZURA', 'ZVIA', 'ZVRA', 'ZVSA',
-    'ZWS', 'ZY', 'ZYBT', 'ZYME', 'ZYXI', 'TLT', 'USDU']
+    'ZWS', 'ZY', 'ZYBT', 'ZYME', 'ZYXI', 'TLT', 'USDU', 'AI.PA', 'AIR.PA', 'ALO.PA', 'MT.PA', 
+    'CS.PA', 'BNP.PA', 'EN.PA', 'CAP.PA', 'CA.PA', 'ACA.PA', 'DSY.PA', 'ENGI.PA', 'EL.PA', 
+    'ETL.PA', 'RMS.PA', 'KER.PA', 'OR.PA', 'LR.PA', 'MC.PA', 'ML.PA', 'ORA.PA', 'RI.PA', 'UG.PA', 
+    'PUB.PA', 'RNO.PA', 'SAF.PA', 'SGO.PA', 'SAN.PA', 'SU.PA', 'GLE.PA', 'STM.PA', 'TEP.PA', 'HO.PA', 
+    'TTE.PA', 'URW.PA', 'FR.PA', 'VIE.PA', 'DG.PA', 'VIV.PA', 'WLN.PA', 'ABBN.SW', 'ADEN.SW', 'ALSO.SW', 'BAER.SW', 'BALN.SW', 'BANB.SW', 'BBBI.SW', 'CFR.SW', 'CIE.SW', 'CSGN.SW', 
+     'DUFN.SW', 'EFGN.SW', 'EMSN.SW', 'GEBN.SW', 'GIVN.SW', 'GPSN.SW', 'HBMN.SW', 'IMPN.SW', 'KOF.SW', 'LHN.SW', 'LONN.SW', 
+     'NEON.SW', 'NESN.SW', 'NWRN.SW', 'OCO.SW', 'PGHN.SW', 'RICN.SW', 'ROSE.SW', 'SAN.SW', 'SCMN.SW', 'SGSN.SW', 'SIX.SW', 'SLHN.SW', 
+     'SMGR.SW', 'SREN.SW', 'STLN.SW', 'SWCA.SW', 'SWX.SW', 'SYNN.SW', 'TLSN.SW', 'UBSG.SW', 'UBSN.SW', 'UHR.SW', 'VAPO.SW', 'VIFN.SW', 'VTX.SW', 'ZURN.SW',
+'ADYEN.AS', 'AKZO.AS', 'ASML.AS', 'BAMNB.AS', 'DSM.AS', 'HEIA.AS', 'INGA.AS', 'KPN.AS', 'NN.AS', 'PHIA.AS', 'RAND.AS', 'RDSB.AS', 'SBMO.AS', 'SHV.AS', 'TKWY.AS', 
+ 'UNA.AS', 'WKL.AS', '1JAN.DE', 'ADN.DE', 'AIXA.DE', 'ALV.DE', 'BAS.DE', 'BAYN.DE', 'BEI.DE', 'BMW.DE', 'BPE.DE', 'CBK.DE', 'CON.DE', 'DTE.DE', 'EON.DE', 'FME.DE', 
+ 'FPE3.DE', 'FRA.DE', 'HEI.DE', 'HEN3.DE', 'IFX.DE', 'IWG.DE', 'KPN.DE', 'LHA.DE', 'LIN.DE', 'MRK.DE', 'MUV2.DE', 'NOAJ.DE', 'OSR.DE', 'RIB.DE', 'SAP.DE', 'SDF.DE', 
+ 'SIE.DE', 'TKA.DE', 'VOW3.DE', 'VZ.DE', 'WCH.DE', '3IN.L', 'AAL.L', 'ABF.L', 'ADM.L', 'AHT.L', 'AMGO.L', 'ANTO.L', 'ARM.L', 'AV.L', 'AVST.L', 'AZN.L', 'BA.L', 
+ 'BARC.L', 'BATS.L', 'BDEV.L', 'BHP.L', 'BP.L', 'BRBY.L', 'BT.L', 'CRH.L', 'CRST.L', 'DCC.L', 'DGE.L', 'DIAG.L', 'ENT.L', 'EXPN.L', 'FERG.L', 'GKN.L', 'GVC.L', 
+ 'HAS.L', 'HSBA.L', 'HSX.L', 'IMI.L', 'INF.L', 'INTU.L', 'ITRK.L', 'ITV.L', 'JET.L', 'JMAT.L', 'KGF.L', 'KIE.L', 'LAND.L', 'LGEN.L', 'LLOY.L', 'LSE.L', 'MGAM.L', 
+ 'MKS.L', 'MRW.L', 'NG.L', 'NMC.L', 'NXT.L', 'OCDO.L', 'PFC.L', 'PSH.L', 'PSN.L', 'REL.L', 'RIO.L', 'RMG.L', 'RMV.L', 'RR.L', 'RTO.L', 'SAB.L', 'SBRY.L', 'SGC.L', 
+ 'SGRO.L', 'SHB.L', 'SHP.L', 'SMT.L', 'SMWH.L', 'SOPH.L', 'SPX.L', 'SSE.L', 'STAN.L', 'STJ.L', 'STMR.L', 'SVS.L', 'TALK.L', 'TED.L', 'TEP.L', 'TGT.L', 'TPK.L', 'TUI.L',
+ 'TW.L', 'ULE.L', 'ULVR.L', 'UU.L', 'VOD.L', 'WEIR.L', 'WIZZ.L', 'WPP.L', 'A2A.MI', 'ACE.MI', 'AMP.MI', 'ATL.MI', 'AZIM.MI', 'BAMI.MI', 'BANCA.MI', 'BAMI.MI', 'BAS.MI', 
+ 'BPER.MI', 'BRE.MI', 'BU.MI', 'CALT.MI', 'CNHI.MI', 'CPR.MI', 'CRT.MI', 'ENEL.MI', 'ENI.MI', 'ERM.MI', 'EXO.MI', 'FER.MI', 'FBK.MI', 'G.MI', 'GEO.MI', 'IGD.MI', 'ILTY.MI', 
+ 'INT.MI', 'ISP.MI', 'IT.MI', 'LDO.MI', 'LUX.MI', 'MB.MI', 'MED.MI', 'MONC.MI', 'MPS.MI', 'MT.MI', 'NEXI.MI', 'PST.MI', 'PRY.MI', 'RCS.MI', 'REC.MI', 'SFER.MI', 'SIFI.MI',
+ 'SPE.MI', 'SRG.MI', 'STLA.MI', 'TEN.MI', 'TIT.MI', 'TOD.MI', 'UBI.MI', 'UCG.MI', 'UNI.MI', 'US.MI', 'ABE.MC', 'ACX.MC', 'ACS.MC', 'AENA.MC', 'AGF.MC', 'ALM.MC', 'AMPER.MC',
+ 'ANA.MC', 'APD.MC', 'ATE.MC', 'BBVA.MC', 'BKT.MC', 'BMN.MC', 'BNC.MC', 'CAI.MC', 'CIE.MC', 'CLNX.MC', 'COL.MC', 'DIA.MC', 'ELE.MC', 'ENG.MC', 'FER.MC', 'GAM.MC', 'GAS.MC', 
+ 'GRF.MC', 'IAG.MC', 'IDR.MC', 'IME.MC', 'IND.MC', 'ITX.MC', 'MAP.MC', 'MEL.MC', 'MER.MC', 'MRL.MC', 'MTS.MC', 'NAT.MC', 'NHK.MC', 'OHL.MC', 'PHP.MC', 'POP.MC', 'REE.MC', 
+ 'REP.MC', 'SAB.MC', 'SAN.MC', 'SGC.MC', 'SOL.MC', 'SPM.MC', 'TDE.MC', 'TEF.MC', 'TGS.MC', 'VIS.MC']
+
+    
     selected_tickers = st.multiselect(
         "Sélectionnez des tickers à comparer",
         options=popular_tickers,
