@@ -3,7 +3,6 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import requests
 from datetime import datetime, timedelta
-import csv
 import os
 import json
 
@@ -231,23 +230,39 @@ def generate_newsletter_html(news_list, synthesis_text):
     return html
 
 # =============================================
-# LECTURE DES ABONNÉS
+# LECTURE DES ABONNÉS DEPUIS SUPABASE
 # =============================================
 def get_subscribers():
-    """Lit la liste des abonnés depuis le CSV"""
-    subscribers = []
+    """Lit la liste des abonnés depuis Supabase"""
     try:
-        with open('newsletter_subscribers.csv', 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                if row.get('active', '1') == '1':
-                    subscribers.append(row['email'])
-    except FileNotFoundError:
-        print("Fichier newsletter_subscribers.csv non trouvé")
+        supabase_url = os.environ.get('SUPABASE_URL', '')
+        supabase_key = os.environ.get('SUPABASE_KEY', '')
+        
+        if not supabase_url or not supabase_key:
+            print("❌ Identifiants Supabase manquants")
+            return []
+        
+        # Requête pour récupérer les emails actifs
+        response = requests.get(
+            f"{supabase_url}/rest/v1/emails?active=eq.true&select=email",
+            headers={
+                "apikey": supabase_key,
+                "Authorization": f"Bearer {supabase_key}"
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            subscribers = [item['email'] for item in data]
+            return subscribers
+        else:
+            print(f"❌ Erreur Supabase: {response.status_code}")
+            return []
+            
     except Exception as e:
-        print(f"Erreur lecture CSV: {e}")
-    
-    return subscribers
+        print(f"❌ Erreur lecture Supabase: {e}")
+        return []
 
 # =============================================
 # ENVOI EMAIL
