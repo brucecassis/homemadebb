@@ -1315,17 +1315,20 @@ def add_subscriber(email):
     try:
         file_path = 'newsletter_subscribers.csv'
         
-        # Créer le fichier s'il n'existe pas
-        if not os.path.isfile(file_path):
-            with open(file_path, 'w', newline='', encoding='utf-8') as f:
-                writer = csv.writer(f)
-                writer.writerow(['email', 'subscribed_date', 'active'])
-        
-        # Lire les emails existants
+        # Lire les emails existants (si le fichier existe)
         existing_emails = []
-        with open(file_path, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            existing_emails = [row['email'].lower() for row in reader]
+        file_exists = os.path.isfile(file_path)
+        
+        if file_exists:
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read().strip()
+                    if content:  # Si le fichier n'est pas vide
+                        f.seek(0)
+                        reader = csv.DictReader(f)
+                        existing_emails = [row['email'].lower() for row in reader]
+            except:
+                pass
         
         # Vérifier si l'email existe déjà
         if email.lower() in existing_emails:
@@ -1334,13 +1337,17 @@ def add_subscriber(email):
         # Ajouter le nouvel abonné
         with open(file_path, 'a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
+            
+            # Ajouter le header si fichier vide ou inexistant
+            if not file_exists or os.path.getsize(file_path) == 0:
+                writer.writerow(['email', 'subscribed_date', 'active'])
+            
             writer.writerow([email, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), '1'])
         
         return True, "Inscription réussie !"
         
     except Exception as e:
         return False, f"Erreur: {str(e)}"
-
         
 # AFFICHAGE DU FORMULAIRE
 st.markdown('<hr style="border-color:#333;margin:30px 0;">', unsafe_allow_html=True)
