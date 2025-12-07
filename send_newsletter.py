@@ -5,6 +5,7 @@ import requests
 from datetime import datetime, timedelta
 import csv
 import os
+import json
 
 # =============================================
 # CONFIGURATION - À REMPLIR
@@ -12,9 +13,81 @@ import os
 SENDER_EMAIL = os.environ.get('NEWSLETTER_EMAIL', 'votre-email@gmail.com')
 SENDER_PASSWORD = os.environ.get('NEWSLETTER_PASSWORD', 'votre-mot-de-passe-app')
 FINNHUB_API_KEY = os.environ.get('FINNHUB_API_KEY', 'd14re49r01qop9mf2algd14re49r01qop9mf2am0')
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
 
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
+
+# =============================================
+# GÉNÉRATION DE SYNTHÈSE AVEC GROK
+# =============================================
+def generate_synthesis_with_grok(news_list):
+    """Génère une synthèse intelligente des news avec Grok"""
+    try:
+        # Préparer les articles pour Grok
+        articles_text = ""
+        for i, news in enumerate(news_list[:30], 1):
+            headline = news.get('headline', '')
+            summary = news.get('summary', '')
+            source = news.get('source', '')
+            category = news.get('category', 'general')
+            
+            articles_text += f"\n[Article {i}] ({category.upper()}) - {source}\n"
+            articles_text += f"Titre: {headline}\n"
+            if summary:
+                articles_text += f"Résumé: {summary}\n"
+            articles_text += "---\n"
+        
+        # Prompt pour Grok
+        prompt = f"""Tu es un analyste financier Bloomberg. Voici les 30 principaux articles de la semaine des marchés financiers.
+
+{articles_text}
+
+Ta mission: Rédiger une synthèse percutante style Bloomberg Terminal avec:
+
+1. Un paragraphe d'introduction (2-3 phrases) sur le climat général des marchés cette semaine
+
+2. Les 5-7 TENDANCES CLÉS de la semaine, chacune avec:
+   - Un titre court et impactant (style Bloomberg)
+   - 2-3 phrases d'explication
+   - Les faits marquants
+
+3. Une conclusion prospective (1-2 phrases)
+
+Format: Texte fluide et professionnel, sans bullet points. Ton sérieux mais accessible. Mets l'accent sur l'impact pour les investisseurs.
+
+Maximum 8 paragraphes au total."""
+
+        # Appel API Grok
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.7,
+                "max_tokens": 2000
+            },
+            timeout=60
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            synthesis = result['choices'][0]['message']['content']
+            print("✅ Synthèse générée par Grok")
+            return synthesis
+        else:
+            print(f"❌ Erreur API Grok: {response.status_code}")
+            return None
+            
+    except Exception as e:
+        print(f"❌ Erreur génération synthèse: {e}")
+        return None
 
 # =============================================
 # RÉCUPÉRATION DES NEWS DE LA SEMAINE
@@ -56,72 +129,39 @@ def get_weekly_news():
 # =============================================
 # GÉNÉRATION HTML BLOOMBERG
 # =============================================
-def generate_newsletter_html(news_list):
-    """Génère l'email HTML style Bloomberg Terminal"""
+def generate_newsletter_html(news_list, synthesis_text):
+    """Génère l'email HTML style Bloomberg Terminal avec synthèse Grok"""
     
     today = datetime.now()
     week_start = (today - timedelta(days=today.weekday())).strftime("%d/%m/%Y")
     week_end = today.strftime("%d/%m/%Y")
     
-    # Grouper par catégorie
-    news_by_category = {
-        "general": [],
-        "forex": [],
-        "crypto": [],
-        "merger": []
-    }
+    # Convertir la synthèse en HTML (paragraphes)
+    synthesis_html = ""
+    if synthesis_text:
+        paragraphs = synthesis_text.split('\n\n')
+        for para in paragraphs:
+            if para.strip():
+                synthesis_html += f'<p style="color:#AAA;font-size:12px;line-height:1.7;margin-bottom:15px;">{para.strip()}</p>\n'
+    else:
+        # Fallback si Grok ne marche pas
+        synthesis_html = '<p style="color:#AAA;font-size:12px;">Synthèse non disponible cette semaine.</p>'
     
-    for news in news_list:
-        cat = news.get('category', 'general')
-        if cat in news_by_category:
-            news_by_category[cat].append(news)
-    
-    # Générer les sections HTML
-    sections_html = ""
-    
-    category_names = {
-        "general": "📊 GENERAL MARKET",
-        "forex": "💱 FOREX & CURRENCIES",
-        "crypto": "₿ CRYPTO MARKETS",
-        "merger": "🤝 M&A & CORPORATE"
-    }
-    
-    for cat, cat_news in news_by_category.items():
-        if not cat_news:
-            continue
+    # Sélectionner quelques articles phares pour la section "Sources"
+    top_articles_html = ""
+    for news in news_list[:10]:
+        headline = news.get('headline', '')
+        url = news.get('url', '#')
+        source = news.get('source', '')
         
-        cat_name = category_names.get(cat, cat.upper())
-        
-        sections_html += f"""
-        <div style="background:#FFAA00;color:#000;padding:10px 15px;font-weight:bold;font-size:13px;margin:25px 0 15px 0;letter-spacing:2px;">
-            {cat_name}
+        top_articles_html += f"""
+        <div style="background:#0a0a0a;border-left:2px solid #333;padding:8px 12px;margin:6px 0;">
+            <a href="{url}" style="color:#00FFFF;text-decoration:none;font-size:10px;" target="_blank">
+                {headline[:80]}{'...' if len(headline) > 80 else ''}
+            </a>
+            <span style="color:#666;font-size:9px;margin-left:10px;">— {source}</span>
         </div>
         """
-        
-        for news in cat_news[:10]:  # Max 10 par catégorie
-            headline = news.get('headline', 'Sans titre')
-            url = news.get('url', '#')
-            source = news.get('source', 'Source')
-            timestamp = news.get('datetime', 0)
-            summary = news.get('summary', '')
-            
-            date_str = datetime.fromtimestamp(timestamp).strftime("%d/%m %H:%M") if timestamp else ""
-            
-            short_summary = summary[:150] + "..." if len(summary) > 150 else summary
-            
-            sections_html += f"""
-            <div style="background:#111;border:1px solid #333;border-left:4px solid #FFAA00;padding:15px;margin:10px 0;">
-                <div style="color:#666;font-size:10px;margin-bottom:5px;">
-                    <span style="color:#00FFFF;font-weight:bold;">{source}</span> • {date_str}
-                </div>
-                <div style="color:#FFAA00;font-size:13px;font-weight:bold;margin-bottom:8px;line-height:1.4;">
-                    <a href="{url}" style="color:#FFAA00;text-decoration:none;" target="_blank">{headline}</a>
-                </div>
-                <div style="color:#AAA;font-size:11px;line-height:1.5;">
-                    {short_summary}
-                </div>
-            </div>
-            """
     
     html = f"""
     <!DOCTYPE html>
@@ -148,22 +188,35 @@ def generate_newsletter_html(news_list):
                 <div style="color:#FFAA00;font-size:14px;font-weight:bold;margin-bottom:10px;">
                     📅 SEMAINE DU {week_start} AU {week_end}
                 </div>
-                <div style="color:#AAA;font-size:11px;line-height:1.6;">
-                    Voici votre récapitulatif hebdomadaire des principales actualités des marchés financiers.
-                    {len(news_list)} articles sélectionnés parmi les sources les plus fiables.
+                <div style="color:#888;font-size:11px;line-height:1.6;">
+                    Analyse synthétique des tendances clés qui ont marqué les marchés cette semaine.
                 </div>
             </div>
             
-            <!-- CONTENU -->
-            <div style="padding:20px;">
-                {sections_html}
+            <!-- SYNTHÈSE GROK -->
+            <div style="padding:25px 20px;">
+                <div style="background:#FFAA00;color:#000;padding:10px 15px;font-weight:bold;font-size:13px;margin-bottom:20px;letter-spacing:2px;">
+                    📊 ANALYSE DE LA SEMAINE
+                </div>
+                
+                <div style="background:#111;border:1px solid #333;border-left:4px solid #FFAA00;padding:20px;">
+                    {synthesis_html}
+                </div>
+            </div>
+            
+            <!-- SOURCES -->
+            <div style="padding:0 20px 25px 20px;">
+                <div style="background:#00FFFF;color:#000;padding:8px 15px;font-weight:bold;font-size:11px;margin-bottom:15px;letter-spacing:1px;">
+                    📰 SOURCES PRINCIPALES
+                </div>
+                {top_articles_html}
             </div>
             
             <!-- FOOTER -->
             <div style="background:#111;border-top:2px solid #FFAA00;padding:20px;text-align:center;margin-top:30px;">
                 <div style="color:#666;font-size:10px;line-height:1.6;">
                     © 2025 BLOOMBERG ENS® | NEWSLETTER HEBDOMADAIRE<br>
-                    Source: Finnhub API • Envoyé le {today.strftime("%d/%m/%Y à %H:%M")}<br><br>
+                    Powered by Finnhub API + Grok AI • Envoyé le {today.strftime("%d/%m/%Y à %H:%M")}<br><br>
                     <a href="mailto:{SENDER_EMAIL}?subject=Unsubscribe" style="color:#00FFFF;text-decoration:none;">
                         Se désabonner
                     </a>
@@ -238,11 +291,19 @@ def send_weekly_newsletter():
     
     print(f"✅ {len(news_list)} news récupérées")
     
-    # 2. Générer l'HTML
-    print("🎨 Génération du template HTML...")
-    html_content = generate_newsletter_html(news_list)
+    # 2. Générer la synthèse avec Grok
+    print("🤖 Génération de la synthèse avec Grok AI...")
+    synthesis = generate_synthesis_with_grok(news_list)
     
-    # 3. Récupérer les abonnés
+    if not synthesis:
+        print("⚠️ Synthèse Grok non disponible, utilisation du format basique")
+        synthesis = "Synthèse non disponible cette semaine. Veuillez consulter les sources ci-dessous."
+    
+    # 3. Générer l'HTML
+    print("🎨 Génération du template HTML...")
+    html_content = generate_newsletter_html(news_list, synthesis)
+    
+    # 4. Récupérer les abonnés
     print("📋 Lecture des abonnés...")
     subscribers = get_subscribers()
     
@@ -252,7 +313,7 @@ def send_weekly_newsletter():
     
     print(f"✅ {len(subscribers)} abonné(s) trouvé(s)")
     
-    # 4. Envoyer les emails
+    # 5. Envoyer les emails
     print("📧 Envoi des emails...")
     success_count = 0
     
