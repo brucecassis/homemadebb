@@ -31,5 +31,6 @@ jobs:
         NEWSLETTER_EMAIL: ${{ secrets.NEWSLETTER_EMAIL }}
         NEWSLETTER_PASSWORD: ${{ secrets.NEWSLETTER_PASSWORD }}
         FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       run: |
         python send_newsletter.py
