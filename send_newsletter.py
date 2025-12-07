@@ -5,6 +5,8 @@ import requests
 from datetime import datetime, timedelta
 import os
 import json
+import base64
+from io import BytesIO
 
 # =============================================
 # CONFIGURATION - À REMPLIR
@@ -17,13 +19,141 @@ GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
+# Indices à suivre
+INDICES = {
+    "NASDAQ": "^IXIC",
+    "S&P 500": "^GSPC",
+    "CAC 40": "^FCHI",
+    "Bitcoin": "BTC-USD"
+}
+
 # =============================================
-# GÉNÉRATION DE SYNTHÈSE AVEC GROK
+# RÉCUPÉRATION DES DONNÉES D'INDICES
 # =============================================
-def generate_synthesis_with_grok(news_list):
-    """Génère une synthèse intelligente des news avec Grok"""
+def get_index_data(symbol):
+    """Récupère les données d'un indice via Finnhub"""
     try:
-        # Préparer les articles pour Grok
+        # Calculer les timestamps
+        now = datetime.now()
+        week_ago = now - timedelta(days=7)
+        
+        to_timestamp = int(now.timestamp())
+        from_timestamp = int(week_ago.timestamp())
+        
+        # API Finnhub pour les données historiques
+        url = f"https://finnhub.io/api/v1/stock/candle?symbol={symbol}&resolution=D&from={from_timestamp}&to={to_timestamp}&token={FINNHUB_API_KEY}"
+        
+        response = requests.get(url, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('s') == 'ok' and data.get('c'):
+                closes = data['c']
+                if len(closes) >= 2:
+                    start_price = closes[0]
+                    end_price = closes[-1]
+                    change = end_price - start_price
+                    change_pct = (change / start_price) * 100
+                    
+                    return {
+                        'start': start_price,
+                        'end': end_price,
+                        'change': change,
+                        'change_pct': change_pct,
+                        'prices': closes,
+                        'timestamps': data['t']
+                    }
+        return None
+    except Exception as e:
+        print(f"Erreur récupération {symbol}: {e}")
+        return None
+
+def generate_sparkline_svg(prices, width=120, height=30):
+    """Génère un mini graphique SVG sparkline"""
+    if not prices or len(prices) < 2:
+        return ""
+    
+    min_price = min(prices)
+    max_price = max(prices)
+    price_range = max_price - min_price if max_price != min_price else 1
+    
+    # Calculer les points
+    points = []
+    for i, price in enumerate(prices):
+        x = (i / (len(prices) - 1)) * width
+        y = height - ((price - min_price) / price_range) * height
+        points.append(f"{x:.2f},{y:.2f}")
+    
+    # Déterminer la couleur (vert si hausse, rouge si baisse)
+    color = "#00FF00" if prices[-1] >= prices[0] else "#FF0000"
+    
+    svg = f'''<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">
+        <polyline points="{' '.join(points)}" fill="none" stroke="{color}" stroke-width="1.5"/>
+    </svg>'''
+    
+    return svg
+
+def get_all_indices():
+    """Récupère les données de tous les indices"""
+    indices_data = {}
+    
+    print("📊 Récupération des indices boursiers...")
+    
+    for name, symbol in INDICES.items():
+        print(f"  - {name}...")
+        data = get_index_data(symbol)
+        if data:
+            indices_data[name] = data
+            print(f"    ✅ {data['end']:.2f} ({data['change_pct']:+.2f}%)")
+        else:
+            print(f"    ❌ Erreur")
+    
+    return indices_data
+
+# =============================================
+# GÉNÉRATION HTML DES INDICES
+# =============================================
+def generate_indices_html(indices_data):
+    """Génère le HTML pour afficher les indices"""
+    if not indices_data:
+        return '<p style="color:#888;">Données des indices non disponibles</p>'
+    
+    html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;">'
+    
+    for name, data in indices_data.items():
+        change_pct = data['change_pct']
+        color = "#00FF00" if change_pct >= 0 else "#FF0000"
+        arrow = "▲" if change_pct >= 0 else "▼"
+        
+        sparkline = generate_sparkline_svg(data['prices'])
+        
+        html += f'''
+        <div style="background:#0a0a0a;border:1px solid #333;border-left:3px solid {color};padding:12px;">
+            <div style="color:#AAA;font-size:10px;font-weight:bold;margin-bottom:5px;">
+                {name}
+            </div>
+            <div style="color:#FFF;font-size:16px;font-weight:bold;margin-bottom:5px;">
+                {data['end']:,.2f}
+            </div>
+            <div style="color:{color};font-size:11px;font-weight:bold;margin-bottom:8px;">
+                {arrow} {change_pct:+.2f}% ({data['change']:+,.2f})
+            </div>
+            <div style="margin-top:8px;">
+                {sparkline}
+            </div>
+        </div>
+        '''
+    
+    html += '</div>'
+    return html
+
+# =============================================
+# GÉNÉRATION DE SYNTHÈSE AVEC GROK (AMÉLIORÉE)
+# =============================================
+def generate_synthesis_with_grok(news_list, indices_data):
+    """Génère une synthèse structurée avec Grok"""
+    try:
+        # Préparer les articles
         articles_text = ""
         for i, news in enumerate(news_list[:30], 1):
             headline = news.get('headline', '')
@@ -37,25 +167,40 @@ def generate_synthesis_with_grok(news_list):
                 articles_text += f"Résumé: {summary}\n"
             articles_text += "---\n"
         
-        # Prompt pour Grok
-        prompt = f"""Tu es un analyste financier Bloomberg. Voici les 30 principaux articles de la semaine des marchés financiers.
+        # Préparer les données des indices
+        indices_text = "\n\nPERFORMANCES DES INDICES (semaine):\n"
+        for name, data in indices_data.items():
+            indices_text += f"- {name}: {data['change_pct']:+.2f}% (de {data['start']:.2f} à {data['end']:.2f})\n"
+        
+        # Prompt amélioré pour Grok
+        prompt = f"""Tu es un analyste financier Bloomberg. Voici les données de la semaine:
 
 {articles_text}
+{indices_text}
 
-Ta mission: Rédiger une synthèse percutante style Bloomberg Terminal avec:
+Rédige une synthèse STRUCTURÉE en 5 sections distinctes:
 
-1. Un paragraphe d'introduction (2-3 phrases) sur le climat général des marchés cette semaine
+## VUE D'ENSEMBLE
+Un paragraphe synthétique (3-4 phrases) résumant l'ambiance générale des marchés et les performances des indices cette semaine.
 
-2. Les 5-7 TENDANCES CLÉS de la semaine, chacune avec:
-   - Un titre court et impactant (style Bloomberg)
-   - 2-3 phrases d'explication
-   - Les faits marquants
+## MARCHÉS ACTIONS
+2-3 phrases sur les tendances des marchés actions (S&P 500, NASDAQ, CAC 40), les secteurs performants/sous-performants, et les catalyseurs principaux.
 
-3. Une conclusion prospective (1-2 phrases)
+## CRYPTOMONNAIES
+2-3 phrases sur Bitcoin et le marché crypto: évolution, catalyseurs, sentiment du marché.
 
-Format: Texte fluide et professionnel, sans bullet points. Ton sérieux mais accessible. Mets l'accent sur l'impact pour les investisseurs.
+## ACTUALITÉS MAJEURES
+3-4 phrases couvrant les événements clés de la semaine (annonces d'entreprises, données macroéconomiques, actualité géopolitique, fusions/acquisitions).
 
-Maximum 8 paragraphes au total."""
+## PERSPECTIVES
+2-3 phrases sur les points d'attention pour la semaine prochaine et les facteurs à surveiller.
+
+IMPORTANT: 
+- Utilise les titres de section EXACTEMENT comme indiqués (avec ##)
+- Style professionnel mais accessible
+- Intègre les chiffres des indices fournis
+- Ton objectif et factuel
+- Maximum 12 phrases au total"""
 
         # Appel API Grok
         response = requests.post(
@@ -70,7 +215,7 @@ Maximum 8 paragraphes au total."""
                     {"role": "user", "content": prompt}
                 ],
                 "temperature": 0.7,
-                "max_tokens": 2000
+                "max_tokens": 2500
             },
             timeout=60
         )
@@ -88,20 +233,58 @@ Maximum 8 paragraphes au total."""
         print(f"❌ Erreur génération synthèse: {e}")
         return None
 
+def format_synthesis_html(synthesis_text):
+    """Convertit la synthèse en HTML structuré avec sections colorées"""
+    if not synthesis_text:
+        return '<p style="color:#888;">Synthèse non disponible</p>'
+    
+    html = ""
+    sections = synthesis_text.split('##')
+    
+    # Couleurs par section
+    section_colors = {
+        "VUE D'ENSEMBLE": "#FFAA00",
+        "MARCHÉS ACTIONS": "#00AAFF",
+        "CRYPTOMONNAIES": "#FF9500",
+        "ACTUALITÉS MAJEURES": "#00FF88",
+        "PERSPECTIVES": "#FF6B9D"
+    }
+    
+    for section in sections:
+        if not section.strip():
+            continue
+        
+        lines = section.strip().split('\n', 1)
+        if len(lines) == 2:
+            title = lines[0].strip()
+            content = lines[1].strip()
+            
+            color = section_colors.get(title, "#FFAA00")
+            
+            html += f'''
+            <div style="margin-bottom:25px;">
+                <div style="background:{color};color:#000;padding:8px 12px;font-weight:bold;font-size:11px;letter-spacing:1px;margin-bottom:10px;">
+                    {title}
+                </div>
+                <div style="background:#0a0a0a;border-left:3px solid {color};padding:15px;color:#CCC;font-size:12px;line-height:1.7;">
+                    {content}
+                </div>
+            </div>
+            '''
+    
+    return html
+
 # =============================================
 # RÉCUPÉRATION DES NEWS DE LA SEMAINE
 # =============================================
 def get_weekly_news():
     """Récupère les news de la semaine via Finnhub"""
     try:
-        # Calcul des dates (lundi à dimanche)
         today = datetime.now()
-        days_since_monday = today.weekday()  # 0 = lundi, 6 = dimanche
+        days_since_monday = today.weekday()
         monday = today - timedelta(days=days_since_monday)
         
         all_news = []
-        
-        # Récupérer les news générales
         categories = ["general", "forex", "crypto", "merger"]
         
         for category in categories:
@@ -109,7 +292,6 @@ def get_weekly_news():
             response = requests.get(url, timeout=10)
             if response.status_code == 200:
                 news = response.json()
-                # Filtrer les news de la semaine
                 for item in news:
                     timestamp = item.get('datetime', 0)
                     news_date = datetime.fromtimestamp(timestamp)
@@ -117,36 +299,29 @@ def get_weekly_news():
                         item['category'] = category
                         all_news.append(item)
         
-        # Trier par date (plus récent en premier)
         all_news.sort(key=lambda x: x.get('datetime', 0), reverse=True)
-        
-        return all_news[:30]  # Top 30 news
+        return all_news[:30]
     except Exception as e:
         print(f"Erreur récupération news: {e}")
         return []
 
 # =============================================
-# GÉNÉRATION HTML BLOOMBERG
+# GÉNÉRATION HTML BLOOMBERG AMÉLIORÉE
 # =============================================
-def generate_newsletter_html(news_list, synthesis_text):
-    """Génère l'email HTML style Bloomberg Terminal avec synthèse Grok"""
+def generate_newsletter_html(news_list, synthesis_text, indices_data):
+    """Génère l'email HTML style Bloomberg Terminal amélioré"""
     
     today = datetime.now()
     week_start = (today - timedelta(days=today.weekday())).strftime("%d/%m/%Y")
     week_end = today.strftime("%d/%m/%Y")
     
-    # Convertir la synthèse en HTML (paragraphes)
-    synthesis_html = ""
-    if synthesis_text:
-        paragraphs = synthesis_text.split('\n\n')
-        for para in paragraphs:
-            if para.strip():
-                synthesis_html += f'<p style="color:#AAA;font-size:12px;line-height:1.7;margin-bottom:15px;">{para.strip()}</p>\n'
-    else:
-        # Fallback si Grok ne marche pas
-        synthesis_html = '<p style="color:#AAA;font-size:12px;">Synthèse non disponible cette semaine.</p>'
+    # Formater la synthèse structurée
+    synthesis_html = format_synthesis_html(synthesis_text)
     
-    # Sélectionner quelques articles phares pour la section "Sources"
+    # Générer l'HTML des indices
+    indices_html = generate_indices_html(indices_data)
+    
+    # Articles phares
     top_articles_html = ""
     for news in news_list[:10]:
         headline = news.get('headline', '')
@@ -192,15 +367,20 @@ def generate_newsletter_html(news_list, synthesis_text):
                 </div>
             </div>
             
-            <!-- SYNTHÈSE GROK -->
+            <!-- INDICES BOURSIERS -->
             <div style="padding:25px 20px;">
+                <div style="background:#00FFFF;color:#000;padding:10px 15px;font-weight:bold;font-size:13px;margin-bottom:20px;letter-spacing:2px;">
+                    📈 PERFORMANCES DE LA SEMAINE
+                </div>
+                {indices_html}
+            </div>
+            
+            <!-- SYNTHÈSE STRUCTURÉE -->
+            <div style="padding:0 20px 25px 20px;">
                 <div style="background:#FFAA00;color:#000;padding:10px 15px;font-weight:bold;font-size:13px;margin-bottom:20px;letter-spacing:2px;">
-                    📊 ANALYSE DE LA SEMAINE
+                    📊 ANALYSE DÉTAILLÉE
                 </div>
-                
-                <div style="background:#111;border:1px solid #333;border-left:4px solid #FFAA00;padding:20px;">
-                    {synthesis_html}
-                </div>
+                {synthesis_html}
             </div>
             
             <!-- SOURCES -->
@@ -242,7 +422,6 @@ def get_subscribers():
             print("❌ Identifiants Supabase manquants")
             return []
         
-        # Requête pour récupérer les emails actifs
         response = requests.get(
             f"{supabase_url}/rest/v1/emails?active=eq.true&select=email",
             headers={
@@ -271,7 +450,7 @@ def send_email(to_email, html_content):
     """Envoie l'email à un destinataire"""
     try:
         message = MIMEMultipart("alternative")
-        message["Subject"] = f"📰 Bloomberg ENS® Weekly Digest - {datetime.now().strftime('%d/%m/%Y')}"
+        message["Subject"] = f"📊 Bloomberg ENS® Weekly Digest - {datetime.now().strftime('%d/%m/%Y')}"
         message["From"] = SENDER_EMAIL
         message["To"] = to_email
         
@@ -296,7 +475,10 @@ def send_weekly_newsletter():
     """Fonction principale d'envoi de la newsletter"""
     print(f"\n🚀 Début envoi newsletter hebdomadaire - {datetime.now()}")
     
-    # 1. Récupérer les news
+    # 1. Récupérer les indices
+    indices_data = get_all_indices()
+    
+    # 2. Récupérer les news
     print("📡 Récupération des news de la semaine...")
     news_list = get_weekly_news()
     
@@ -306,19 +488,19 @@ def send_weekly_newsletter():
     
     print(f"✅ {len(news_list)} news récupérées")
     
-    # 2. Générer la synthèse avec Grok
-    print("🤖 Génération de la synthèse avec Grok AI...")
-    synthesis = generate_synthesis_with_grok(news_list)
+    # 3. Générer la synthèse avec Grok
+    print("🤖 Génération de la synthèse structurée avec Grok AI...")
+    synthesis = generate_synthesis_with_grok(news_list, indices_data)
     
     if not synthesis:
-        print("⚠️ Synthèse Grok non disponible, utilisation du format basique")
-        synthesis = "Synthèse non disponible cette semaine. Veuillez consulter les sources ci-dessous."
+        print("⚠️ Synthèse Grok non disponible")
+        synthesis = "Synthèse non disponible cette semaine."
     
-    # 3. Générer l'HTML
+    # 4. Générer l'HTML
     print("🎨 Génération du template HTML...")
-    html_content = generate_newsletter_html(news_list, synthesis)
+    html_content = generate_newsletter_html(news_list, synthesis, indices_data)
     
-    # 4. Récupérer les abonnés
+    # 5. Récupérer les abonnés
     print("📋 Lecture des abonnés...")
     subscribers = get_subscribers()
     
@@ -328,14 +510,13 @@ def send_weekly_newsletter():
     
     print(f"✅ {len(subscribers)} abonné(s) trouvé(s)")
     
-    # 5. Envoyer les emails
+    # 6. Envoyer les emails
     print("📧 Envoi des emails...")
     success_count = 0
     
     for email in subscribers:
         if send_email(email, html_content):
             success_count += 1
-        # Pause pour éviter les limites d'envoi
         import time
         time.sleep(2)
     
