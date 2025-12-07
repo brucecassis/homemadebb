@@ -1301,9 +1301,12 @@ with tab_calendar:
 # JUSTE AVANT LE FOOTER
 # =============================================
 
-import csv
-import os
 import re
+import requests
+
+# Configuration Supabase
+SUPABASE_URL = "https://eityroxwiryhupmjeqvp.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpdHlyb3h3aXJ5aHVwbWplcXZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxMDAzODcsImV4cCI6MjA4MDY3NjM4N30.pIYAmo1K4Y2XkRB4JWGdzsxfOwLdTf7hExNcFkoyzQM"
 
 def is_valid_email(email):
     """Valide le format d'un email"""
@@ -1311,44 +1314,33 @@ def is_valid_email(email):
     return re.match(pattern, email) is not None
 
 def add_subscriber(email):
-    """Ajoute un abonné au fichier CSV"""
+    """Ajoute un abonné à Supabase"""
     try:
-        file_path = 'newsletter_subscribers.csv'
+        # Insérer dans Supabase
+        response = requests.post(
+            f"{SUPABASE_URL}/rest/v1/emails",
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal"
+            },
+            json={
+                "email": email.lower(),
+                "active": True
+            }
+        )
         
-        # Lire les emails existants (si le fichier existe)
-        existing_emails = []
-        file_exists = os.path.isfile(file_path)
-        
-        if file_exists:
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    content = f.read().strip()
-                    if content:  # Si le fichier n'est pas vide
-                        f.seek(0)
-                        reader = csv.DictReader(f)
-                        existing_emails = [row['email'].lower() for row in reader]
-            except:
-                pass
-        
-        # Vérifier si l'email existe déjà
-        if email.lower() in existing_emails:
+        if response.status_code == 201:
+            return True, "Inscription réussie !"
+        elif response.status_code == 409:
             return False, "Cet email est déjà inscrit"
-        
-        # Ajouter le nouvel abonné
-        with open(file_path, 'a', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
+        else:
+            return False, f"Erreur serveur ({response.status_code})"
             
-            # Ajouter le header si fichier vide ou inexistant
-            if not file_exists or os.path.getsize(file_path) == 0:
-                writer.writerow(['email', 'subscribed_date', 'active'])
-            
-            writer.writerow([email, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), '1'])
-        
-        return True, "Inscription réussie !"
-        
     except Exception as e:
         return False, f"Erreur: {str(e)}"
-        
+
 # AFFICHAGE DU FORMULAIRE
 st.markdown('<hr style="border-color:#333;margin:30px 0;">', unsafe_allow_html=True)
 
@@ -1400,7 +1392,6 @@ st.markdown("""
     🔒 Vos données restent privées
 </div>
 """, unsafe_allow_html=True)
-
 
 # =============================================
 # FOOTER
