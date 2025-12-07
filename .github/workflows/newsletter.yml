@@ -1,0 +1,35 @@
+name: Send Weekly Newsletter
+
+on:
+  schedule:
+    # Tous les dimanches à 20h00 UTC (21h Paris hiver, 22h Paris été)
+    - cron: '0 20 * * 0'
+  
+  # Permet aussi de lancer manuellement depuis GitHub
+  workflow_dispatch:
+
+jobs:
+  send-newsletter:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests
+    
+    - name: Send newsletter
+      env:
+        NEWSLETTER_EMAIL: ${{ secrets.NEWSLETTER_EMAIL }}
+        NEWSLETTER_PASSWORD: ${{ secrets.NEWSLETTER_PASSWORD }}
+        FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+      run: |
+        python send_newsletter.py
