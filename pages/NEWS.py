@@ -1297,6 +1297,105 @@ with tab_calendar:
             """, unsafe_allow_html=True)
 
 # =============================================
+# SECTION NEWSLETTER - À AJOUTER À LA FIN DE NEWS.py
+# JUSTE AVANT LE FOOTER
+# =============================================
+
+import csv
+import os
+import re
+
+def is_valid_email(email):
+    """Valide le format d'un email"""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
+def add_subscriber(email):
+    """Ajoute un abonné au fichier CSV"""
+    try:
+        # Vérifier si le fichier existe
+        file_exists = os.path.isfile('newsletter_subscribers.csv')
+        
+        # Lire les emails existants
+        existing_emails = []
+        if file_exists:
+            with open('newsletter_subscribers.csv', 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                existing_emails = [row['email'].lower() for row in reader]
+        
+        # Vérifier si l'email existe déjà
+        if email.lower() in existing_emails:
+            return False, "Cet email est déjà inscrit"
+        
+        # Ajouter le nouvel abonné
+        with open('newsletter_subscribers.csv', 'a', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            
+            # Ajouter le header si fichier vide
+            if not file_exists or os.path.getsize('newsletter_subscribers.csv') == 0:
+                writer.writerow(['email', 'subscribed_date', 'active'])
+            
+            writer.writerow([email, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), '1'])
+        
+        return True, "Inscription réussie !"
+        
+    except Exception as e:
+        return False, f"Erreur: {str(e)}"
+
+# AFFICHAGE DU FORMULAIRE
+st.markdown('<hr style="border-color:#333;margin:30px 0;">', unsafe_allow_html=True)
+
+st.markdown("""
+<div style="background:#111;border:2px solid #FFAA00;padding:25px;margin:20px 0;">
+    <div style="text-align:center;margin-bottom:20px;">
+        <div style="color:#FFAA00;font-size:18px;font-weight:bold;letter-spacing:2px;margin-bottom:8px;">
+            📧 BLOOMBERG ENS® NEWSLETTER
+        </div>
+        <div style="color:#AAA;font-size:11px;line-height:1.6;">
+            Recevez chaque dimanche un condensé des actualités financières de la semaine<br>
+            directement dans votre boîte mail • Format Bloomberg Terminal
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+col_news1, col_news2, col_news3 = st.columns([1, 2, 1])
+
+with col_news2:
+    with st.form("newsletter_subscription", clear_on_submit=True):
+        newsletter_email = st.text_input(
+            "Email",
+            placeholder="votre-email@example.com",
+            label_visibility="collapsed"
+        )
+        
+        col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+        with col_btn2:
+            subscribe_btn = st.form_submit_button("🚀 S'INSCRIRE", use_container_width=True)
+        
+        if subscribe_btn:
+            if newsletter_email:
+                if is_valid_email(newsletter_email):
+                    success, message = add_subscriber(newsletter_email)
+                    if success:
+                        st.success(f"✅ {message} Vous recevrez la newsletter chaque dimanche à 20h.")
+                    else:
+                        st.warning(f"⚠️ {message}")
+                else:
+                    st.error("❌ Format d'email invalide")
+            else:
+                st.error("❌ Veuillez entrer une adresse email")
+
+st.markdown("""
+<div style="text-align:center;color:#666;font-size:9px;margin-top:15px;">
+    📅 Envoi automatique chaque dimanche • 
+    📊 Top actualités de la semaine • 
+    🔒 Vos données restent privées
+</div>
+""", unsafe_allow_html=True)
+
+
+# =============================================
 # FOOTER
 # =============================================
 st.markdown('<hr>', unsafe_allow_html=True)
