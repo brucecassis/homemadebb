@@ -458,13 +458,31 @@ with tab_eco_calendar:
     
     # Widget Finlogix Economic Calendar
     economic_calendar_widget = """
-    <div style="background:#111;border:2px solid #FFAA00;padding:20px;margin:20px 0;min-height:600px;">
+    <style>
+        body {
+            background-color: #000 !important;
+            margin: 0;
+            padding: 0;
+        }
+        .finlogix-container {
+            background-color: #000 !important;
+            min-height: 1200px !important;
+            width: 100% !important;
+        }
+        .finlogix-container * {
+            background-color: transparent !important;
+        }
+        .finlogix-container table {
+            background-color: #000 !important;
+        }
+    </style>
+    <div style="background:#000;border:2px solid #FFAA00;padding:20px;margin:0;min-height:1200px;">
         <div style="background:#FFAA00;color:#000;padding:10px 15px;font-weight:bold;font-size:14px;margin:-20px -20px 20px -20px;text-transform:uppercase;letter-spacing:2px;">
             📊 ECONOMIC CALENDAR WIDGET
         </div>
         
         <!-- Finlogix Widget BEGIN-->
-        <div class="finlogix-container"></div>
+        <div class="finlogix-container" style="background:#000 !important;"></div>
         <script type="text/javascript" src="https://widget.finlogix.com/Widget.js"></script>
         <script type="text/javascript">
             Widget.init({
@@ -478,7 +496,7 @@ with tab_eco_calendar:
     </div>
     """
     
-    components.html(economic_calendar_widget, height=900, scrolling=True)
+    components.html(economic_calendar_widget, height=1400, scrolling=True)
     
     st.markdown("""
     <div style="color:#666;font-size:9px;margin-top:15px;text-align:center;">
