@@ -377,7 +377,7 @@ st.markdown(f"""
         <div>⬛ BLOOMBERG ENS® | NEWS TERMINAL V2</div>
         <a href="accueil.html" style="background:#333;color:#FFAA00;border:1px solid #000;padding:4px 12px;font-size:11px;text-decoration:none;">ACCUEIL</a>
     </div>
-    <div>{current_time} UTC • TRADINGVIEW + YAHOO FINANCE • AUTO-REFRESH: 60s</div>
+    <div>{current_time} UTC • TRADINGVIEW WIDGETS • AUTO-REFRESH: 60s</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -521,18 +521,18 @@ with tab_eco_calendar:
     """, unsafe_allow_html=True)
 
 # =============================================
-# ONGLET 3 : EARNINGS CALENDAR (YAHOO FINANCE V2)
+# ONGLET 3 : EARNINGS CALENDAR (TRADINGVIEW SCREENER V2)
 # =============================================
 with tab_earnings:
-    st.markdown("### 💰 EARNINGS CALENDAR - YAHOO FINANCE")
+    st.markdown("### 💰 EARNINGS CALENDAR - TRADINGVIEW SCREENER")
     
     st.markdown("""
     <div style="color:#666;font-size:10px;margin:10px 0 20px 0;">
-        📈 Calendrier des résultats trimestriels Yahoo Finance • Données complètes • Sociétés US et internationales
+        📈 Screener TradingView avec focus sur les earnings • Données temps réel • Filtrages avancés
     </div>
     """, unsafe_allow_html=True)
     
-    # Widget Yahoo Finance Earnings Calendar
+    # Widget TradingView Stock Screener (avec colonnes earnings)
     earnings_calendar_widget = """
     <!DOCTYPE html>
     <html>
@@ -549,33 +549,40 @@ with tab_earnings:
                 width: 100%;
                 overflow: hidden;
             }
-            .widget-container {
+            .tradingview-widget-container {
                 width: 100% !important;
                 height: 100vh !important;
                 background-color: #000 !important;
-            }
-            iframe {
-                width: 100% !important;
-                height: 100% !important;
-                border: none !important;
             }
         </style>
     </head>
     <body>
         <div style="background:#000;border:2px solid #FFAA00;padding:20px;margin:0;height:100vh;display:flex;flex-direction:column;">
             <div style="background:#FFAA00;color:#000;padding:10px 15px;font-weight:bold;font-size:14px;margin:-20px -20px 20px -20px;text-transform:uppercase;letter-spacing:2px;flex-shrink:0;">
-                💰 YAHOO FINANCE EARNINGS CALENDAR
+                💰 EARNINGS & FINANCIALS SCREENER
             </div>
             
-            <!-- Yahoo Finance Earnings Calendar Widget -->
-            <div class="widget-container" style="flex-grow:1;">
-                <iframe src="https://finance.yahoo.com/calendar/earnings" 
-                        style="width:100%;height:100%;border:none;background:#000;">
-                </iframe>
+            <!-- TradingView Widget BEGIN -->
+            <div class="tradingview-widget-container" style="flex-grow:1;">
+                <div class="tradingview-widget-container__widget"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-screener.js" async>
+                {
+                  "width": "100%",
+                  "height": "100%",
+                  "defaultColumn": "overview",
+                  "defaultScreen": "general",
+                  "market": "america",
+                  "showToolbar": true,
+                  "colorTheme": "dark",
+                  "locale": "en",
+                  "isTransparent": false
+                }
+                </script>
             </div>
+            <!-- TradingView Widget END -->
             
             <div style="background:#111;color:#666;padding:8px;font-size:9px;text-align:center;flex-shrink:0;margin:-20px;margin-top:10px;">
-                💡 Données fournies par Yahoo Finance • Earnings passés et à venir • Cliquez pour accéder aux détails
+                💡 Screener TradingView • Cliquez sur les colonnes pour trier • Filtrez par secteur, cap., performance
             </div>
         </div>
     </body>
@@ -586,8 +593,8 @@ with tab_earnings:
     
     st.markdown("""
     <div style="color:#666;font-size:9px;margin-top:15px;text-align:center;">
-        📊 Source: Yahoo Finance • Actualisation automatique • 
-        Résultats EPS, Revenue, estimations et surprises pour toutes les sociétés cotées
+        📊 Source: TradingView Screener • Données temps réel • 
+        Filtrez par EPS, P/E ratio, Market Cap et autres métriques financières
     </div>
     """, unsafe_allow_html=True)
 
@@ -692,7 +699,7 @@ st.markdown("""
 st.markdown('<hr>', unsafe_allow_html=True)
 st.markdown(f"""
 <div style='text-align: center; color: #666; font-size: 9px; font-family: "Courier New", monospace; padding: 10px;'>
-    © 2025 BLOOMBERG ENS® V2 | TRADINGVIEW + YAHOO FINANCE | SYSTÈME OPÉRATIONNEL<br>
+    © 2025 BLOOMBERG ENS® V2 | TRADINGVIEW WIDGETS | SYSTÈME OPÉRATIONNEL<br>
     AUTO-REFRESH: 60 SECONDES • DERNIÈRE MAJ: {datetime.now().strftime('%H:%M:%S')}
 </div>
 """, unsafe_allow_html=True)
