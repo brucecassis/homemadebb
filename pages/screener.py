@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import requests
+import yfinance as yf
 from datetime import datetime
 import plotly.graph_objects as go
 from auth_utils import init_session_state
@@ -112,11 +112,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =============================================
-# API CONFIGURATION
-# =============================================
-FMP_API_KEY = "3eR6TT3vA8rOZvoiFtZzGbro5a3rA5Ix"
-
-# =============================================
 # HEADER
 # =============================================
 current_time = datetime.now().strftime("%H:%M:%S")
@@ -125,74 +120,87 @@ st.markdown(f"""
     <div style="display:flex;align-items:center;gap:15px;">
         <div>🔍 BLOOMBERG ENS® - STOCK SCREENER</div>
     </div>
-    <div>{current_time} UTC • HYBRID API (FMP + YAHOO)</div>
+    <div>{current_time} UTC • YAHOO FINANCE (100% GRATUIT)</div>
 </div>
 """, unsafe_allow_html=True)
 
 # =============================================
-# FONCTIONS API
+# LISTE DE TICKERS PRÉ-DÉFINIE
 # =============================================
-@st.cache_data(ttl=3600)
-def get_stock_list(exchange="NASDAQ"):
-    """Récupère la liste des actions d'un exchange"""
-    url = f"https://financialmodelingprep.com/api/v3/stock/list"
-    params = {'apikey': FMP_API_KEY}
-    
-    try:
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        
-        # Filtrer par exchange
-        if exchange != "All":
-            data = [stock for stock in data if stock.get('exchangeShortName') == exchange]
-        
-        return data
-    except Exception as e:
-        st.error(f"Erreur API: {str(e)}")
-        return []
+# Liste complète des tickers populaires US
+POPULAR_TICKERS = {
+    'Technology': ['AAPL', 'MSFT', 'GOOGL', 'GOOG', 'META', 'NVDA', 'TSLA', 'AVGO', 'ORCL', 'ADBE', 
+                   'CRM', 'CSCO', 'ACN', 'AMD', 'INTC', 'IBM', 'QCOM', 'INTU', 'TXN', 'NOW'],
+    'Financial Services': ['BRK-B', 'JPM', 'V', 'MA', 'BAC', 'WFC', 'GS', 'MS', 'SCHW', 'AXP',
+                          'BLK', 'SPGI', 'C', 'CB', 'MMC', 'PGR', 'AON', 'USB', 'BK', 'TFC'],
+    'Healthcare': ['UNH', 'JNJ', 'LLY', 'ABBV', 'MRK', 'TMO', 'ABT', 'DHR', 'PFE', 'BMY',
+                  'AMGN', 'GILD', 'CVS', 'MDT', 'CI', 'REGN', 'VRTX', 'ZTS', 'HUM', 'ISRG'],
+    'Consumer Cyclical': ['AMZN', 'TSLA', 'HD', 'MCD', 'NKE', 'SBUX', 'LOW', 'TJX', 'BKNG', 'CMG',
+                         'MAR', 'GM', 'F', 'ABNB', 'ROST', 'HLT', 'YUM', 'DRI', 'ULTA', 'ORLY'],
+    'Communication Services': ['GOOGL', 'META', 'NFLX', 'DIS', 'T', 'VZ', 'CMCSA', 'TMUS', 'CHTR', 'EA',
+                               'TTWO', 'MTCH', 'SPOT', 'PINS', 'SNAP', 'PARA', 'WBD', 'OMC', 'IPG', 'FOXA'],
+    'Consumer Defensive': ['WMT', 'PG', 'COST', 'KO', 'PEP', 'PM', 'MO', 'MDLZ', 'CL', 'GIS',
+                          'KMB', 'SYY', 'HSY', 'K', 'TSN', 'CAG', 'STZ', 'TAP', 'CPB', 'HRL'],
+    'Energy': ['XOM', 'CVX', 'COP', 'SLB', 'EOG', 'MPC', 'PSX', 'VLO', 'OXY', 'HES',
+              'BKR', 'WMB', 'KMI', 'HAL', 'DVN', 'FANG', 'MRO', 'APA', 'CTRA', 'OVV'],
+    'Industrials': ['UPS', 'HON', 'RTX', 'UNP', 'BA', 'CAT', 'GE', 'LMT', 'DE', 'MMM',
+                   'NOC', 'FDX', 'CSX', 'GD', 'NSC', 'EMR', 'ETN', 'ITW', 'PH', 'TDG'],
+    'Basic Materials': ['LIN', 'APD', 'ECL', 'SHW', 'FCX', 'NEM', 'NUE', 'CTVA', 'DOW', 'DD',
+                       'PPG', 'VMC', 'MLM', 'ALB', 'CF', 'MOS', 'IFF', 'CE', 'FMC', 'EMN'],
+    'Real Estate': ['PLD', 'AMT', 'EQIX', 'CCI', 'PSA', 'WELL', 'DLR', 'O', 'SBAC', 'VICI',
+                   'AVB', 'EQR', 'SPG', 'WY', 'INVH', 'ARE', 'VTR', 'EXR', 'MAA', 'SUI'],
+    'Utilities': ['NEE', 'DUK', 'SO', 'D', 'AEP', 'SRE', 'EXC', 'XEL', 'PCG', 'ED',
+                 'WEC', 'ES', 'AWK', 'DTE', 'PEG', 'EIX', 'PPL', 'FE', 'AEE', 'CMS']
+}
 
-@st.cache_data(ttl=600)
-def get_quotes_batch(symbols):
-    """Récupère les cours pour plusieurs symboles"""
-    symbols_str = ",".join(symbols[:100])  # Limite à 100 symboles
-    url = f"https://financialmodelingprep.com/api/v3/quote/{symbols_str}"
-    params = {'apikey': FMP_API_KEY}
-    
+# Liste des indices
+INDICES = {
+    'S&P 500': ['^GSPC'],
+    'DOW JONES': ['^DJI'],
+    'NASDAQ': ['^IXIC'],
+    'RUSSELL 2000': ['^RUT']
+}
+
+# =============================================
+# FONCTIONS
+# =============================================
+@st.cache_data(ttl=300)
+def get_stock_data(ticker):
+    """Récupère les données d'une action"""
     try:
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
-        return response.json()
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        hist = stock.history(period='5d')
+        
+        if len(hist) < 2:
+            return None
+        
+        current_price = hist['Close'].iloc[-1]
+        previous_close = hist['Close'].iloc[-2]
+        change_percent = ((current_price - previous_close) / previous_close) * 100
+        
+        return {
+            'symbol': ticker,
+            'name': info.get('shortName', ticker),
+            'sector': info.get('sector', 'Unknown'),
+            'industry': info.get('industry', 'Unknown'),
+            'price': current_price,
+            'change': change_percent,
+            'volume': hist['Volume'].iloc[-1],
+            'marketCap': info.get('marketCap', 0),
+            'beta': info.get('beta', 0),
+            'dividendYield': info.get('dividendYield', 0) * 100 if info.get('dividendYield') else 0,
+            'pe': info.get('trailingPE', 0),
+            'high': hist['High'].iloc[-1],
+            'low': hist['Low'].iloc[-1],
+            'avgVolume': info.get('averageVolume', 0)
+        }
     except:
-        return []
-
-@st.cache_data(ttl=3600)
-def get_company_profile_batch(symbols):
-    """Récupère les profils d'entreprises"""
-    results = []
-    
-    # Traiter par batch de 5 pour éviter les limites
-    for i in range(0, len(symbols), 5):
-        batch = symbols[i:i+5]
-        symbols_str = ",".join(batch)
-        url = f"https://financialmodelingprep.com/api/v3/profile/{symbols_str}"
-        params = {'apikey': FMP_API_KEY}
-        
-        try:
-            response = requests.get(url, params=params, timeout=5)
-            response.raise_for_status()
-            data = response.json()
-            if data:
-                results.extend(data)
-            time.sleep(0.2)  # Éviter les limites de rate
-        except:
-            continue
-    
-    return results
+        return None
 
 def filter_stocks(stocks_data, filters):
-    """Applique les filtres sur les données"""
-    df = pd.DataFrame(stocks_data)
+    """Applique les filtres"""
+    df = pd.DataFrame([s for s in stocks_data if s is not None])
     
     if df.empty:
         return df
@@ -217,9 +225,19 @@ def filter_stocks(stocks_data, filters):
     
     # Filtrer par variation
     if filters['change_min'] is not None:
-        df = df[df['changesPercentage'] >= filters['change_min']]
+        df = df[df['change'] >= filters['change_min']]
     if filters['change_max'] is not None:
-        df = df[df['changesPercentage'] <= filters['change_max']]
+        df = df[df['change'] <= filters['change_max']]
+    
+    # Filtrer par dividend yield
+    if filters['dividend_min'] > 0:
+        df = df[df['dividendYield'] >= filters['dividend_min']]
+    
+    # Filtrer par beta
+    if filters['beta_min'] is not None:
+        df = df[df['beta'] >= filters['beta_min']]
+    if filters['beta_max'] is not None:
+        df = df[df['beta'] <= filters['beta_max']]
     
     # Filtrer par secteur
     if filters['sector'] != "All":
@@ -232,23 +250,14 @@ def filter_stocks(stocks_data, filters):
 # =============================================
 st.markdown("### 🎯 FILTRES DE RECHERCHE")
 
-# Créer des colonnes pour les filtres
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     st.markdown("**📊 MARCHÉ**")
     
-    exchange = st.selectbox(
-        "Exchange",
-        options=["NASDAQ", "NYSE", "AMEX", "All"],
-        index=0
-    )
-    
     sector = st.selectbox(
         "Secteur",
-        options=["All", "Technology", "Financial Services", "Healthcare", 
-                "Consumer Cyclical", "Industrials", "Energy", "Basic Materials",
-                "Consumer Defensive", "Real Estate", "Utilities", "Communication Services"],
+        options=["All"] + list(POPULAR_TICKERS.keys()),
         index=0
     )
 
@@ -257,17 +266,12 @@ with col2:
     
     market_cap_range = st.select_slider(
         "Market Cap",
-        options=["Micro (<300M)", "Small (300M-2B)", "Mid (2B-10B)", 
-                "Large (10B-200B)", "Mega (>200B)", "All"],
+        options=["All", "Small (<2B)", "Mid (2B-10B)", "Large (10B-200B)", "Mega (>200B)"],
         value="All"
     )
     
-    # Convertir en valeurs
     market_cap_min, market_cap_max = None, None
-    if market_cap_range == "Micro (<300M)":
-        market_cap_max = 300000000
-    elif market_cap_range == "Small (300M-2B)":
-        market_cap_min = 300000000
+    if market_cap_range == "Small (<2B)":
         market_cap_max = 2000000000
     elif market_cap_range == "Mid (2B-10B)":
         market_cap_min = 2000000000
@@ -303,32 +307,30 @@ with col3:
         change_max = -5.0
 
 with col4:
-    st.markdown("**📈 VOLUME**")
+    st.markdown("**📈 DIVIDENDES & VOLATILITÉ**")
     
-    volume_range = st.selectbox(
-        "Volume moyen",
-        options=["All", "Low (<100K)", "Medium (100K-1M)", "High (1M-10M)", "Very High (>10M)"],
+    dividend_min = st.number_input("Dividend Yield min (%)", min_value=0.0, value=0.0, step=0.5)
+    
+    beta_range = st.selectbox(
+        "Volatilité (Beta)",
+        options=["All", "Low Risk (<0.8)", "Medium (0.8-1.2)", "High Risk (>1.2)"],
         index=0
     )
     
-    volume_min, volume_max = None, None
-    if volume_range == "Low (<100K)":
-        volume_max = 100000
-    elif volume_range == "Medium (100K-1M)":
-        volume_min = 100000
-        volume_max = 1000000
-    elif volume_range == "High (1M-10M)":
-        volume_min = 1000000
-        volume_max = 10000000
-    elif volume_range == "Very High (>10M)":
-        volume_min = 10000000
+    beta_min, beta_max = None, None
+    if beta_range == "Low Risk (<0.8)":
+        beta_max = 0.8
+    elif beta_range == "Medium (0.8-1.2)":
+        beta_min = 0.8
+        beta_max = 1.2
+    elif beta_range == "High Risk (>1.2)":
+        beta_min = 1.2
     
-    limit_results = st.number_input("Limite de résultats", min_value=10, max_value=500, value=100, step=10)
+    volume_min = st.number_input("Volume min", min_value=0, value=0, step=100000)
 
-# Bouton de recherche
 st.markdown('<hr>', unsafe_allow_html=True)
 
-col_btn1, col_btn2, col_btn3 = st.columns([2, 1, 7])
+col_btn1, col_btn2 = st.columns([2, 8])
 
 with col_btn1:
     search_button = st.button("🔍 LANCER LA RECHERCHE", use_container_width=True)
@@ -345,117 +347,61 @@ if reset_button:
 if search_button:
     st.markdown("### 📊 RÉSULTATS DE LA RECHERCHE")
     
-    with st.spinner('🔍 Recherche en cours... Cela peut prendre quelques secondes...'):
-        # 1. Récupérer la liste des actions
-        stock_list = get_stock_list(exchange)
+    # Sélectionner les tickers à analyser
+    if sector == "All":
+        tickers_to_analyze = []
+        for sector_tickers in POPULAR_TICKERS.values():
+            tickers_to_analyze.extend(sector_tickers[:10])  # 10 par secteur
+    else:
+        tickers_to_analyze = POPULAR_TICKERS[sector]
+    
+    with st.spinner(f'🔍 Analyse de {len(tickers_to_analyze)} actions...'):
+        # Récupérer les données
+        stocks_data = []
+        progress_bar = st.progress(0)
         
-        if not stock_list:
-            st.error("❌ Impossible de récupérer la liste des actions")
-            st.stop()
+        for idx, ticker in enumerate(tickers_to_analyze):
+            data = get_stock_data(ticker)
+            if data:
+                stocks_data.append(data)
+            progress_bar.progress((idx + 1) / len(tickers_to_analyze))
+            time.sleep(0.1)  # Éviter de surcharger Yahoo Finance
         
-        # 2. Limiter le nombre d'actions à analyser
-        stock_list = stock_list[:limit_results]
-        symbols = [stock['symbol'] for stock in stock_list]
+        progress_bar.empty()
         
-        st.info(f"📊 Analyse de {len(symbols)} actions...")
-        
-        # 3. Récupérer les cours
-        quotes = get_quotes_batch(symbols)
-        
-        if not quotes:
-            st.error("❌ Impossible de récupérer les cours")
-            st.stop()
-        
-        # 4. Récupérer les profils (secteur, etc.)
-        st.info("📊 Récupération des profils d'entreprises...")
-        profiles = get_company_profile_batch(symbols)
-        
-        # 5. Fusionner les données
-        quotes_df = pd.DataFrame(quotes)
-        profiles_df = pd.DataFrame(profiles)
-        
-        if not profiles_df.empty:
-            merged_df = quotes_df.merge(profiles_df[['symbol', 'sector', 'industry']], 
-                                       on='symbol', how='left')
-        else:
-            merged_df = quotes_df
-            merged_df['sector'] = 'Unknown'
-        
-        # 6. Appliquer les filtres
+        # Appliquer les filtres
         filters = {
             'price_min': price_min,
             'price_max': price_max,
             'market_cap_min': market_cap_min,
             'market_cap_max': market_cap_max,
             'volume_min': volume_min,
-            'volume_max': volume_max,
+            'volume_max': None,
             'change_min': change_min,
             'change_max': change_max,
+            'dividend_min': dividend_min,
+            'beta_min': beta_min,
+            'beta_max': beta_max,
             'sector': sector
         }
         
-        filtered_df = filter_stocks(merged_df.to_dict('records'), filters)
+        filtered_df = filter_stocks(stocks_data, filters)
     
     if not filtered_df.empty:
-        # Colonnes à afficher
-        display_columns = ['symbol', 'name', 'sector', 'price', 'changesPercentage', 
-                          'marketCap', 'volume', 'dayHigh', 'dayLow']
+        st.success(f"✅ **{len(filtered_df)} actions trouvées**")
         
-        available_columns = [col for col in display_columns if col in filtered_df.columns]
-        df_display = filtered_df[available_columns].copy()
-        
-        # Renommer les colonnes
-        column_names = {
-            'symbol': 'Ticker',
-            'name': 'Company',
-            'sector': 'Sector',
-            'price': 'Price ($)',
-            'changesPercentage': 'Change (%)',
-            'marketCap': 'Market Cap',
-            'volume': 'Volume',
-            'dayHigh': 'High ($)',
-            'dayLow': 'Low ($)'
-        }
-        df_display.rename(columns=column_names, inplace=True)
-        
-        # Formater les nombres
-        if 'Market Cap' in df_display.columns:
-            df_display['Market Cap'] = df_display['Market Cap'].apply(
-                lambda x: f"{x/1e9:.2f}B" if x > 1e9 else f"{x/1e6:.2f}M" if x > 1e6 else f"{x:,.0f}"
-            )
-        
-        if 'Volume' in df_display.columns:
-            df_display['Volume'] = df_display['Volume'].apply(
-                lambda x: f"{x/1e6:.2f}M" if x > 1e6 else f"{x/1e3:.2f}K" if x > 1e3 else f"{x:,.0f}"
-            )
-        
-        if 'Price ($)' in df_display.columns:
-            df_display['Price ($)'] = df_display['Price ($)'].apply(lambda x: f"${x:.2f}")
-        
-        if 'High ($)' in df_display.columns:
-            df_display['High ($)'] = df_display['High ($)'].apply(lambda x: f"${x:.2f}")
-        
-        if 'Low ($)' in df_display.columns:
-            df_display['Low ($)'] = df_display['Low ($)'].apply(lambda x: f"${x:.2f}")
-        
-        if 'Change (%)' in df_display.columns:
-            df_display['Change (%)'] = df_display['Change (%)'].apply(lambda x: f"{x:+.2f}%")
-        
-        # Afficher le nombre de résultats
-        st.success(f"✅ **{len(df_display)} actions trouvées**")
-        
-        # Statistiques rapides
+        # Statistiques
         st.markdown("#### 📊 STATISTIQUES")
         
-        stat_cols = st.columns(5)
+        stat_cols = st.columns(6)
         
         with stat_cols[0]:
-            avg_change = filtered_df['changesPercentage'].mean()
-            st.metric("Variation moyenne", f"{avg_change:+.2f}%")
+            avg_change = filtered_df['change'].mean()
+            st.metric("Var. moyenne", f"{avg_change:+.2f}%")
         
         with stat_cols[1]:
             avg_volume = filtered_df['volume'].mean()
-            st.metric("Volume moyen", f"{avg_volume/1e6:.2f}M")
+            st.metric("Vol. moyen", f"{avg_volume/1e6:.2f}M")
         
         with stat_cols[2]:
             avg_price = filtered_df['price'].mean()
@@ -466,47 +412,75 @@ if search_button:
             st.metric("Cap. totale", f"${total_mcap/1e9:.2f}B")
         
         with stat_cols[4]:
-            gainers = len(filtered_df[filtered_df['changesPercentage'] > 0])
-            losers = len(filtered_df[filtered_df['changesPercentage'] < 0])
-            st.metric("Gainers/Losers", f"{gainers}/{losers}")
+            avg_div = filtered_df['dividendYield'].mean()
+            st.metric("Div. moyen", f"{avg_div:.2f}%")
+        
+        with stat_cols[5]:
+            avg_beta = filtered_df['beta'].mean()
+            st.metric("Beta moyen", f"{avg_beta:.2f}")
         
         st.markdown('<hr>', unsafe_allow_html=True)
         
-        # Tableau des résultats
+        # Préparer le DataFrame pour l'affichage
+        df_display = filtered_df.copy()
+        df_display = df_display.rename(columns={
+            'symbol': 'Ticker',
+            'name': 'Company',
+            'sector': 'Sector',
+            'price': 'Price ($)',
+            'change': 'Change (%)',
+            'marketCap': 'Market Cap',
+            'volume': 'Volume',
+            'dividendYield': 'Div. Yield (%)',
+            'beta': 'Beta',
+            'pe': 'P/E'
+        })
+        
+        # Formater
+        df_display['Market Cap'] = df_display['Market Cap'].apply(
+            lambda x: f"{x/1e9:.2f}B" if x > 1e9 else f"{x/1e6:.2f}M"
+        )
+        df_display['Volume'] = df_display['Volume'].apply(
+            lambda x: f"{x/1e6:.2f}M" if x > 1e6 else f"{x/1e3:.2f}K"
+        )
+        df_display['Price ($)'] = df_display['Price ($)'].apply(lambda x: f"${x:.2f}")
+        df_display['Change (%)'] = df_display['Change (%)'].apply(lambda x: f"{x:+.2f}%")
+        df_display['Div. Yield (%)'] = df_display['Div. Yield (%)'].apply(lambda x: f"{x:.2f}%")
+        df_display['Beta'] = df_display['Beta'].apply(lambda x: f"{x:.2f}")
+        df_display['P/E'] = df_display['P/E'].apply(lambda x: f"{x:.2f}" if x > 0 else "N/A")
+        
+        # Colonnes à afficher
+        display_cols = ['Ticker', 'Company', 'Sector', 'Price ($)', 'Change (%)', 
+                       'Market Cap', 'Volume', 'Div. Yield (%)', 'Beta', 'P/E']
+        
         st.markdown("#### 📋 LISTE DES ACTIONS")
         
-        # Options de tri
         col_sort1, col_sort2 = st.columns([3, 9])
         
         with col_sort1:
-            sort_by = st.selectbox(
-                "Trier par",
-                options=list(df_display.columns),
-                index=0
-            )
+            sort_by = st.selectbox("Trier par", options=display_cols, index=4)
         
-        # Trier le DataFrame (en gardant les valeurs numériques pour le tri)
-        sort_column_original = {v: k for k, v in column_names.items()}[sort_by]
-        filtered_df_sorted = filtered_df.sort_values(by=sort_column_original, ascending=False)
-        df_display = df_display.loc[filtered_df_sorted.index]
+        # Trier (utiliser les valeurs originales)
+        sort_map = {
+            'Ticker': 'symbol', 'Company': 'name', 'Sector': 'sector',
+            'Price ($)': 'price', 'Change (%)': 'change', 'Market Cap': 'marketCap',
+            'Volume': 'volume', 'Div. Yield (%)': 'dividendYield', 'Beta': 'beta', 'P/E': 'pe'
+        }
+        filtered_df_sorted = filtered_df.sort_values(by=sort_map[sort_by], ascending=False)
+        df_display_sorted = df_display.loc[filtered_df_sorted.index]
         
-        # Afficher le tableau
-        st.dataframe(
-            df_display,
-            use_container_width=True,
-            height=400
-        )
+        st.dataframe(df_display_sorted[display_cols], use_container_width=True, height=400)
         
-        # Bouton d'export
-        csv = df_display.to_csv(index=False).encode('utf-8')
+        # Export CSV
+        csv = df_display_sorted.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📥 EXPORTER EN CSV",
-            data=csv,
-            file_name=f"screener_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv"
+            "📥 EXPORTER EN CSV",
+            csv,
+            f"screener_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            "text/csv"
         )
         
-        # ===== TOP GAINERS & LOSERS =====
+        # Top Gainers/Losers
         st.markdown('<hr>', unsafe_allow_html=True)
         st.markdown("#### 🏆 TOP GAINERS & LOSERS")
         
@@ -514,73 +488,53 @@ if search_button:
         
         with col_gain:
             st.markdown("**🟢 TOP 5 GAINERS**")
-            top_gainers = filtered_df.nlargest(5, 'changesPercentage')[['symbol', 'name', 'changesPercentage', 'price']]
+            top_gainers = filtered_df.nlargest(5, 'change')
             for _, row in top_gainers.iterrows():
-                st.metric(
-                    f"{row['symbol']} - {row['name'][:20]}",
-                    f"${row['price']:.2f}",
-                    f"{row['changesPercentage']:+.2f}%"
-                )
+                st.metric(f"{row['symbol']}", f"${row['price']:.2f}", f"{row['change']:+.2f}%")
         
         with col_lose:
             st.markdown("**🔴 TOP 5 LOSERS**")
-            top_losers = filtered_df.nsmallest(5, 'changesPercentage')[['symbol', 'name', 'changesPercentage', 'price']]
+            top_losers = filtered_df.nsmallest(5, 'change')
             for _, row in top_losers.iterrows():
-                st.metric(
-                    f"{row['symbol']} - {row['name'][:20]}",
-                    f"${row['price']:.2f}",
-                    f"{row['changesPercentage']:+.2f}%"
-                )
+                st.metric(f"{row['symbol']}", f"${row['price']:.2f}", f"{row['change']:+.2f}%")
         
-        # ===== ANALYSE PAR SECTEUR =====
-        if 'sector' in filtered_df.columns:
+        # Graphique par secteur
+        if len(filtered_df['sector'].unique()) > 1:
             st.markdown('<hr>', unsafe_allow_html=True)
             st.markdown("#### 📊 RÉPARTITION PAR SECTEUR")
             
             sector_counts = filtered_df['sector'].value_counts()
             
-            fig_sector = go.Figure(data=[go.Pie(
+            fig = go.Figure(data=[go.Pie(
                 labels=sector_counts.index,
                 values=sector_counts.values,
                 hole=0.3,
-                marker=dict(
-                    colors=['#00FFFF', '#FF00FF', '#00FF00', '#FFA500', '#FF0000', 
-                           '#FFFF00', '#FF1493', '#00CED1', '#32CD32', '#FFD700']
-                )
+                marker=dict(colors=['#00FFFF', '#FF00FF', '#00FF00', '#FFA500', '#FF0000'])
             )])
             
-            fig_sector.update_layout(
+            fig.update_layout(
                 paper_bgcolor='#000',
                 plot_bgcolor='#111',
                 font=dict(color='#FFAA00', size=10),
                 height=400
             )
             
-            st.plotly_chart(fig_sector, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True)
     
     else:
-        st.warning("⚠️ Aucun résultat trouvé. Essayez de modifier vos critères de recherche.")
+        st.warning("⚠️ Aucun résultat. Modifiez vos critères.")
 
-# =============================================
-# INFO
-# =============================================
+# Footer
 st.markdown('<hr>', unsafe_allow_html=True)
 st.info("""
-📌 **NOTE:** Ce screener utilise une approche hybride pour contourner les limitations de l'API gratuite :
-- Liste des actions via FMP API
-- Cours en temps réel via FMP API  
-- Filtrage côté client pour une flexibilité maximale
-
-⏱️ Le chargement peut prendre quelques secondes selon le nombre d'actions analysées.
+📌 **NOTE:** Ce screener utilise Yahoo Finance (100% gratuit).
+- Base de données : ~200 actions populaires US
+- Données en temps réel
+- Aucune limitation d'API
 """)
 
-# =============================================
-# FOOTER
-# =============================================
-st.markdown('<hr>', unsafe_allow_html=True)
 st.markdown(f"""
 <div style='text-align: center; color: #666; font-size: 9px; font-family: "Courier New", monospace; padding: 10px;'>
-    © 2025 BLOOMBERG ENS® | HYBRID SCREENER (FMP + YAHOO) | SYSTÈME OPÉRATIONNEL<br>
-    SCREENER ACTIF • LAST UPDATE: {datetime.now().strftime('%H:%M:%S')}
+    © 2025 BLOOMBERG ENS® | YAHOO FINANCE | {datetime.now().strftime('%H:%M:%S')}
 </div>
 """, unsafe_allow_html=True)
