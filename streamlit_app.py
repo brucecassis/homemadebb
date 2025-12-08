@@ -6,6 +6,17 @@ import yfinance as yf
 import time
 import requests
 
+from auth_utils import init_session_state, logout
+from login import show_login_page
+
+init_session_state()
+
+if not st.session_state.get('authenticated', False):
+    show_login_page()
+    st.stop()
+
+# Votre code existant continue ici...
+
 # =============================================
 # AUTO-REFRESH TOUTES LES 3 SECONDES
 # =============================================
