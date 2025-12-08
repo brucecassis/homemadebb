@@ -9,28 +9,22 @@ openpyxl
 statsmodels
 scikit-learn
 xgboost
-numpy
 groq
 python-binance
 ccxt
-typing_extensions==4.12.2
-pydantic==2.10.3
-supabase==2.10.0
+typing_extensions
+pydantic
+supabase
 PyPDF2
 python-docx
 openpyxl
 streamlit-autorefresh
 beautifulsoup4
 openbb
-# Requirements pour Python Terminal Bloomberg
-# Dépendances de base (requises)
-streamlit>=1.28.0
-pandas>=2.0.0
-numpy>=1.24.0
-seaborn>=0.13.0
-scikit-learn>=1.3.0
-matplotlib>=3.7.0
-plotly>=5.18.0
+seaborn
+scikit-learn
+matplotlib
+plotly
 psycopg2-binary
 
 
