@@ -2,7 +2,6 @@
 Module d'authentification pour Bloomberg Terminal avec Supabase
 Gestion des utilisateurs avec PostgreSQL via Supabase
 """
-
 import hashlib
 import secrets
 from datetime import datetime
@@ -14,19 +13,11 @@ class AuthManager:
     """Gestionnaire d'authentification des utilisateurs avec Supabase"""
     
     def __init__(self):
-    """Initialise la connexion Supabase"""
-    from config import SUPABASE_URL, SUPABASE_KEY
-    
-    supabase_url = SUPABASE_URL
-    supabase_key = SUPABASE_KEY
-```
-
-### 3️⃣ Dans Render, ajoutez les variables
-
-Dashboard Render → Votre app → **Environment** → **Add Environment Variable** :
-```
-SUPABASE_URL = https://xxxxx.supabase.co
-SUPABASE_KEY = votre_clé_ici
+        """Initialise la connexion Supabase"""
+        from config import SUPABASE_URL, SUPABASE_KEY
+        
+        supabase_url = SUPABASE_URL
+        supabase_key = SUPABASE_KEY
         
         self.supabase: Client = create_client(supabase_url, supabase_key)
     
