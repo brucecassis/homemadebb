@@ -445,10 +445,10 @@ with tab_global:
         st.warning("⚠️ Aucune news disponible pour le moment")
 
 # =============================================
-# ONGLET 2 : ECONOMIC CALENDAR (WIDGET FINLOGIX)
+# ONGLET 2 : ECONOMIC CALENDAR (WIDGET TRADINGVIEW)
 # =============================================
 with tab_eco_calendar:
-    st.markdown("### 📅 ECONOMIC CALENDAR - FINLOGIX")
+    st.markdown("### 📅 ECONOMIC CALENDAR - TRADINGVIEW")
     
     st.markdown("""
     <div style="color:#666;font-size:10px;margin:10px 0 20px 0;">
@@ -456,7 +456,7 @@ with tab_eco_calendar:
     </div>
     """, unsafe_allow_html=True)
     
-    # Widget Finlogix Economic Calendar
+    # Widget TradingView Economic Calendar
     economic_calendar_widget = """
     <!DOCTYPE html>
     <html>
@@ -470,91 +470,53 @@ with tab_eco_calendar:
             html, body {
                 background-color: #000 !important;
                 height: 100%;
-                overflow: auto;
+                width: 100%;
+                overflow: hidden;
             }
-            .finlogix-container {
-                background-color: #000 !important;
-                min-height: 2000px !important;
+            .tradingview-widget-container {
                 width: 100% !important;
-                height: auto !important;
-            }
-            /* Force dark theme on all Finlogix elements */
-            .finlogix-container,
-            .finlogix-container *,
-            .finlogix-container div,
-            .finlogix-container table,
-            .finlogix-container tbody,
-            .finlogix-container tr,
-            .finlogix-container td,
-            .finlogix-container th {
+                height: 100vh !important;
                 background-color: #000 !important;
-                color: #FFAA00 !important;
             }
-            .finlogix-container table {
+            #tradingview-widget {
                 width: 100% !important;
-                min-height: 1500px !important;
-            }
-            /* Override white backgrounds */
-            [style*="background-color: white"],
-            [style*="background-color: #fff"],
-            [style*="background-color: #ffffff"],
-            [style*="background: white"],
-            [style*="background: #fff"] {
-                background-color: #000 !important;
-                background: #000 !important;
-            }
-            /* Text colors */
-            [style*="color: black"],
-            [style*="color: #000"] {
-                color: #FFAA00 !important;
+                height: 100% !important;
             }
         </style>
     </head>
     <body>
-        <div style="background:#000;border:2px solid #FFAA00;padding:20px;margin:0;">
-            <div style="background:#FFAA00;color:#000;padding:10px 15px;font-weight:bold;font-size:14px;margin:-20px -20px 20px -20px;text-transform:uppercase;letter-spacing:2px;">
+        <div style="background:#000;border:2px solid #FFAA00;padding:20px;margin:0;height:100vh;display:flex;flex-direction:column;">
+            <div style="background:#FFAA00;color:#000;padding:10px 15px;font-weight:bold;font-size:14px;margin:-20px -20px 20px -20px;text-transform:uppercase;letter-spacing:2px;flex-shrink:0;">
                 📊 ECONOMIC CALENDAR WIDGET
             </div>
             
-            <!-- Finlogix Widget BEGIN-->
-            <div class="finlogix-container" style="background:#000 !important; min-height:2000px !important;"></div>
-            <script type="text/javascript" src="https://widget.finlogix.com/Widget.js"></script>
-            <script type="text/javascript">
-                Widget.init({
-                    widgetId: "b891c370-cb7f-4341-94ae-15cfb195fe64",
-                    type: "EconomicCalendar",
-                    language: "en",
-                    isAdaptive: true
-                });
-                
-                // Force dark theme after widget loads
-                setTimeout(function() {
-                    document.querySelectorAll('.finlogix-container *').forEach(function(el) {
-                        el.style.backgroundColor = '#000';
-                        if (el.style.color === 'black' || el.style.color === '#000') {
-                            el.style.color = '#FFAA00';
-                        }
-                    });
-                }, 1000);
-                
-                setTimeout(function() {
-                    document.querySelectorAll('.finlogix-container *').forEach(function(el) {
-                        el.style.backgroundColor = '#000';
-                    });
-                }, 2000);
-            </script>
-            <!-- Finlogix Widget END-->
+            <!-- TradingView Widget BEGIN -->
+            <div class="tradingview-widget-container" style="flex-grow:1;">
+                <div class="tradingview-widget-container__widget" id="tradingview-widget" style="height:100%;width:100%;"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
+                {
+                  "colorTheme": "dark",
+                  "isTransparent": false,
+                  "width": "100%",
+                  "height": "100%",
+                  "locale": "en",
+                  "importanceFilter": "-1,0,1",
+                  "countryFilter": "ar,au,br,ca,cn,fr,de,in,id,it,jp,kr,mx,ru,sa,za,tr,gb,us,eu"
+                }
+                </script>
+            </div>
+            <!-- TradingView Widget END -->
         </div>
     </body>
     </html>
     """
     
-    components.html(economic_calendar_widget, height=2200, scrolling=True)
+    components.html(economic_calendar_widget, height=1000, scrolling=False)
     
     st.markdown("""
     <div style="color:#666;font-size:9px;margin-top:15px;text-align:center;">
-        💡 Widget fourni par Finlogix • Actualisation automatique • 
-        Filtrez par pays, importance et catégorie directement dans le widget
+        💡 Widget fourni par TradingView • Actualisation automatique • 
+        Données économiques mondiales en temps réel
     </div>
     """, unsafe_allow_html=True)
 
