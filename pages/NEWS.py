@@ -458,17 +458,23 @@ with tab_eco_calendar:
     
     # Widget Finlogix Economic Calendar
     economic_calendar_widget = """
-    <div class="widget-container">
-        <div class="widget-header">
+    <div style="background:#111;border:2px solid #FFAA00;padding:20px;margin:20px 0;min-height:600px;">
+        <div style="background:#FFAA00;color:#000;padding:10px 15px;font-weight:bold;font-size:14px;margin:-20px -20px 20px -20px;text-transform:uppercase;letter-spacing:2px;">
             📊 ECONOMIC CALENDAR WIDGET
         </div>
-        <iframe 
-            src="https://www.finlogix.com/widgets/economic-calendar/full?theme=dark" 
-            width="100%" 
-            height="800" 
-            frameborder="0" 
-            style="border:0; background:#000;">
-        </iframe>
+        
+        <!-- Finlogix Widget BEGIN-->
+        <div class="finlogix-container"></div>
+        <script type="text/javascript" src="https://widget.finlogix.com/Widget.js"></script>
+        <script type="text/javascript">
+            Widget.init({
+                widgetId: "b891c370-cb7f-4341-94ae-15cfb195fe64",
+                type: "EconomicCalendar",
+                language: "en",
+                isAdaptive: true
+            });
+        </script>
+        <!-- Finlogix Widget END-->
     </div>
     """
     
@@ -495,17 +501,36 @@ with tab_earnings:
     
     # Widget Finlogix Earnings Calendar
     earnings_calendar_widget = """
-    <div class="widget-container">
-        <div class="widget-header">
+    <div style="background:#111;border:2px solid #FFAA00;padding:20px;margin:20px 0;min-height:600px;">
+        <div style="background:#FFAA00;color:#000;padding:10px 15px;font-weight:bold;font-size:14px;margin:-20px -20px 20px -20px;text-transform:uppercase;letter-spacing:2px;">
             💰 EARNINGS CALENDAR WIDGET
         </div>
-        <iframe 
-            src="https://www.finlogix.com/widgets/earnings-calendar/full?theme=dark" 
-            width="100%" 
-            height="800" 
-            frameborder="0" 
-            style="border:0; background:#000;">
-        </iframe>
+        
+        <!-- Finlogix Widget BEGIN-->
+        <div class="finlogix-container"></div>
+        <script type="text/javascript" src="https://widget.finlogix.com/Widget.js"></script>
+        <script type="text/javascript">
+            Widget.init({
+                widgetId: "b891c370-cb7f-4341-94ae-15cfb195fe64",
+                type: "EarningCalendar",
+                language: "en",
+                importanceOptions: [
+                    "low",
+                    "medium",
+                    "high"
+                ],
+                dateRangeOptions: [
+                    "recentAndNext",
+                    "today",
+                    "tomorrow",
+                    "thisWeek",
+                    "nextWeek",
+                    "thisMonth"
+                ],
+                isAdaptive: true
+            });
+        </script>
+        <!-- Finlogix Widget END-->
     </div>
     """
     
