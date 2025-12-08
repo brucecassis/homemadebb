@@ -106,6 +106,15 @@ st.markdown("""
     .stDataFrame tbody tr:hover {
         background-color: #1a1a1a !important;
     }
+    
+    /* Style pour les heatmaps */
+    .heatmap-container {
+        background: #111;
+        border: 2px solid #FFAA00;
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 0px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -116,11 +125,138 @@ current_time = datetime.now().strftime("%H:%M:%S")
 st.markdown(f"""
 <div style="background:#FFAA00;padding:8px 20px;color:#000;font-weight:bold;font-size:14px;border-bottom:2px solid #FFAA00;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
     <div style="display:flex;align-items:center;gap:15px;">
-        <div>🔍 BLOOMBERG ENS® - STOCK SCREENER</div>
+        <div>🔍 BLOOMBERG ENS® - MARKET HEATMAPS & SCREENER</div>
     </div>
-    <div>{current_time} UTC • YAHOO FINANCE DATA</div>
+    <div>{current_time} UTC • TRADINGVIEW + YAHOO FINANCE</div>
 </div>
 """, unsafe_allow_html=True)
+
+# =============================================
+# HEATMAPS TRADINGVIEW
+# =============================================
+st.markdown("### 🔥 MARKET HEATMAPS - REAL TIME")
+
+# Sélecteur de heatmap
+heatmap_tabs = st.tabs(["📊 STOCKS US", "🌍 ETF GLOBAL", "₿ CRYPTO"])
+
+with heatmap_tabs[0]:
+    st.markdown("#### 📊 US STOCKS HEATMAP")
+    
+    # Widget TradingView Stock Heatmap
+    stock_heatmap = """
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js" async>
+      {
+        "exchanges": [],
+        "dataSource": "SPX500",
+        "grouping": "sector",
+        "blockSize": "market_cap_basic",
+        "blockColor": "change",
+        "locale": "en",
+        "symbolUrl": "",
+        "colorTheme": "dark",
+        "hasTopBar": true,
+        "isDataSetEnabled": true,
+        "isZoomEnabled": true,
+        "hasSymbolTooltip": true,
+        "width": "100%",
+        "height": "600"
+      }
+      </script>
+    </div>
+    <!-- TradingView Widget END -->
+    """
+    
+    st.components.v1.html(stock_heatmap, height=650)
+    
+    st.caption("""
+    **📖 Comment lire la heatmap :**
+    - 🟢 **Vert** : Performance positive
+    - 🔴 **Rouge** : Performance négative
+    - **Taille des blocs** : Proportionnelle à la capitalisation boursière
+    - **Groupement** : Par secteur (Technology, Healthcare, Finance, etc.)
+    """)
+
+with heatmap_tabs[1]:
+    st.markdown("#### 🌍 GLOBAL ETF HEATMAP")
+    
+    # Widget TradingView ETF Heatmap
+    etf_heatmap = """
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-etf-heatmap.js" async>
+      {
+        "dataSource": "AllUSEtf",
+        "blockSize": "aum",
+        "blockColor": "change",
+        "grouping": "asset_class",
+        "locale": "en",
+        "symbolUrl": "",
+        "colorTheme": "dark",
+        "hasTopBar": true,
+        "isDataSetEnabled": true,
+        "isZoomEnabled": true,
+        "hasSymbolTooltip": true,
+        "width": "100%",
+        "height": "600"
+      }
+      </script>
+    </div>
+    <!-- TradingView Widget END -->
+    """
+    
+    st.components.v1.html(etf_heatmap, height=650)
+    
+    st.caption("""
+    **📖 Comment lire la heatmap :**
+    - 🟢 **Vert** : Performance positive
+    - 🔴 **Rouge** : Performance négative
+    - **Taille des blocs** : Proportionnelle aux actifs sous gestion (AUM)
+    - **Groupement** : Par classe d'actifs (Equity, Bond, Commodity, etc.)
+    """)
+
+with heatmap_tabs[2]:
+    st.markdown("#### ₿ CRYPTOCURRENCY HEATMAP")
+    
+    # Widget TradingView Crypto Heatmap
+    crypto_heatmap = """
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-crypto-coins-heatmap.js" async>
+      {
+        "dataSource": "Crypto",
+        "blockSize": "market_cap_calc",
+        "blockColor": "change",
+        "locale": "en",
+        "symbolUrl": "",
+        "colorTheme": "dark",
+        "hasTopBar": true,
+        "isDataSetEnabled": true,
+        "isZoomEnabled": true,
+        "hasSymbolTooltip": true,
+        "width": "100%",
+        "height": "600"
+      }
+      </script>
+    </div>
+    <!-- TradingView Widget END -->
+    """
+    
+    st.components.v1.html(crypto_heatmap, height=650)
+    
+    st.caption("""
+    **📖 Comment lire la heatmap :**
+    - 🟢 **Vert** : Performance positive
+    - 🔴 **Rouge** : Performance négative
+    - **Taille des blocs** : Proportionnelle à la capitalisation boursière
+    - **Principales cryptos** : BTC, ETH, BNB, SOL, XRP, ADA, DOGE, etc.
+    """)
+
+st.markdown('<hr style="border-color: #FFAA00; margin: 30px 0;">', unsafe_allow_html=True)
 
 # =============================================
 # BASE DE DONNÉES DE TICKERS PAR SECTEUR
@@ -220,7 +356,7 @@ def get_stock_info(ticker):
 # =============================================
 # INTERFACE DE FILTRAGE
 # =============================================
-st.markdown("### 🎯 CRITÈRES DE RECHERCHE")
+st.markdown("### 🎯 STOCK SCREENER - CRITÈRES DE RECHERCHE")
 
 col1, col2, col3 = st.columns(3)
 
@@ -570,7 +706,7 @@ with st.expander("📖 AIDE - COMPRENDRE LES CRITÈRES"):
 st.markdown('<hr>', unsafe_allow_html=True)
 st.markdown(f"""
 <div style='text-align: center; color: #666; font-size: 9px; font-family: "Courier New", monospace; padding: 10px;'>
-    © 2025 BLOOMBERG ENS® | YAHOO FINANCE API | SYSTÈME OPÉRATIONNEL<br>
-    SCREENER ACTIF • LAST UPDATE: {datetime.now().strftime('%H:%M:%S')}
+    © 2025 BLOOMBERG ENS® | TRADINGVIEW + YAHOO FINANCE | SYSTÈME OPÉRATIONNEL<br>
+    HEATMAPS & SCREENER ACTIFS • LAST UPDATE: {datetime.now().strftime('%H:%M:%S')}
 </div>
 """, unsafe_allow_html=True)
