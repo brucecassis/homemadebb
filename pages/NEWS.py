@@ -1,5 +1,5 @@
 # pages/NEWS.py
-# Bloomberg Terminal - News Feed avec Finnhub API + Widgets TradingView & Yahoo Finance (V2)
+# Bloomberg Terminal - News Feed avec Finnhub API + Widgets Finlogix
 
 import streamlit as st
 import requests
@@ -374,10 +374,10 @@ current_time = time.strftime("%H:%M:%S", time.gmtime())
 st.markdown(f"""
 <div style="background:#FFAA00;padding:8px 20px;color:#000;font-weight:bold;font-size:14px;border-bottom:2px solid #FFAA00;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
     <div style="display:flex;align-items:center;gap:15px;">
-        <div>⬛ BLOOMBERG ENS® | NEWS TERMINAL V2</div>
+        <div>⬛ BLOOMBERG ENS® | NEWS TERMINAL</div>
         <a href="accueil.html" style="background:#333;color:#FFAA00;border:1px solid #000;padding:4px 12px;font-size:11px;text-decoration:none;">ACCUEIL</a>
     </div>
-    <div>{current_time} UTC • TRADINGVIEW WIDGETS • AUTO-REFRESH: 60s</div>
+    <div>{current_time} UTC • FINNHUB + FINLOGIX • AUTO-REFRESH: 60s</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -521,18 +521,18 @@ with tab_eco_calendar:
     """, unsafe_allow_html=True)
 
 # =============================================
-# ONGLET 3 : EARNINGS CALENDAR (TRADINGVIEW SCREENER V2)
+# ONGLET 3 : EARNINGS CALENDAR (WIDGET CUSTOM)
 # =============================================
 with tab_earnings:
-    st.markdown("### 💰 EARNINGS CALENDAR - TRADINGVIEW SCREENER")
+    st.markdown("### 💰 EARNINGS CALENDAR")
     
     st.markdown("""
     <div style="color:#666;font-size:10px;margin:10px 0 20px 0;">
-        📈 Screener TradingView avec focus sur les earnings • Données temps réel • Filtrages avancés
+        📈 Calendrier des résultats trimestriels • Estimations vs Résultats réels • Sociétés cotées
     </div>
     """, unsafe_allow_html=True)
     
-    # Widget TradingView Stock Screener (avec colonnes earnings)
+    # Widget Earnings Calendar - Yahoo Finance Screener Style
     earnings_calendar_widget = """
     <!DOCTYPE html>
     <html>
@@ -549,40 +549,33 @@ with tab_earnings:
                 width: 100%;
                 overflow: hidden;
             }
-            .tradingview-widget-container {
+            .widget-container {
                 width: 100% !important;
                 height: 100vh !important;
                 background-color: #000 !important;
+            }
+            iframe {
+                width: 100% !important;
+                height: 100% !important;
+                border: none !important;
             }
         </style>
     </head>
     <body>
         <div style="background:#000;border:2px solid #FFAA00;padding:20px;margin:0;height:100vh;display:flex;flex-direction:column;">
             <div style="background:#FFAA00;color:#000;padding:10px 15px;font-weight:bold;font-size:14px;margin:-20px -20px 20px -20px;text-transform:uppercase;letter-spacing:2px;flex-shrink:0;">
-                💰 EARNINGS & FINANCIALS SCREENER
+                💰 EARNINGS CALENDAR WIDGET
             </div>
             
-            <!-- TradingView Widget BEGIN -->
-            <div class="tradingview-widget-container" style="flex-grow:1;">
-                <div class="tradingview-widget-container__widget"></div>
-                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-screener.js" async>
-                {
-                  "width": "100%",
-                  "height": "100%",
-                  "defaultColumn": "overview",
-                  "defaultScreen": "general",
-                  "market": "america",
-                  "showToolbar": true,
-                  "colorTheme": "dark",
-                  "locale": "en",
-                  "isTransparent": false
-                }
-                </script>
+            <!-- Earnings Calendar Widget -->
+            <div class="widget-container" style="flex-grow:1;">
+                <iframe src="https://www.investing.com/earnings-calendar/" 
+                        style="width:100%;height:100%;border:none;background:#000;">
+                </iframe>
             </div>
-            <!-- TradingView Widget END -->
             
             <div style="background:#111;color:#666;padding:8px;font-size:9px;text-align:center;flex-shrink:0;margin:-20px;margin-top:10px;">
-                💡 Screener TradingView • Cliquez sur les colonnes pour trier • Filtrez par secteur, cap., performance
+                💡 Données fournies par Investing.com • Cliquez sur une entreprise pour voir les détails
             </div>
         </div>
     </body>
@@ -593,8 +586,8 @@ with tab_earnings:
     
     st.markdown("""
     <div style="color:#666;font-size:9px;margin-top:15px;text-align:center;">
-        📊 Source: TradingView Screener • Données temps réel • 
-        Filtrez par EPS, P/E ratio, Market Cap et autres métriques financières
+        📊 Source: Investing.com • Actualisation automatique • 
+        Consultez les résultats passés et à venir avec estimations EPS/Revenue
     </div>
     """, unsafe_allow_html=True)
 
@@ -699,7 +692,7 @@ st.markdown("""
 st.markdown('<hr>', unsafe_allow_html=True)
 st.markdown(f"""
 <div style='text-align: center; color: #666; font-size: 9px; font-family: "Courier New", monospace; padding: 10px;'>
-    © 2025 BLOOMBERG ENS® V2 | TRADINGVIEW WIDGETS | SYSTÈME OPÉRATIONNEL<br>
+    © 2025 BLOOMBERG ENS® | FINNHUB + FINLOGIX APIs | SYSTÈME OPÉRATIONNEL<br>
     AUTO-REFRESH: 60 SECONDES • DERNIÈRE MAJ: {datetime.now().strftime('%H:%M:%S')}
 </div>
 """, unsafe_allow_html=True)
