@@ -1,7 +1,6 @@
 import streamlit as st
 from datetime import datetime
 from auth_utils import init_session_state
-import streamlit.components.v1 as components
 
 init_session_state()
 
@@ -98,7 +97,7 @@ st.markdown("""
     
     iframe {
         border: 2px solid #FFAA00 !important;
-        border-radius: 0px !important;
+        background: #000 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -112,7 +111,7 @@ st.markdown(f"""
     <div style="display:flex;align-items:center;gap:15px;">
         <div>🔍 BLOOMBERG ENS® - STOCK SCREENER</div>
     </div>
-    <div>{current_time} UTC • POWERED BY TAKEPROFIT.COM</div>
+    <div>{current_time} UTC • TRADINGVIEW SCREENER</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -128,135 +127,198 @@ with col1:
         "Type de screener",
         options=[
             "Stock Screener (US)",
-            "Stock Screener (Global)",
-            "Top Gainers",
-            "Top Losers",
-            "Most Active",
-            "Dividend Stocks"
+            "Stock Screener (Europe)",
+            "Crypto Screener",
+            "Forex Screener",
+            "Top Gainers US",
+            "Top Losers US"
         ],
         index=0
     )
 
 # =============================================
-# WIDGET TAKEPROFIT
+# WIDGET TRADINGVIEW (Alternative fonctionnelle)
 # =============================================
 st.markdown('<hr>', unsafe_allow_html=True)
-
-# Widget HTML TakeProfit Stock Screener
-# Documentation: https://takeprofit.com/docs/guide/platform/stock-screener/Stock-screener-overview
 
 if screener_type == "Stock Screener (US)":
     st.markdown("#### 📊 US STOCK SCREENER")
     
-    # Widget TakeProfit pour US stocks
-    takeprofit_html = """
-    <!-- TakeProfit.com Widget BEGIN -->
-    <script type="text/javascript" src="https://files.takeprofit.com/tools/widgets/stock_screener/js/init.js"></script>
-    <div 
-        class="tp-stock-screener" 
-        data-countries="US"
-        data-theme="dark"
-        data-width="100%"
-        data-height="800"
-    ></div>
-    <!-- TakeProfit.com Widget END -->
+    # TradingView Stock Screener Widget
+    screener_html = """
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-screener.js" async>
+      {
+      "width": "100%",
+      "height": "800",
+      "defaultColumn": "overview",
+      "screener_type": "crypto_mkt",
+      "displayCurrency": "USD",
+      "colorTheme": "dark",
+      "locale": "en",
+      "isTransparent": false
+      }
+      </script>
+    </div>
+    <!-- TradingView Widget END -->
     """
     
-    components.html(takeprofit_html, height=850, scrolling=True)
+    st.markdown(screener_html, unsafe_allow_html=True)
 
-elif screener_type == "Stock Screener (Global)":
-    st.markdown("#### 🌍 GLOBAL STOCK SCREENER")
+elif screener_type == "Stock Screener (Europe)":
+    st.markdown("#### 🇪🇺 EUROPEAN STOCK SCREENER")
     
-    takeprofit_html = """
-    <!-- TakeProfit.com Widget BEGIN -->
-    <script type="text/javascript" src="https://files.takeprofit.com/tools/widgets/stock_screener/js/init.js"></script>
-    <div 
-        class="tp-stock-screener" 
-        data-countries="US,GB,DE,FR,IT,ES,CH,NL"
-        data-theme="dark"
-        data-width="100%"
-        data-height="800"
-    ></div>
-    <!-- TakeProfit.com Widget END -->
+    screener_html = """
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-screener.js" async>
+      {
+      "width": "100%",
+      "height": "800",
+      "defaultColumn": "overview",
+      "screener_type": "crypto_mkt",
+      "displayCurrency": "EUR",
+      "colorTheme": "dark",
+      "locale": "en"
+      }
+      </script>
+    </div>
+    <!-- TradingView Widget END -->
     """
     
-    components.html(takeprofit_html, height=850, scrolling=True)
+    st.markdown(screener_html, unsafe_allow_html=True)
 
-elif screener_type == "Top Gainers":
-    st.markdown("#### 🚀 TOP GAINERS TODAY")
+elif screener_type == "Crypto Screener":
+    st.markdown("#### ₿ CRYPTOCURRENCY SCREENER")
     
-    takeprofit_html = """
-    <!-- TakeProfit.com Widget BEGIN -->
-    <script type="text/javascript" src="https://files.takeprofit.com/tools/widgets/stock_screener/js/init.js"></script>
-    <div 
-        class="tp-stock-screener" 
-        data-countries="US"
-        data-filter="gainers"
-        data-theme="dark"
-        data-width="100%"
-        data-height="800"
-    ></div>
-    <!-- TakeProfit.com Widget END -->
+    screener_html = """
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-screener.js" async>
+      {
+      "width": "100%",
+      "height": "800",
+      "defaultColumn": "overview",
+      "screener_type": "crypto_mkt",
+      "displayCurrency": "USD",
+      "colorTheme": "dark",
+      "locale": "en"
+      }
+      </script>
+    </div>
+    <!-- TradingView Widget END -->
     """
     
-    components.html(takeprofit_html, height=850, scrolling=True)
+    st.markdown(screener_html, unsafe_allow_html=True)
 
-elif screener_type == "Top Losers":
-    st.markdown("#### 📉 TOP LOSERS TODAY")
+elif screener_type == "Forex Screener":
+    st.markdown("#### 💱 FOREX SCREENER")
     
-    takeprofit_html = """
-    <!-- TakeProfit.com Widget BEGIN -->
-    <script type="text/javascript" src="https://files.takeprofit.com/tools/widgets/stock_screener/js/init.js"></script>
-    <div 
-        class="tp-stock-screener" 
-        data-countries="US"
-        data-filter="losers"
-        data-theme="dark"
-        data-width="100%"
-        data-height="800"
-    ></div>
-    <!-- TakeProfit.com Widget END -->
+    screener_html = """
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-screener.js" async>
+      {
+      "width": "100%",
+      "height": "800",
+      "defaultColumn": "overview",
+      "screener_type": "forex_mkt",
+      "displayCurrency": "USD",
+      "colorTheme": "dark",
+      "locale": "en"
+      }
+      </script>
+    </div>
+    <!-- TradingView Widget END -->
     """
     
-    components.html(takeprofit_html, height=850, scrolling=True)
+    st.markdown(screener_html, unsafe_allow_html=True)
 
-elif screener_type == "Most Active":
-    st.markdown("#### 🔥 MOST ACTIVE STOCKS")
+elif screener_type == "Top Gainers US":
+    st.markdown("#### 🚀 TOP GAINERS - US STOCKS")
     
-    takeprofit_html = """
-    <!-- TakeProfit.com Widget BEGIN -->
-    <script type="text/javascript" src="https://files.takeprofit.com/tools/widgets/stock_screener/js/init.js"></script>
-    <div 
-        class="tp-stock-screener" 
-        data-countries="US"
-        data-filter="active"
-        data-theme="dark"
-        data-width="100%"
-        data-height="800"
-    ></div>
-    <!-- TakeProfit.com Widget END -->
+    # Market Overview Widget avec filtre Gainers
+    screener_html = """
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-hotlists.js" async>
+      {
+      "colorTheme": "dark",
+      "dateRange": "1D",
+      "exchange": "US",
+      "showChart": true,
+      "locale": "en",
+      "largeChartUrl": "",
+      "isTransparent": false,
+      "showSymbolLogo": true,
+      "showFloatingTooltip": true,
+      "width": "100%",
+      "height": "800",
+      "plotLineColorGrowing": "rgba(41, 98, 255, 1)",
+      "plotLineColorFalling": "rgba(41, 98, 255, 1)",
+      "gridLineColor": "rgba(240, 243, 250, 0)",
+      "scaleFontColor": "rgba(106, 109, 120, 1)",
+      "belowLineFillColorGrowing": "rgba(41, 98, 255, 0.12)",
+      "belowLineFillColorFalling": "rgba(41, 98, 255, 0.12)",
+      "belowLineFillColorGrowingBottom": "rgba(41, 98, 255, 0)",
+      "belowLineFillColorFallingBottom": "rgba(41, 98, 255, 0)",
+      "symbolActiveColor": "rgba(41, 98, 255, 0.12)"
+      }
+      </script>
+    </div>
+    <!-- TradingView Widget END -->
     """
     
-    components.html(takeprofit_html, height=850, scrolling=True)
+    st.markdown(screener_html, unsafe_allow_html=True)
 
-elif screener_type == "Dividend Stocks":
-    st.markdown("#### 💰 DIVIDEND PAYING STOCKS")
+elif screener_type == "Top Losers US":
+    st.markdown("#### 📉 TOP LOSERS - US STOCKS")
     
-    takeprofit_html = """
-    <!-- TakeProfit.com Widget BEGIN -->
-    <script type="text/javascript" src="https://files.takeprofit.com/tools/widgets/stock_screener/js/init.js"></script>
-    <div 
-        class="tp-stock-screener" 
-        data-countries="US"
-        data-filter="dividend"
-        data-theme="dark"
-        data-width="100%"
-        data-height="800"
-    ></div>
-    <!-- TakeProfit.com Widget END -->
+    screener_html = """
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-hotlists.js" async>
+      {
+      "colorTheme": "dark",
+      "dateRange": "1D",
+      "exchange": "US",
+      "showChart": true,
+      "locale": "en",
+      "width": "100%",
+      "height": "800",
+      "plotLineColorGrowing": "rgba(255, 82, 82, 1)",
+      "plotLineColorFalling": "rgba(255, 82, 82, 1)",
+      "gridLineColor": "rgba(240, 243, 250, 0)",
+      "scaleFontColor": "rgba(106, 109, 120, 1)",
+      "belowLineFillColorGrowing": "rgba(255, 82, 82, 0.12)",
+      "belowLineFillColorFalling": "rgba(255, 82, 82, 0.12)",
+      "belowLineFillColorGrowingBottom": "rgba(255, 82, 82, 0)",
+      "belowLineFillColorFallingBottom": "rgba(255, 82, 82, 0)",
+      "symbolActiveColor": "rgba(255, 82, 82, 0.12)",
+      "tabs": [
+        {
+          "title": "Losers",
+          "sortField": "change",
+          "sortOrder": "asc"
+        }
+      ]
+      }
+      </script>
+    </div>
+    <!-- TradingView Widget END -->
     """
     
-    components.html(takeprofit_html, height=850, scrolling=True)
+    st.markdown(screener_html, unsafe_allow_html=True)
+
+# Ajouter de l'espace pour le widget
+st.markdown('<div style="height: 850px;"></div>', unsafe_allow_html=True)
 
 # =============================================
 # INFORMATIONS
@@ -267,26 +329,25 @@ st.info("""
 📌 **À PROPOS DU SCREENER:**
 
 ✅ **Fonctionnalités:**
-- Filtrage avancé par secteur, capitalisation, P/E ratio, etc.
+- Filtrage avancé multi-critères
 - Données en temps réel
-- Export des résultats
 - Graphiques intégrés
-- Analyse technique
+- Analyse technique complète
+- Export des résultats
 
-🔍 **Navigation:**
-- Utilisez les filtres dans le widget pour affiner votre recherche
-- Cliquez sur une action pour voir les détails
-- Les résultats sont mis à jour automatiquement
+🔍 **Comment utiliser:**
+- Cliquez sur les en-têtes de colonnes pour trier
+- Utilisez les filtres dans le widget
+- Double-cliquez sur une action pour voir le détail
+- Les données sont actualisées en temps réel
 
 🌐 **Marchés disponibles:**
-- 🇺🇸 États-Unis (NYSE, NASDAQ, AMEX)
-- 🇬🇧 Royaume-Uni (LSE)
-- 🇩🇪 Allemagne (XETRA)
-- 🇫🇷 France (Euronext Paris)
-- 🇨🇭 Suisse (SIX)
-- Et plus...
+- 🇺🇸 Actions américaines (NYSE, NASDAQ, AMEX)
+- 🇪🇺 Actions européennes
+- ₿ Cryptomonnaies
+- 💱 Forex
 
-Powered by **TakeProfit.com** - Professional Trading Tools
+Powered by **TradingView** - Professional Charting Platform
 """)
 
 # =============================================
@@ -295,7 +356,7 @@ Powered by **TakeProfit.com** - Professional Trading Tools
 st.markdown('<hr>', unsafe_allow_html=True)
 st.markdown(f"""
 <div style='text-align: center; color: #666; font-size: 9px; font-family: "Courier New", monospace; padding: 10px;'>
-    © 2025 BLOOMBERG ENS® | POWERED BY TAKEPROFIT.COM | SYSTÈME OPÉRATIONNEL<br>
+    © 2025 BLOOMBERG ENS® | POWERED BY TRADINGVIEW | SYSTÈME OPÉRATIONNEL<br>
     STOCK SCREENER ACTIF • LAST UPDATE: {datetime.now().strftime('%H:%M:%S')}
 </div>
 """, unsafe_allow_html=True)
