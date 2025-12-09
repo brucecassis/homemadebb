@@ -505,68 +505,6 @@ for idx, (name, ticker) in enumerate(indices.items()):
 st.markdown('<hr>', unsafe_allow_html=True)
 
 # =============================================
-# FOREX
-# =============================================
-st.markdown("### 💱 FOREX - LIVE")
-
-forex = {
-    'EUR/USD': 'EURUSD=X',
-    'CHF/USD': 'CHFUSD=X',
-    'CHF/EUR': 'CHFEUR=X',
-    'GBP/USD': 'GBPUSD=X',
-    'USD/JPY': 'JPY=X',
-    'USD/CNY': 'CNY=X'
-}
-
-cols_fx = st.columns(6)
-
-for idx, (name, ticker) in enumerate(forex.items()):
-    with cols_fx[idx]:
-        current, change = get_market_data(ticker)
-        
-        if current is not None:
-            st.metric(
-                label=name,
-                value=f"{current:.4f}",
-                delta=f"{change:+.2f}%"
-            )
-        else:
-            st.metric(label=name, value="LOAD...", delta="0%")
-
-st.markdown('<hr>', unsafe_allow_html=True)
-
-# =============================================
-# FOREX
-# =============================================
-st.markdown("### 💱 FOREX - LIVE")
-
-forex = {
-    'EUR/USD': 'EURUSD=X',
-    'CHF/USD': 'CHFUSD=X',
-    'CHF/EUR': 'CHFEUR=X',
-    'GBP/USD': 'GBPUSD=X',
-    'USD/JPY': 'JPY=X',
-    'USD/CNY': 'CNY=X'
-}
-
-cols_fx = st.columns(6)
-
-for idx, (name, ticker) in enumerate(forex.items()):
-    with cols_fx[idx]:
-        current, change = get_market_data(ticker)
-        
-        if current is not None:
-            st.metric(
-                label=name,
-                value=f"{current:.4f}",
-                delta=f"{change:+.2f}%"
-            )
-        else:
-            st.metric(label=name, value="LOAD...", delta="0%")
-
-st.markdown('<hr>', unsafe_allow_html=True)
-
-# =============================================
 # WIDGET TRADINGVIEW - FOREX CROSS RATES
 # =============================================
 st.markdown("### 💹 FOREX CROSS RATES - TRADINGVIEW")
@@ -634,14 +572,6 @@ forex_widget = f"""
 st.components.v1.html(forex_widget, height=forex_height + 20)
 
 st.markdown('<hr>', unsafe_allow_html=True)
-
-# =============================================
-# COMMODITIES
-# =============================================
-st.markdown("### 💰 COMMODITIES - LIVE")
-
-# ... reste du code commodities ...
-
 
 # =============================================
 # COMMODITIES
