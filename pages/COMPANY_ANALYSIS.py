@@ -518,6 +518,43 @@ if display_ticker:
                 </div>
                 """, unsafe_allow_html=True)
                 
+                # ===== GURUFOCUS WIDGETS =====
+                st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
+                st.markdown("#### 📊 GURUFOCUS ANALYSIS")
+                
+                # Préparer le ticker pour GuruFocus (format sans suffixes d'exchange)
+                guru_ticker = display_ticker.split('.')[0]  # Enlève les suffixes comme .PA, .DE, etc.
+                
+                col_guru1, col_guru2 = st.columns(2)
+                
+                with col_guru1:
+                    st.markdown("##### 📈 Stock Overview")
+                    gurufocus_widget_1 = f'''
+                    <div class="gurufocus-widget">
+                        <div class="gurufocus-widget-container"></div>
+                        <div class="gurufocus-widget-script">
+                          <script type="text/javascript">
+                          !function(e){{var t=document.currentScript.closest(".gurufocus-widget");if(t){{t=t.querySelector(".gurufocus-widget-container");if(t){{var o=document.createElement("iframe");o.style.border="none",o.style.width="100%",o.style.height="100%";const n={{}};e.dark&&(n.dark=e.dark),e.options&&(e.options.symbol="{guru_ticker}",Object.assign(n,e.options)),t.innerHTML="",t.style.width=e.width,t.style.height=e.height,e.r&&(n.r=e.r),n.utm_source=window.location.hostname,n.utm_medium="widget",n.utm_campaign="widget_"+e.type;var r=Object.keys(n).map(e=>e+"="+encodeURIComponent(n[e])).join("&");o.src="https://www.gurufocus.com/widgets/"+e.type+"?"+r,t.appendChild(o)}}else console.error("[gurufocus-widget]Parent not found")}}else console.error("[gurufocus-widget]Parent not found")}})({{"type":"stock","options":{{"symbol":"{guru_ticker}"}},"dark":true,"width":"100%","height":"780px","r":"347dfe9ec2afe1ee3f12a7b9e3f46a7d"}});
+                          </script>
+                        </div>
+                      </div>
+                    '''
+                    components.html(gurufocus_widget_1, height=800)
+                
+                with col_guru2:
+                    st.markdown("##### 💰 Financials Summary")
+                    gurufocus_widget_2 = f'''
+                    <div class="gurufocus-widget">
+                        <div class="gurufocus-widget-container"></div>
+                        <div class="gurufocus-widget-script">
+                          <script type="text/javascript">
+                          !function(e){{var t=document.currentScript.closest(".gurufocus-widget");if(t){{t=t.querySelector(".gurufocus-widget-container");if(t){{var o=document.createElement("iframe");o.style.border="none",o.style.width="100%",o.style.height="100%";const n={{}};e.dark&&(n.dark=e.dark),e.options&&(e.options.symbol="{guru_ticker}",Object.assign(n,e.options)),t.innerHTML="",t.style.width=e.width,t.style.height=e.height,e.r&&(n.r=e.r),n.utm_source=window.location.hostname,n.utm_medium="widget",n.utm_campaign="widget_"+e.type;var r=Object.keys(n).map(e=>e+"="+encodeURIComponent(n[e])).join("&");o.src="https://www.gurufocus.com/widgets/"+e.type+"?"+r,t.appendChild(o)}}else console.error("[gurufocus-widget]Parent not found")}}else console.error("[gurufocus-widget]Parent not found")}})({{"type":"income_cashflow_balance","options":{{"symbol":"{guru_ticker}"}},"dark":true,"width":"100%","height":"780px","r":"347dfe9ec2afe1ee3f12a7b9e3f46a7d"}});
+                          </script>
+                        </div>
+                      </div>
+                    '''
+                    components.html(gurufocus_widget_2, height=800)
+                
                 # Executives
                 st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
                 st.markdown("#### 👥 KEY EXECUTIVES")
