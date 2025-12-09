@@ -384,10 +384,11 @@ st.markdown(f"""
 # =============================================
 # ONGLETS PRINCIPAUX
 # =============================================
-tab_global, tab_eco_calendar, tab_earnings = st.tabs([
+tab_global, tab_eco_calendar, tab_earnings, tab_dividends = st.tabs([
     "📰 GLOBAL FEED", 
     "📅 ECONOMIC CALENDAR", 
-    "💰 EARNINGS CALENDAR"
+    "💰 EARNINGS CALENDAR",
+    "💵 DIVIDEND CALENDAR"
 ])
 
 # =============================================
@@ -521,10 +522,10 @@ with tab_eco_calendar:
     """, unsafe_allow_html=True)
 
 # =============================================
-# ONGLET 3 : EARNINGS CALENDAR (WIDGET CUSTOM)
+# ONGLET 3 : EARNINGS CALENDAR (WIDGET MARKETCHAMELEON)
 # =============================================
 with tab_earnings:
-    st.markdown("### 💰 EARNINGS CALENDAR")
+    st.markdown("### 💰 EARNINGS CALENDAR - MARKETCHAMELEON")
     
     st.markdown("""
     <div style="color:#666;font-size:10px;margin:10px 0 20px 0;">
@@ -532,7 +533,7 @@ with tab_earnings:
     </div>
     """, unsafe_allow_html=True)
     
-    # Widget Earnings Calendar - Yahoo Finance Screener Style
+    # Widget MarketChameleon Earnings Calendar
     earnings_calendar_widget = """
     <!DOCTYPE html>
     <html>
@@ -549,16 +550,6 @@ with tab_earnings:
                 width: 100%;
                 overflow: hidden;
             }
-            .widget-container {
-                width: 100% !important;
-                height: 100vh !important;
-                background-color: #000 !important;
-            }
-            iframe {
-                width: 100% !important;
-                height: 100% !important;
-                border: none !important;
-            }
         </style>
     </head>
     <body>
@@ -567,15 +558,13 @@ with tab_earnings:
                 💰 EARNINGS CALENDAR WIDGET
             </div>
             
-            <!-- Earnings Calendar Widget -->
-            <div class="widget-container" style="flex-grow:1;">
-                <iframe src="https://www.investing.com/earnings-calendar/" 
-                        style="width:100%;height:100%;border:none;background:#000;">
-                </iframe>
+            <!-- MarketChameleon Earnings Calendar Widget -->
+            <div style="flex-grow:1;overflow:auto;background:#000;">
+                <script async src='https://marketchameleon.com/Widget?height=800&width=1000&wtype=ecfull'></script>
             </div>
             
             <div style="background:#111;color:#666;padding:8px;font-size:9px;text-align:center;flex-shrink:0;margin:-20px;margin-top:10px;">
-                💡 Données fournies par Investing.com • Cliquez sur une entreprise pour voir les détails
+                💡 Données fournies par MarketChameleon • Actualisation automatique
             </div>
         </div>
     </body>
@@ -586,8 +575,67 @@ with tab_earnings:
     
     st.markdown("""
     <div style="color:#666;font-size:9px;margin-top:15px;text-align:center;">
-        📊 Source: Investing.com • Actualisation automatique • 
+        📊 Source: MarketChameleon • Actualisation automatique • 
         Consultez les résultats passés et à venir avec estimations EPS/Revenue
+    </div>
+    """, unsafe_allow_html=True)
+
+# =============================================
+# ONGLET 4 : DIVIDEND CALENDAR (WIDGET MARKETCHAMELEON)
+# =============================================
+with tab_dividends:
+    st.markdown("### 💵 DIVIDEND CALENDAR - MARKETCHAMELEON")
+    
+    st.markdown("""
+    <div style="color:#666;font-size:10px;margin:10px 0 20px 0;">
+        💸 Calendrier des dividendes • Ex-Dividend Dates • Montants des distributions • Rendements
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Widget MarketChameleon Dividend Calendar
+    dividend_calendar_widget = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            html, body {
+                background-color: #000 !important;
+                height: 100%;
+                width: 100%;
+                overflow: hidden;
+            }
+        </style>
+    </head>
+    <body>
+        <div style="background:#000;border:2px solid #FFAA00;padding:20px;margin:0;height:100vh;display:flex;flex-direction:column;">
+            <div style="background:#FFAA00;color:#000;padding:10px 15px;font-weight:bold;font-size:14px;margin:-20px -20px 20px -20px;text-transform:uppercase;letter-spacing:2px;flex-shrink:0;">
+                💵 DIVIDEND CALENDAR WIDGET
+            </div>
+            
+            <!-- MarketChameleon Dividend Calendar Widget -->
+            <div style="flex-grow:1;overflow:auto;background:#000;">
+                <script async src='https://marketchameleon.com/Widget?height=800&width=1000&wtype=dcfull'></script>
+            </div>
+            
+            <div style="background:#111;color:#666;padding:8px;font-size:9px;text-align:center;flex-shrink:0;margin:-20px;margin-top:10px;">
+                💡 Données fournies par MarketChameleon • Ex-Dividend Dates • Montants et Rendements
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    components.html(dividend_calendar_widget, height=1000, scrolling=False)
+    
+    st.markdown("""
+    <div style="color:#666;font-size:9px;margin-top:15px;text-align:center;">
+        📊 Source: MarketChameleon • Actualisation automatique • 
+        Suivez les dates ex-dividende et les montants distribués par les sociétés
     </div>
     """, unsafe_allow_html=True)
 
