@@ -224,8 +224,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# Après la section HEADER BLOOMBERG et avant les INDICES GLOBAUX, ajoutez ce code :
-
 # =============================================
 # WIDGET TRADINGVIEW - TICKER TAPE
 # =============================================
@@ -460,6 +458,9 @@ st.markdown(f"""
     <div>{current_time} UTC • AUTO-REFRESH: 3s</div>
 </div>
 """, unsafe_allow_html=True)
+
+# ===== PUB HEADER =====
+add_header_ad()
 
 # =============================================
 # INDICES GLOBAUX
@@ -2371,6 +2372,8 @@ with col_info2:
         📍 CONNEXION: PARIS, FRANCE • SYSTÈME OPÉRATIONNEL
     </div>
     """, unsafe_allow_html=True)
+# ===== PUB FOOTER =====
+add_footer_ad()
 
 # =============================================
 # FOOTER
