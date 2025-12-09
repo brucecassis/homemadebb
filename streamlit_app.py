@@ -224,6 +224,88 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
+# Après la section HEADER BLOOMBERG et avant les INDICES GLOBAUX, ajoutez ce code :
+
+# =============================================
+# WIDGET TRADINGVIEW - TICKER TAPE
+# =============================================
+st.markdown("### 📊 MARKET TICKER TAPE")
+
+# Interface discrète pour sélectionner les tickers
+with st.expander("⚙️ CONFIGURE TICKER TAPE", expanded=False):
+    ticker_tape_options = st.multiselect(
+        "Sélectionnez les tickers à afficher dans le bandeau",
+        options=[
+            "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "JPM", "V", "WMT",
+            "DIS", "NFLX", "BA", "GE", "GM", "F", "T", "VZ", "INTC", "AMD",
+            "BTCUSD", "ETHUSD", "EURUSD", "GBPUSD", "USDJPY", "GOLD", "SILVER", "CRUDE_OIL"
+        ],
+        default=["AAPL", "MSFT", "TSLA", "BTCUSD", "EURUSD", "GOLD"],
+        help="Choisissez jusqu'à 20 tickers"
+    )
+    
+    # Options d'affichage
+    col_widget1, col_widget2 = st.columns(2)
+    with col_widget1:
+        show_market = st.selectbox(
+            "Marché",
+            options=["stocks", "forex", "crypto", "futures"],
+            index=0,
+            key="widget_market"
+        )
+    
+    with col_widget2:
+        color_theme = st.selectbox(
+            "Thème",
+            options=["dark", "light"],
+            index=0,
+            key="widget_theme"
+        )
+
+# Construire la liste des symboles pour TradingView
+if ticker_tape_options:
+    # Convertir les tickers en format TradingView
+    symbols_tv = []
+    for ticker in ticker_tape_options[:20]:  # Limite à 20
+        if ticker in ["BTCUSD", "ETHUSD"]:
+            symbols_tv.append({"proName": f"BINANCE:{ticker}", "title": ticker})
+        elif ticker in ["EURUSD", "GBPUSD", "USDJPY"]:
+            symbols_tv.append({"proName": f"FX_IDC:{ticker}", "title": ticker})
+        elif ticker in ["GOLD", "SILVER"]:
+            symbols_tv.append({"proName": f"TVC:{ticker}", "title": ticker})
+        elif ticker == "CRUDE_OIL":
+            symbols_tv.append({"proName": "TVC:USOIL", "title": "OIL"})
+        else:
+            symbols_tv.append({"proName": f"NASDAQ:{ticker}", "title": ticker})
+    
+    # Créer le code HTML du widget TradingView
+    import json
+    symbols_json = json.dumps(symbols_tv)
+    
+    tradingview_widget = f"""
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container" style="margin-bottom: 20px;">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
+      {{
+      "symbols": {symbols_json},
+      "showSymbolLogo": true,
+      "colorTheme": "{color_theme}",
+      "isTransparent": false,
+      "displayMode": "adaptive",
+      "locale": "fr"
+      }}
+      </script>
+    </div>
+    <!-- TradingView Widget END -->
+    """
+    
+    # Afficher le widget
+    st.components.v1.html(tradingview_widget, height=80)
+else:
+    st.info("Sélectionnez des tickers pour afficher le bandeau TradingView")
+
+st.markdown('<hr style="border-color: #333; margin: 15px 0;">', unsafe_allow_html=True)
 
 # =============================================
 # BARRE DE COMMANDE BLOOMBERG
