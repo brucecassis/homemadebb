@@ -474,40 +474,7 @@ if display_ticker:
                 "📊 OVERVIEW", "💰 FINANCIALS", "🔬 ADVANCED ANALYSIS"
             ])
             
-            # ===== TAB 1: OVERVIEW =====
-            with tab1:
-                st.markdown("### 📊 COMPANY OVERVIEW")
-                
-                col_ov1, col_ov2, col_ov3, col_ov4 = st.columns(4)
-                
-                current_price = info.get('currentPrice', info.get('regularMarketPrice', 0))
-                previous_close = info.get('previousClose', 0)
-                change = current_price - previous_close if current_price and previous_close else 0
-                change_pct = (change / previous_close * 100) if previous_close else 0
-                
-                with col_ov1:
-                    st.metric("CURRENT PRICE", f"${current_price:.2f}" if current_price else "N/A",
-                              delta=f"{change:+.2f} ({change_pct:+.2f}%)")
-                
-                with col_ov2:
-                    market_cap = info.get('marketCap', 0)
-                    if market_cap:
-                        cap_display = f"${market_cap/1e12:.2f}T" if market_cap >= 1e12 else f"${market_cap/1e9:.2f}B" if market_cap >= 1e9 else f"${market_cap/1e6:.2f}M"
-                    else:
-                        cap_display = "N/A"
-                    st.metric("MARKET CAP", cap_display)
-                
-                with col_ov3:
-                    pe_ratio = info.get('trailingPE', 0)
-                    st.metric("P/E RATIO", f"{pe_ratio:.2f}" if pe_ratio else "N/A")
-                
-                with col_ov4:
-                    dividend_yield = info.get('dividendYield', 0)
-                    if dividend_yield:
-                        st.metric("DIVIDEND YIELD", f"{dividend_yield*100:.2f}%" if dividend_yield < 1 else f"{dividend_yield:.2f}%")
-                    else:
-                        st.metric("DIVIDEND YIELD", "N/A")
-                
+
                 st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
                 
                 # ===== TRADINGVIEW CHART =====
