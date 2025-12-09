@@ -350,6 +350,36 @@ def get_tradingview_symbol(ticker):
     return ticker
 
 
+def convert_ticker_for_gurufocus(ticker):
+    """Convertit un ticker Yahoo Finance en format GuruFocus"""
+    # Pour les actions US, pas besoin de préfixe
+    if '.' not in ticker:
+        return ticker
+    
+    # Mapping des suffixes vers les exchanges GuruFocus
+    exchange_mapping = {
+        '.PA': 'EPA:',  # Euronext Paris
+        '.AS': 'AMS:',  # Amsterdam
+        '.BR': 'EBR:',  # Brussels
+        '.L': 'LON:',   # London
+        '.DE': 'FRA:',  # Frankfurt
+        '.SW': 'SWX:',  # Swiss
+        '.MI': 'BIT:',  # Milan
+        '.MC': 'BME:',  # Madrid
+        '.TO': 'TSE:',  # Toronto
+        '.HK': 'HKG:',  # Hong Kong
+        '.T': 'TYO:',   # Tokyo
+        '.AX': 'ASX:',  # Australia
+    }
+    
+    for suffix, exchange in exchange_mapping.items():
+        if ticker.endswith(suffix):
+            base_ticker = ticker.replace(suffix, '')
+            return f"{exchange}{base_ticker}"
+    
+    # Si pas de correspondance, retourner le ticker sans suffixe
+    return ticker.split('.')[0]
+
 def render_tradingview_chart(symbol, height=450):
     """Render TradingView chart - Bloomberg style"""
     return f'''
@@ -522,36 +552,41 @@ if display_ticker:
                 st.markdown('<div style="border-bottom: 1px solid #333; margin: 15px 0;"></div>', unsafe_allow_html=True)
                 st.markdown("#### 📊 GURUFOCUS ANALYSIS")
                 
-                # Préparer le ticker pour GuruFocus (format sans suffixes d'exchange)
-                guru_ticker = display_ticker.split('.')[0]  # Enlève les suffixes comme .PA, .DE, etc.
+                # Préparer le ticker pour GuruFocus
+                guru_ticker = convert_ticker_for_gurufocus(display_ticker)
+                
+                # Afficher le ticker utilisé pour debug
+                st.markdown(f'<p style="font-size: 10px; color: #666;">Using GuruFocus ticker: {guru_ticker}</p>', unsafe_allow_html=True)
                 
                 col_guru1, col_guru2 = st.columns(2)
                 
                 with col_guru1:
                     st.markdown("##### 📈 Stock Overview")
                     gurufocus_widget_1 = f'''
-                    <div class="gurufocus-widget">
-                        <div class="gurufocus-widget-container"></div>
-                        <div class="gurufocus-widget-script">
-                          <script type="text/javascript">
-                          !function(e){{var t=document.currentScript.closest(".gurufocus-widget");if(t){{t=t.querySelector(".gurufocus-widget-container");if(t){{var o=document.createElement("iframe");o.style.border="none",o.style.width="100%",o.style.height="100%";const n={{}};e.dark&&(n.dark=e.dark),e.options&&(e.options.symbol="{guru_ticker}",Object.assign(n,e.options)),t.innerHTML="",t.style.width=e.width,t.style.height=e.height,e.r&&(n.r=e.r),n.utm_source=window.location.hostname,n.utm_medium="widget",n.utm_campaign="widget_"+e.type;var r=Object.keys(n).map(e=>e+"="+encodeURIComponent(n[e])).join("&");o.src="https://www.gurufocus.com/widgets/"+e.type+"?"+r,t.appendChild(o)}}else console.error("[gurufocus-widget]Parent not found")}}else console.error("[gurufocus-widget]Parent not found")}})({{"type":"stock","options":{{"symbol":"{guru_ticker}"}},"dark":true,"width":"100%","height":"780px","r":"347dfe9ec2afe1ee3f12a7b9e3f46a7d"}});
-                          </script>
-                        </div>
-                      </div>
+                    <div style="width:100%; height:800px; background:#000;">
+                        <iframe 
+                            src="https://www.gurufocus.com/widgets/stock?symbol={guru_ticker}&dark=true&r=347dfe9ec2afe1ee3f12a7b9e3f46a7d"
+                            style="border:none; width:100%; height:100%;"
+                            frameborder="0"
+                            scrolling="no"
+                            allow="same-origin">
+                        </iframe>
+                    </div>
                     '''
                     components.html(gurufocus_widget_1, height=800)
                 
                 with col_guru2:
                     st.markdown("##### 💰 Financials Summary")
                     gurufocus_widget_2 = f'''
-                    <div class="gurufocus-widget">
-                        <div class="gurufocus-widget-container"></div>
-                        <div class="gurufocus-widget-script">
-                          <script type="text/javascript">
-                          !function(e){{var t=document.currentScript.closest(".gurufocus-widget");if(t){{t=t.querySelector(".gurufocus-widget-container");if(t){{var o=document.createElement("iframe");o.style.border="none",o.style.width="100%",o.style.height="100%";const n={{}};e.dark&&(n.dark=e.dark),e.options&&(e.options.symbol="{guru_ticker}",Object.assign(n,e.options)),t.innerHTML="",t.style.width=e.width,t.style.height=e.height,e.r&&(n.r=e.r),n.utm_source=window.location.hostname,n.utm_medium="widget",n.utm_campaign="widget_"+e.type;var r=Object.keys(n).map(e=>e+"="+encodeURIComponent(n[e])).join("&");o.src="https://www.gurufocus.com/widgets/"+e.type+"?"+r,t.appendChild(o)}}else console.error("[gurufocus-widget]Parent not found")}}else console.error("[gurufocus-widget]Parent not found")}})({{"type":"income_cashflow_balance","options":{{"symbol":"{guru_ticker}"}},"dark":true,"width":"100%","height":"780px","r":"347dfe9ec2afe1ee3f12a7b9e3f46a7d"}});
-                          </script>
-                        </div>
-                      </div>
+                    <div style="width:100%; height:800px; background:#000;">
+                        <iframe 
+                            src="https://www.gurufocus.com/widgets/income_cashflow_balance?symbol={guru_ticker}&dark=true&r=347dfe9ec2afe1ee3f12a7b9e3f46a7d"
+                            style="border:none; width:100%; height:100%;"
+                            frameborder="0"
+                            scrolling="no"
+                            allow="same-origin">
+                        </iframe>
+                    </div>
                     '''
                     components.html(gurufocus_widget_2, height=800)
                 
