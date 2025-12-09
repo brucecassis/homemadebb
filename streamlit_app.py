@@ -536,6 +536,114 @@ for idx, (name, ticker) in enumerate(forex.items()):
 st.markdown('<hr>', unsafe_allow_html=True)
 
 # =============================================
+# FOREX
+# =============================================
+st.markdown("### 💱 FOREX - LIVE")
+
+forex = {
+    'EUR/USD': 'EURUSD=X',
+    'CHF/USD': 'CHFUSD=X',
+    'CHF/EUR': 'CHFEUR=X',
+    'GBP/USD': 'GBPUSD=X',
+    'USD/JPY': 'JPY=X',
+    'USD/CNY': 'CNY=X'
+}
+
+cols_fx = st.columns(6)
+
+for idx, (name, ticker) in enumerate(forex.items()):
+    with cols_fx[idx]:
+        current, change = get_market_data(ticker)
+        
+        if current is not None:
+            st.metric(
+                label=name,
+                value=f"{current:.4f}",
+                delta=f"{change:+.2f}%"
+            )
+        else:
+            st.metric(label=name, value="LOAD...", delta="0%")
+
+st.markdown('<hr>', unsafe_allow_html=True)
+
+# =============================================
+# WIDGET TRADINGVIEW - FOREX CROSS RATES
+# =============================================
+st.markdown("### 💹 FOREX CROSS RATES - TRADINGVIEW")
+
+# Interface de configuration (discrète)
+with st.expander("⚙️ CONFIGURE FOREX WIDGET", expanded=False):
+    col_fx_widget1, col_fx_widget2, col_fx_widget3 = st.columns(3)
+    
+    with col_fx_widget1:
+        forex_theme = st.selectbox(
+            "Thème",
+            options=["dark", "light"],
+            index=0,
+            key="forex_widget_theme"
+        )
+    
+    with col_fx_widget2:
+        forex_height = st.slider(
+            "Hauteur (px)",
+            min_value=300,
+            max_value=800,
+            value=500,
+            step=50,
+            key="forex_widget_height"
+        )
+    
+    with col_fx_widget3:
+        show_symbol_logo = st.checkbox(
+            "Afficher les logos",
+            value=True,
+            key="forex_show_logo"
+        )
+
+# Widget TradingView Forex Cross Rates
+forex_widget = f"""
+<!-- TradingView Widget BEGIN -->
+<div class="tradingview-widget-container" style="margin: 20px 0;">
+  <div class="tradingview-widget-container__widget"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-forex-cross-rates.js" async>
+  {{
+  "width": "100%",
+  "height": {forex_height},
+  "currencies": [
+    "EUR",
+    "USD",
+    "JPY",
+    "GBP",
+    "CHF",
+    "AUD",
+    "CAD",
+    "NZD",
+    "CNY"
+  ],
+  "isTransparent": false,
+  "colorTheme": "{forex_theme}",
+  "locale": "fr",
+  "backgroundColor": "#000000"
+  }}
+  </script>
+</div>
+<!-- TradingView Widget END -->
+"""
+
+# Afficher le widget
+st.components.v1.html(forex_widget, height=forex_height + 20)
+
+st.markdown('<hr>', unsafe_allow_html=True)
+
+# =============================================
+# COMMODITIES
+# =============================================
+st.markdown("### 💰 COMMODITIES - LIVE")
+
+# ... reste du code commodities ...
+
+
+# =============================================
 # COMMODITIES
 # =============================================
 st.markdown("### 💰 COMMODITIES - LIVE")
