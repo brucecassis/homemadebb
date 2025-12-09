@@ -9,6 +9,11 @@ import requests
 from auth_utils import init_session_state, logout
 from login import show_login_page
 
+from adsense_utils import add_header_ad, add_footer_ad
+# =================================
+
+from auth_utils import init_session_state, logout
+from login import show_login_page
 init_session_state()
 
 if not st.session_state.get('authenticated', False):
