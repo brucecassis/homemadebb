@@ -1706,7 +1706,7 @@ with col_chart1:
  'SPE.MI', 'SRG.MI', 'STLA.MI', 'TEN.MI', 'TIT.MI', 'TOD.MI', 'UBI.MI', 'UCG.MI', 'UNI.MI', 'US.MI', 'ABE.MC', 'ACX.MC', 'ACS.MC', 'AENA.MC', 'AGF.MC', 'ALM.MC', 'AMPER.MC',
  'ANA.MC', 'APD.MC', 'ATE.MC', 'BBVA.MC', 'BKT.MC', 'BMN.MC', 'BNC.MC', 'CAI.MC', 'CIE.MC', 'CLNX.MC', 'COL.MC', 'DIA.MC', 'ELE.MC', 'ENG.MC', 'FER.MC', 'GAM.MC', 'GAS.MC', 
  'GRF.MC', 'IAG.MC', 'IDR.MC', 'IME.MC', 'IND.MC', 'ITX.MC', 'MAP.MC', 'MEL.MC', 'MER.MC', 'MRL.MC', 'MTS.MC', 'NAT.MC', 'NHK.MC', 'OHL.MC', 'PHP.MC', 'POP.MC', 'REE.MC', 
- 'REP.MC', 'SAB.MC', 'SAN.MC', 'SGC.MC', 'SOL.MC', 'SPM.MC', 'TDE.MC', 'TEF.MC', 'TGS.MC', 'VIS.MC', 'CSH2.PA', 'PUST.PA', 'GOLD.AS']
+ 'REP.MC', 'SAB.MC', 'SAN.MC', 'SGC.MC', 'SOL.MC', 'SPM.MC', 'TDE.MC', 'TEF.MC', 'TGS.MC', 'VIS.MC', 'CSH2.PA', 'PUST.PA', 'GOLD.AS', 'LQQ.PA']
 
     
     selected_tickers = st.multiselect(
