@@ -205,7 +205,7 @@ COMMANDS = {
     "PY":"pages/PYTHON_EDITOR.py",
     "SQL":"pages/SQL_EDITOR.py",
     "BONDS":"pages/BONDS.py",
-    "HOME":"pages/HOME.py",
+    "HOME":"streamlit_app.py",
 }
 
 # Affichage de la barre de commande
