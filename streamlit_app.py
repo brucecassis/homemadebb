@@ -243,7 +243,8 @@ with st.expander("⚙️ CONFIGURE TICKER TAPE", expanded=False):
             "DIS", "NFLX", "BA", "GE", "GM", "F", "T", "VZ", "INTC", "AMD",
             "BTCUSD", "ETHUSD", "EURUSD", "GBPUSD", "USDJPY", "GOLD", "SILVER", "CRUDE_OIL"
         ],
-        default=["AAPL", "MSFT", "TSLA", "BTCUSD", "EURUSD", "GOLD"],
+        default=["XOM","QQQ","BTCUSD", "EURUSD", "GOLD", "EURCHF", "SLHN.CH", "HSBC", "HYPEUSD", "XPLUSD", 
+                "VIX"],
         help="Choisissez jusqu'à 20 tickers"
     )
     
