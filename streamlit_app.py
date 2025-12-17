@@ -241,7 +241,7 @@ with st.expander("⚙️ CONFIGURE TICKER TAPE", expanded=False):
         options=[
             "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "JPM", "V", "WMT",
             "DIS", "NFLX", "BA", "GE", "GM", "F", "T", "VZ", "INTC", "AMD",
-            "BTCUSD", "ETHUSD", "XOM","QQQ","BTCUSD", "EURUSD", "GOLD", "EURCHF", "SLHN.CH", "HSBC", "HYPEUSD", "XPLUSD", 
+            "BTCUSD", "ETHUSD", "XOM","QQQ","BTCUSD", "EURUSD", "GOLD", "EURCHF", "SLHN", "HSBC", "HYPEUSD", "XPLUSD", 
                 "VIX","EURUSD", "GBPUSD", "USDJPY", "GOLD", "SILVER", "CRUDE_OIL"
         ],
         default=["XOM","QQQ","BTCUSD", "EURUSD", "GOLD", "SLHN", "HSBC", "HYPEUSD", "XPLUSD", 
