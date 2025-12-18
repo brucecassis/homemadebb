@@ -265,6 +265,8 @@ with st.expander("CONFIGURE TICKER TAPE", expanded=False):
             key="widget_theme"
         )
 
+# ...
+
 # Construire la liste des symboles pour TradingView
 if ticker_tape_options:
     import json
@@ -272,7 +274,7 @@ if ticker_tape_options:
     symbols_tv2 = [
         {"proName": "INDEX:IXIC", "title": "Nasdaq"},
         {"proName": "INDEX:SPX", "title": "SP500"},
-        {"proName": "INDEX:DJI", "title": "Dow Jones"},
+        {"proName": "INDEX:YM=F", "title": "Dow Jones"},
         {"proName": "INDEX:VIX", "title": "VIX"}
     ]
     for i, ticker in enumerate(ticker_tape_options[:20]):  # Limite à 20
@@ -319,7 +321,7 @@ if ticker_tape_options:
 
     tradingview_widget1 = f"""
     <!-- TradingView Widget BEGIN -->
-    <div class="tradingview-widget-container" style="margin-bottom: 20px;">
+    <div class="tradingview-widget-container" style="margin-bottom: 0px;">
       <div class="tradingview-widget-container__widget"></div>
       <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
       {{
@@ -337,7 +339,7 @@ if ticker_tape_options:
 
     tradingview_widget2 = f"""
     <!-- TradingView Widget BEGIN -->
-    <div class="tradingview-widget-container" style="margin-bottom: 20px;">
+    <div class="tradingview-widget-container" style="margin-top: 0px; margin-bottom: 20px;">
       <div class="tradingview-widget-container__widget"></div>
       <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
       {{
