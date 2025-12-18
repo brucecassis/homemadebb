@@ -228,14 +228,13 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-
 # =============================================
 # WIDGET TRADINGVIEW - TICKER TAPE
 # =============================================
-st.markdown("### 📊 MARKET TICKER TAPE")
+st.markdown("### MARKET TICKER TAPE")
 
 # Interface discrète pour sélectionner les tickers
-with st.expander("⚙️ CONFIGURE TICKER TAPE", expanded=False):
+with st.expander("CONFIGURE TICKER TAPE", expanded=False):
     ticker_tape_options = st.multiselect(
         "Sélectionnez les tickers à afficher dans le bandeau",
         options=[
@@ -248,7 +247,7 @@ with st.expander("⚙️ CONFIGURE TICKER TAPE", expanded=False):
                 "VIX"],
         help="Choisissez jusqu'à 20 tickers"
     )
-    
+
     # Options d'affichage
     col_widget1, col_widget2 = st.columns(2)
     with col_widget1:
@@ -258,7 +257,7 @@ with st.expander("⚙️ CONFIGURE TICKER TAPE", expanded=False):
             index=0,
             key="widget_market"
         )
-    
+
     with col_widget2:
         color_theme = st.selectbox(
             "Thème",
@@ -270,30 +269,52 @@ with st.expander("⚙️ CONFIGURE TICKER TAPE", expanded=False):
 # Construire la liste des symboles pour TradingView
 if ticker_tape_options:
     # Convertir les tickers en format TradingView
-    symbols_tv = []
-    for ticker in ticker_tape_options[:20]:  # Limite à 20
-        if ticker in ["BTCUSD", "ETHUSD"]:
-            symbols_tv.append({"proName": f"BINANCE:{ticker}", "title": ticker})
-        elif ticker in ["EURUSD", "GBPUSD", "USDJPY"]:
-            symbols_tv.append({"proName": f"FX_IDC:{ticker}", "title": ticker})
-        elif ticker in ["GOLD", "SILVER"]:
-            symbols_tv.append({"proName": f"TVC:{ticker}", "title": ticker})
-        elif ticker == "CRUDE_OIL":
-            symbols_tv.append({"proName": "TVC:USOIL", "title": "OIL"})
+    symbols_tv1 = []
+    symbols_tv2 = []
+    for i, ticker in enumerate(ticker_tape_options[:20]):  # Limite à 20
+        if i < 10:
+            if ticker in ["BTCUSD", "ETHUSD"]:
+                symbols_tv1.append({"proName": f"BINANCE:{ticker}", "title": ticker})
+            elif ticker in ["EURUSD", "GBPUSD", "USDJPY"]:
+                symbols_tv1.append({"proName": f"FX_IDC:{ticker}", "title": ticker})
+            elif ticker in ["GOLD", "SILVER"]:
+                symbols_tv1.append({"proName": f"TVC:{ticker}", "title": ticker})
+            elif ticker == "CRUDE_OIL":
+                symbols_tv1.append({"proName": "TVC:USOIL", "title": "OIL"})
+            elif ticker == "SLHN":
+                symbols_tv1.append({"proName": "SWX:SLHN", "title": ticker})  # Utilisez le préfixe SWX pour les actions suisses
+            elif ticker == "XOM":
+                symbols_tv1.append({"proName": "NYSE:XOM", "title": ticker})  # Utilisez le préfixe NYSE pour les actions américaines
+            else:
+                symbols_tv1.append({"proName": f"NASDAQ:{ticker}", "title": ticker})
         else:
-            symbols_tv.append({"proName": f"NASDAQ:{ticker}", "title": ticker})
-    
+            if ticker in ["BTCUSD", "ETHUSD"]:
+                symbols_tv2.append({"proName": f"BINANCE:{ticker}", "title": ticker})
+            elif ticker in ["EURUSD", "GBPUSD", "USDJPY"]:
+                symbols_tv2.append({"proName": f"FX_IDC:{ticker}", "title": ticker})
+            elif ticker in ["GOLD", "SILVER"]:
+                symbols_tv2.append({"proName": f"TVC:{ticker}", "title": ticker})
+            elif ticker == "CRUDE_OIL":
+                symbols_tv2.append({"proName": "TVC:USOIL", "title": "OIL"})
+            elif ticker == "SLHN":
+                symbols_tv2.append({"proName": "SWX:SLHN", "title": ticker})  # Utilisez le préfixe SWX pour les actions suisses
+            elif ticker == "XOM":
+                symbols_tv2.append({"proName": "NYSE:XOM", "title": ticker})  # Utilisez le préfixe NYSE pour les actions américaines
+            else:
+                symbols_tv2.append({"proName": f"NASDAQ:{ticker}", "title": ticker})
+
     # Créer le code HTML du widget TradingView
     import json
-    symbols_json = json.dumps(symbols_tv)
-    
-    tradingview_widget = f"""
+    symbols_json1 = json.dumps(symbols_tv1)
+    symbols_json2 = json.dumps(symbols_tv2)
+
+    tradingview_widget1 = f"""
     <!-- TradingView Widget BEGIN -->
     <div class="tradingview-widget-container" style="margin-bottom: 20px;">
       <div class="tradingview-widget-container__widget"></div>
       <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
       {{
-      "symbols": {symbols_json},
+      "symbols": {symbols_json1},
       "showSymbolLogo": true,
       "colorTheme": "{color_theme}",
       "isTransparent": false,
@@ -304,14 +325,32 @@ if ticker_tape_options:
     </div>
     <!-- TradingView Widget END -->
     """
-    
-    # Afficher le widget
-    st.components.v1.html(tradingview_widget, height=80)
+
+    tradingview_widget2 = f"""
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container" style="margin-bottom: 20px;">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
+      {{
+      "symbols": {symbols_json2},
+      "showSymbolLogo": true,
+      "colorTheme": "{color_theme}",
+      "isTransparent": false,
+      "displayMode": "adaptive",
+      "locale": "fr"
+      }}
+      </script>
+    </div>
+    <!-- TradingView Widget END -->
+    """
+
+    # Afficher les widgets
+    st.components.v1.html(tradingview_widget1, height=80)
+    st.components.v1.html(tradingview_widget2, height=80)
 else:
     st.info("Sélectionnez des tickers pour afficher le bandeau TradingView")
 
 st.markdown('<hr style="border-color: #333; margin: 15px 0;">', unsafe_allow_html=True)
-
 # =============================================
 # BARRE DE COMMANDE BLOOMBERG
 # À ajouter après le header, avant les données de marché
