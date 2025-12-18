@@ -229,10 +229,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-import json
-
-# ...
-
 if ticker_tape_options:
     symbols_tv1 = []
     symbols_tv2 = []
@@ -323,7 +319,6 @@ if ticker_tape_options:
     st.components.v1.html(tradingview_widget2, height=80)
 else:
     st.info("Sélectionnez des tickers pour afficher le bandeau TradingView")
-
 # =============================================
 # BARRE DE COMMANDE BLOOMBERG
 # À ajouter après le header, avant les données de marché
