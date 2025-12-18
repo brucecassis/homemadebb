@@ -228,47 +228,12 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# =============================================
-# WIDGET TRADINGVIEW - TICKER TAPE
-# =============================================
-st.markdown("### MARKET TICKER TAPE")
 
-# Interface discrète pour sélectionner les tickers
-with st.expander("CONFIGURE TICKER TAPE", expanded=False):
-    ticker_tape_options = st.multiselect(
-        "Sélectionnez les tickers à afficher dans le bandeau",
-        options=[
-            "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "JPM", "V", "WMT",
-            "DIS", "NFLX", "BA", "GE", "GM", "F", "T", "VZ", "INTC", "AMD",
-            "BTCUSD", "ETHUSD", "XOM","QQQ","BTCUSD", "EURUSD", "GOLD", "EURCHF", "SLHN", "HSBC", "HYPEUSD", "XPLUSD", 
-                "VIX","EURUSD", "GBPUSD", "USDJPY", "GOLD", "SILVER", "CRUDE_OIL"
-        ],
-        default=["XOM","QQQ","BTCUSD", "EURUSD", "GOLD", "SLHN", "HSBC", "HYPEUSD", "XPLUSD", 
-                "VIX"],
-        help="Choisissez jusqu'à 20 tickers"
-    )
+import json
 
-    # Options d'affichage
-    col_widget1, col_widget2 = st.columns(2)
-    with col_widget1:
-        show_market = st.selectbox(
-            "Marché",
-            options=["stocks", "forex", "crypto", "futures"],
-            index=0,
-            key="widget_market"
-        )
+# ...
 
-    with col_widget2:
-        color_theme = st.selectbox(
-            "Thème",
-            options=["dark", "light"],
-            index=0,
-            key="widget_theme"
-        )
-
-# Construire la liste des symboles pour TradingView
 if ticker_tape_options:
-    # Convertir les tickers en format TradingView
     symbols_tv1 = []
     symbols_tv2 = []
     for i, ticker in enumerate(ticker_tape_options[:20]):  # Limite à 20
@@ -285,6 +250,12 @@ if ticker_tape_options:
                 symbols_tv1.append({"proName": "SWX:SLHN", "title": ticker})  # Utilisez le préfixe SWX pour les actions suisses
             elif ticker == "XOM":
                 symbols_tv1.append({"proName": "NYSE:XOM", "title": ticker})  # Utilisez le préfixe NYSE pour les actions américaines
+            elif ticker == "HSBC":
+                symbols_tv1.append({"proName": "LSE:HSBA", "title": ticker})  # Utilisez le préfixe LSE pour les actions britanniques
+            elif ticker in ["HYPEUSD", "XPLUSD"]:
+                # Il est possible que ces tickers ne soient pas reconnus par TradingView
+                # Vous pouvez essayer d'utiliser un autre préfixe ou de les supprimer de la liste
+                pass
             else:
                 symbols_tv1.append({"proName": f"NASDAQ:{ticker}", "title": ticker})
         else:
@@ -300,11 +271,15 @@ if ticker_tape_options:
                 symbols_tv2.append({"proName": "SWX:SLHN", "title": ticker})  # Utilisez le préfixe SWX pour les actions suisses
             elif ticker == "XOM":
                 symbols_tv2.append({"proName": "NYSE:XOM", "title": ticker})  # Utilisez le préfixe NYSE pour les actions américaines
+            elif ticker == "HSBC":
+                symbols_tv2.append({"proName": "LSE:HSBA", "title": ticker})  # Utilisez le préfixe LSE pour les actions britanniques
+            elif ticker in ["HYPEUSD", "XPLUSD"]:
+                # Il est possible que ces tickers ne soient pas reconnus par TradingView
+                # Vous pouvez essayer d'utiliser un autre préfixe ou de les supprimer de la liste
+                pass
             else:
                 symbols_tv2.append({"proName": f"NASDAQ:{ticker}", "title": ticker})
 
-    # Créer le code HTML du widget TradingView
-    import json
     symbols_json1 = json.dumps(symbols_tv1)
     symbols_json2 = json.dumps(symbols_tv2)
 
@@ -344,13 +319,11 @@ if ticker_tape_options:
     <!-- TradingView Widget END -->
     """
 
-    # Afficher les widgets
     st.components.v1.html(tradingview_widget1, height=80)
     st.components.v1.html(tradingview_widget2, height=80)
 else:
     st.info("Sélectionnez des tickers pour afficher le bandeau TradingView")
 
-st.markdown('<hr style="border-color: #333; margin: 15px 0;">', unsafe_allow_html=True)
 # =============================================
 # BARRE DE COMMANDE BLOOMBERG
 # À ajouter après le header, avant les données de marché
