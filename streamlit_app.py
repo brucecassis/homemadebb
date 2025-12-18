@@ -228,7 +228,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-
 # =============================================
 # WIDGET TRADINGVIEW - TICKER TAPE
 # =============================================
@@ -241,7 +240,7 @@ with st.expander("CONFIGURE TICKER TAPE", expanded=False):
         options=[
             "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "JPM", "V", "WMT",
             "DIS", "NFLX", "BA", "GE", "GM", "F", "T", "VZ", "INTC", "AMD",
-            "BTCUSD", "ETHUSD", "XOM","QQQ","EURUSD", "GOLD", "SLHN", "HSBC", "HYPEUSD", "XPLUSD", 
+            "BTCUSD", "ETHUSD", "XOM","QQQ","EURUSD", "GOLD", "SLHN", "HSBC", 
                 "VIX","EURUSD", "GBPUSD", "USDJPY", "GOLD", "SILVER", "CRUDE_OIL"
         ],
         default=["XOM","QQQ","BTCUSD", "EURUSD", "GOLD", "SLHN", "HSBC"],
@@ -270,7 +269,12 @@ with st.expander("CONFIGURE TICKER TAPE", expanded=False):
 if ticker_tape_options:
     import json
     symbols_tv1 = []
-    symbols_tv2 = []
+    symbols_tv2 = [
+        {"proName": "INDEX:IXIC", "title": "Nasdaq"},
+        {"proName": "INDEX:SPX", "title": "SP500"},
+        {"proName": "INDEX:DJI", "title": "Dow Jones"},
+        {"proName": "INDEX:VIX", "title": "VIX"}
+    ]
     for i, ticker in enumerate(ticker_tape_options[:20]):  # Limite à 20
         if i < 10:
             if ticker in ["BTCUSD", "ETHUSD"]:
@@ -287,29 +291,28 @@ if ticker_tape_options:
                 symbols_tv1.append({"proName": "NYSE:XOM", "title": ticker})  # Utilisez le préfixe NYSE pour les actions américaines
             elif ticker == "HSBC":
                 symbols_tv1.append({"proName": "LSE:HSBA", "title": ticker})  # Utilisez le préfixe LSE pour les actions britanniques
-            elif ticker in ["HYPEUSD", "XPLUSD"]:
+            elif ticker == "VIX":
                 pass
             else:
                 symbols_tv1.append({"proName": f"NASDAQ:{ticker}", "title": ticker})
         else:
-            if ticker in ["BTCUSD", "ETHUSD"]:
-                symbols_tv2.append({"proName": f"BINANCE:{ticker}", "title": ticker})
-            elif ticker in ["EURUSD", "GBPUSD", "USDJPY"]:
-                symbols_tv2.append({"proName": f"FX_IDC:{ticker}", "title": ticker})
-            elif ticker in ["GOLD", "SILVER"]:
-                symbols_tv2.append({"proName": f"TVC:{ticker}", "title": ticker})
-            elif ticker == "CRUDE_OIL":
-                symbols_tv2.append({"proName": "TVC:USOIL", "title": "OIL"})
-            elif ticker == "SLHN":
-                symbols_tv2.append({"proName": "SWX:SLHN", "title": ticker})  # Utilisez le préfixe SWX pour les actions suisses
-            elif ticker == "XOM":
-                symbols_tv2.append({"proName": "NYSE:XOM", "title": ticker})  # Utilisez le préfixe NYSE pour les actions américaines
-            elif ticker == "HSBC":
-                symbols_tv2.append({"proName": "LSE:HSBA", "title": ticker})  # Utilisez le préfixe LSE pour les actions britanniques
-            elif ticker in ["HYPEUSD", "XPLUSD"]:
-                pass
-            else:
-                symbols_tv2.append({"proName": f"NASDAQ:{ticker}", "title": ticker})
+            if ticker not in ["VIX", "Nasdaq", "SP500", "Dow Jones"]:
+                if ticker in ["BTCUSD", "ETHUSD"]:
+                    symbols_tv2.append({"proName": f"BINANCE:{ticker}", "title": ticker})
+                elif ticker in ["EURUSD", "GBPUSD", "USDJPY"]:
+                    symbols_tv2.append({"proName": f"FX_IDC:{ticker}", "title": ticker})
+                elif ticker in ["GOLD", "SILVER"]:
+                    symbols_tv2.append({"proName": f"TVC:{ticker}", "title": ticker})
+                elif ticker == "CRUDE_OIL":
+                    symbols_tv2.append({"proName": "TVC:USOIL", "title": "OIL"})
+                elif ticker == "SLHN":
+                    symbols_tv2.append({"proName": "SWX:SLHN", "title": ticker})  # Utilisez le préfixe SWX pour les actions suisses
+                elif ticker == "XOM":
+                    symbols_tv2.append({"proName": "NYSE:XOM", "title": ticker})  # Utilisez le préfixe NYSE pour les actions américaines
+                elif ticker == "HSBC":
+                    symbols_tv2.append({"proName": "LSE:HSBA", "title": ticker})  # Utilisez le préfixe LSE pour les actions britanniques
+                else:
+                    symbols_tv2.append({"proName": f"NASDAQ:{ticker}", "title": ticker})
 
     symbols_json1 = json.dumps(symbols_tv1)
     symbols_json2 = json.dumps(symbols_tv2)
@@ -356,7 +359,6 @@ else:
     st.info("Sélectionnez des tickers pour afficher le bandeau TradingView")
 
 st.markdown('<hr style="border-color: #333; margin: 15px 0;">', unsafe_allow_html=True)
-
 
 # =============================================
 # BARRE DE COMMANDE BLOOMBERG
