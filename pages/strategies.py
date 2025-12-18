@@ -348,9 +348,8 @@ def run_backtest_cointegration(ticker1, ticker2, capital, start_date, end_date,
                                seuil_achat, seuil_vente, seuil_sortie):
     """Exécute le backtest de la stratégie de cointégration avec seuils personnalisés"""
     
-    # MODIFIER ICI : Créer une fonction spéciale pour la cointégration
+    # Télécharger les données JOURNALIÈRES
     try:
-        # Télécharger en données JOURNALIÈRES pour la cointégration
         stock1 = yf.Ticker(ticker1)
         data1 = stock1.history(start=start_date, end=end_date, interval='1d')
         
@@ -365,30 +364,36 @@ def run_backtest_cointegration(ticker1, ticker2, capital, start_date, end_date,
             st.error(f"❌ Aucune donnée trouvée pour {ticker2}")
             return None, None, None, None
         
-        # Réinitialiser l'index et normaliser les colonnes
-        data1 = data1.reset_index()
-        data2 = data2.reset_index()
-        data1.columns = data1.columns.str.lower()
-        data2.columns = data2.columns.str.lower()
-        
-        # Créer les DataFrames avec Date comme index
-        df1 = data1.set_index('date')[['close']]
-        df2 = data2.set_index('date')[['close']]
+        st.success(f"✅ Données téléchargées: {ticker1} ({len(data1)} jours), {ticker2} ({len(data2)} jours)")
         
     except Exception as e:
         st.error(f"❌ Erreur lors du téléchargement: {str(e)}")
         return None, None, None, None
     
-    # Nettoyer
-    df1 = nettoyer_donnees(df1, 'close')
-    df2 = nettoyer_donnees(df2, 'close')
+    # Nettoyer les données AVANT de renommer
+    # Garder seulement Close
+    df1_clean = data1[['Close']].copy()
+    df2_clean = data2[['Close']].copy()
     
-    df = pd.merge(df1, df2, left_index=True, right_index=True, how="inner")
+    # Nettoyer (supprimer outliers, etc.)
+    df1_clean = nettoyer_donnees(df1_clean, 'Close')
+    df2_clean = nettoyer_donnees(df2_clean, 'Close')
+    
+    # MAINTENANT renommer les colonnes
+    df1_clean.columns = [ticker1]
+    df2_clean.columns = [ticker2]
+    
+    # Merger sur l'index (dates)
+    df = pd.merge(df1_clean, df2_clean, left_index=True, right_index=True, how="inner")
     
     if len(df) < 100:
-        st.error(f"Pas assez de données communes ({len(df)} observations)")
+        st.error(f"❌ Pas assez de données communes ({len(df)} observations). Minimum 100 requis.")
+        st.info("💡 Essayez une période plus longue (ex: 2 ans)")
         return None, None, None, None
     
+    st.info(f"📊 {len(df)} observations communes entre {ticker1} et {ticker2}")
+    
+    # Test d'intégration
     ordre1 = test_integration(df[ticker1])
     ordre2 = test_integration(df[ticker2])
     
@@ -402,26 +407,33 @@ def run_backtest_cointegration(ticker1, ticker2, capital, start_date, end_date,
     
     if ordre1 != 1 or ordre2 != 1:
         st.warning(f"⚠️ Les séries ne sont pas I(1) ({ticker1}: I({ordre1}), {ticker2}: I({ordre2}))")
-        return None, None, None, test_results
+        st.info("💡 La cointégration nécessite que les deux séries soient I(1)")
+        # On continue quand même pour montrer les résultats
     
+    # Régression de cointégration
     X = sm.add_constant(df[ticker1])
     model = sm.OLS(df[ticker2], X).fit()
     df["residuals"] = model.resid
     
+    # Test ADF sur les résidus
     adf_res = adfuller(df["residuals"])
     test_results['adf_residus'] = adf_res[0]
     test_results['p_value_residus'] = adf_res[1]
     test_results['cointegre'] = adf_res[1] < 0.05
     
     if not test_results['cointegre']:
-        st.warning(f"⚠️ Les actifs ne sont pas cointégrés (p-value={adf_res[1]:.4f})")
+        st.warning(f"⚠️ Les actifs ne sont pas statistiquement cointégrés (p-value={adf_res[1]:.4f})")
+        st.info("💡 Un p-value < 0.05 indique une cointégration significative")
     
+    # Signaux de trading avec seuils personnalisés
     df["signal"] = 0
-    df.loc[df["residuals"] > seuil_vente, "signal"] = -1
-    df.loc[df["residuals"] < -seuil_achat, "signal"] = 1
+    df.loc[df["residuals"] > seuil_vente, "signal"] = -1  # Short Y, Long X
+    df.loc[df["residuals"] < -seuil_achat, "signal"] = 1   # Long Y, Short X
     
+    # Backtest
     journal = []
     capital_evolution = []
+    capital_current = capital
     position = 0
     entry_price_x = entry_price_y = None
     
@@ -431,28 +443,32 @@ def run_backtest_cointegration(ticker1, ticker2, capital, start_date, end_date,
         px_x = df[ticker1].iloc[i]
         px_y = df[ticker2].iloc[i]
         
+        # Ouvrir position
         if position == 0:
-            if df["signal"].iloc[i] == 1:
+            if df["signal"].iloc[i] == 1:  # Long Y, Short X
                 entry_price_y = px_y
                 entry_price_x = px_x
-                qty_y = (capital / 2) / entry_price_y
-                qty_x = (capital / 2) / entry_price_x
+                qty_y = (capital_current / 2) / entry_price_y
+                qty_x = (capital_current / 2) / entry_price_x
                 position = 1
                 entry_date = date
-            elif df["signal"].iloc[i] == -1:
+                entry_residual = res
+            elif df["signal"].iloc[i] == -1:  # Short Y, Long X
                 entry_price_y = px_y
                 entry_price_x = px_x
-                qty_y = (capital / 2) / entry_price_y
-                qty_x = (capital / 2) / entry_price_x
+                qty_y = (capital_current / 2) / entry_price_y
+                qty_x = (capital_current / 2) / entry_price_x
                 position = -1
                 entry_date = date
+                entry_residual = res
         
+        # Fermer position Long Y, Short X
         elif position == 1:
-            if res >= -seuil_sortie:
+            if res >= -seuil_sortie:  # Résidus reviennent vers 0
                 pnl_y = (px_y - entry_price_y) * qty_y
                 pnl_x = (entry_price_x - px_x) * qty_x
                 total_pnl = pnl_y + pnl_x
-                capital += total_pnl
+                capital_current += total_pnl
                 duration = (date - entry_date).days
                 journal.append({
                     'Entry Date': entry_date,
@@ -464,16 +480,18 @@ def run_backtest_cointegration(ticker1, ticker2, capital, start_date, end_date,
                     'PnL': total_pnl,
                     'Duration (days)': duration,
                     'Type': 'Long Y / Short X',
+                    'Entry Residual': entry_residual,
                     'Exit Residual': res
                 })
                 position = 0
         
+        # Fermer position Short Y, Long X
         elif position == -1:
-            if res <= seuil_sortie:
+            if res <= seuil_sortie:  # Résidus reviennent vers 0
                 pnl_y = (entry_price_y - px_y) * qty_y
                 pnl_x = (px_x - entry_price_x) * qty_x
                 total_pnl = pnl_y + pnl_x
-                capital += total_pnl
+                capital_current += total_pnl
                 duration = (date - entry_date).days
                 journal.append({
                     'Entry Date': entry_date,
@@ -485,15 +503,20 @@ def run_backtest_cointegration(ticker1, ticker2, capital, start_date, end_date,
                     'PnL': total_pnl,
                     'Duration (days)': duration,
                     'Type': 'Short Y / Long X',
+                    'Entry Residual': entry_residual,
                     'Exit Residual': res
                 })
                 position = 0
         
-        capital_evolution.append(capital)
+        capital_evolution.append(capital_current)
     
-    df['capital'] = [capital] * len(df)
+    # Ajouter l'évolution du capital au DataFrame
+    df['capital'] = capital
     if len(capital_evolution) > 0:
-        df.iloc[-len(capital_evolution):, df.columns.get_loc('capital')] = capital_evolution
+        # Aligner les valeurs
+        start_idx = len(df) - len(capital_evolution)
+        for i, cap in enumerate(capital_evolution):
+            df.iloc[start_idx + i, df.columns.get_loc('capital')] = cap
     
     return df, journal, test_results, (ticker1, ticker2)
 
