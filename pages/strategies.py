@@ -498,14 +498,16 @@ def create_ml_features(df):
         ema = close.ewm(span=p).mean()
         data[f'sma_{p}'] = sma
         data[f'ema_{p}'] = ema
-        data[f'price_to_sma_{p}'] = (close / sma - 1) * 100
+        # Protéger contre division par zéro
+        data[f'price_to_sma_{p}'] = np.where(sma > 0, (close / sma - 1) * 100, 0)
     
     # RSI
     for period in [14, 21]:
         delta = close.diff()
         gain = delta.where(delta > 0, 0).rolling(period).mean()
         loss = -delta.where(delta < 0, 0).rolling(period).mean()
-        rs = gain / (loss + 1e-10)
+        # Éviter division par zéro
+        rs = np.where(loss > 0, gain / loss, 0)
         data[f'rsi_{period}'] = 100 - (100 / (1 + rs))
     
     # MACD
@@ -518,7 +520,8 @@ def create_ml_features(df):
     # Stochastic
     low_14 = low.rolling(14).min()
     high_14 = high.rolling(14).max()
-    data['stoch_k'] = 100 * (close - low_14) / (high_14 - low_14 + 1e-10)
+    range_14 = high_14 - low_14
+    data['stoch_k'] = np.where(range_14 > 0, 100 * (close - low_14) / range_14, 50)
     data['stoch_d'] = data['stoch_k'].rolling(3).mean()
     
     # ATR & Volatilité
@@ -527,26 +530,39 @@ def create_ml_features(df):
     tr3 = abs(low - close.shift())
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
     data['atr'] = tr.rolling(14).mean()
-    data['atr_percent'] = data['atr'] / close * 100
+    data['atr_percent'] = np.where(close > 0, data['atr'] / close * 100, 0)
     
     ret = close.pct_change()
     for p in [5, 10, 20]:
         data[f'volatility_{p}'] = ret.rolling(p).std() * np.sqrt(252) * 100
     
     data['volatility_mean'] = data['volatility_20'].rolling(100).mean()
-    data['volatility_ratio'] = data['volatility_20'] / (data['volatility_mean'] + 0.1)
+    data['volatility_ratio'] = np.where(
+        data['volatility_mean'] > 0.1,
+        data['volatility_20'] / data['volatility_mean'],
+        1.0
+    )
     
     # Bollinger
     sma20 = close.rolling(20).mean()
     std20 = close.rolling(20).std()
     data['bb_upper'] = sma20 + std20 * 2
     data['bb_lower'] = sma20 - std20 * 2
-    data['bb_width'] = (data['bb_upper'] - data['bb_lower']) / sma20 * 100
-    data['bb_position'] = (close - data['bb_lower']) / (data['bb_upper'] - data['bb_lower'] + 1e-10)
+    bb_range = data['bb_upper'] - data['bb_lower']
+    data['bb_width'] = np.where(sma20 > 0, bb_range / sma20 * 100, 0)
+    data['bb_position'] = np.where(
+        bb_range > 0,
+        (close - data['bb_lower']) / bb_range,
+        0.5
+    )
     
     # Volume
     data['volume_sma'] = volume.rolling(20).mean()
-    data['volume_ratio'] = volume / (data['volume_sma'] + 1)
+    data['volume_ratio'] = np.where(
+        data['volume_sma'] > 0,
+        volume / data['volume_sma'],
+        1.0
+    )
     
     # OBV
     obv = (np.sign(close.diff()) * volume).fillna(0).cumsum()
@@ -554,22 +570,30 @@ def create_ml_features(df):
     data['obv_ema'] = obv.ewm(span=20).mean()
     
     # Momentum
-    data['momentum_5'] = close.diff(5) / close.shift(5) * 100
-    data['momentum_10'] = close.diff(10) / close.shift(10) * 100
+    data['momentum_5'] = np.where(
+        close.shift(5) > 0,
+        close.diff(5) / close.shift(5) * 100,
+        0
+    )
+    data['momentum_10'] = np.where(
+        close.shift(10) > 0,
+        close.diff(10) / close.shift(10) * 100,
+        0
+    )
     data['momentum_strength'] = abs(data['momentum_10'])
     
     # Patterns
     body = close - open_price
     total_range = high - low
-    data['body_size'] = abs(body) / (total_range + 1e-10)
-    data['candle_range'] = total_range / close * 100
+    data['body_size'] = np.where(total_range > 0, abs(body) / total_range, 0)
+    data['candle_range'] = np.where(close > 0, total_range / close * 100, 0)
     
     data['higher_high'] = (high > high.shift(1)).astype(int)
     data['lower_low'] = (low < low.shift(1)).astype(int)
     
     # Consolidation
     range_20 = high.rolling(20).max() - low.rolling(20).min()
-    data['consolidation_range'] = range_20 / close
+    data['consolidation_range'] = np.where(close > 0, range_20 / close, 0)
     data['is_consolidating'] = (data['consolidation_range'] < 0.025).astype(int)
     
     # Target
@@ -577,6 +601,9 @@ def create_ml_features(df):
     data['future_close'] = close.shift(-1)
     data['future_high'] = high.shift(-1)
     data['future_low'] = low.shift(-1)
+    
+    # Remplacer les inf/NaN générés par les calculs
+    data = data.replace([np.inf, -np.inf], np.nan)
     
     return data
 
@@ -1110,15 +1137,32 @@ if st.button("🚀 LANCER LE BACKTEST", use_container_width=True):
                    'date', 'open', 'high', 'low', 'close', 'volume', 'dividends', 'stock splits',
                    'is_consolidating', 'consolidation_range']
         
+        # Récupérer uniquement les colonnes numériques
         features = [c for c in df_ml.columns if c not in exclude]
         
-        X = df_ml[features]
+        # S'assurer que toutes les features sont numériques
+        X = df_ml[features].select_dtypes(include=[np.number])
+        
+        # Remplacer les inf par NaN puis supprimer les NaN
+        X = X.replace([np.inf, -np.inf], np.nan)
+        
         y = df_ml['target_return']
+        
+        # Aligner X et y après nettoyage
+        valid_idx = X.dropna().index
+        X = X.loc[valid_idx]
+        y = y.loc[valid_idx]
+        
+        if len(X) < 200:
+            st.error(f"Pas assez de données valides après nettoyage ({len(X)} points). Essayez une période plus longue.")
+            st.stop()
         
         test_cols = ['close', 'high', 'low', 'future_close', 'future_high', 'future_low', 
                      'volatility_20', 'volatility_ratio', 'is_consolidating', 'rsi_14', 
                      'volume_ratio', 'momentum_strength']
-        test_info = df_ml[test_cols]
+        
+        # Assurer que test_info a les mêmes indices
+        test_info = df_ml.loc[valid_idx, test_cols]
         
         # Split
         split = int(len(X) * (1 - test_size))
@@ -1126,8 +1170,25 @@ if st.button("🚀 LANCER LE BACKTEST", use_container_width=True):
         y_train, y_test = y.iloc[:split], y.iloc[split:]
         test_data = test_info.iloc[split:].reset_index(drop=True)
         
-        st.info(f"📈 Split: Train={len(X_train)} | Test={len(X_test)} | Features={len(features)}")
+        st.info(f"📈 Split: Train={len(X_train)} | Test={len(X_test)} | Features={len(X.columns)}")
         
+        # Vérifier qu'il n'y a plus de NaN
+        if X_train.isnull().any().any() or X_test.isnull().any().any():
+            st.error("⚠️ Des valeurs manquantes subsistent dans les données")
+            st.write("Colonnes avec NaN:", X_train.columns[X_train.isnull().any()].tolist())
+            st.stop()
+        
+        # Normalisation
+        scaler = StandardScaler()
+        try:
+            X_train_sc = scaler.fit_transform(X_train)
+            X_test_sc = scaler.transform(X_test)
+        except Exception as e:
+            st.error(f"Erreur lors de la normalisation: {str(e)}")
+            st.write("Types de données dans X_train:", X_train.dtypes.value_counts())
+            st.write("Valeurs infinies:", np.isinf(X_train).sum().sum())
+            st.stop()
+            
         # Normalisation
         scaler = StandardScaler()
         X_train_sc = scaler.fit_transform(X_train)
