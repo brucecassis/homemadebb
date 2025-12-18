@@ -1111,9 +1111,296 @@ if st.button("🚀 LANCER LE BACKTEST", use_container_width=True):
         st.stop()
     
     # =============================================
+    # EXÉCUTION COINTÉGRATION
+    # =============================================
+    if strategy == "Cointégration (Pairs Trading)":
+        
+        with st.spinner(f"📊 Test de cointégration entre {ticker1} et {ticker2}..."):
+            df, journal, test_results, tickers = run_backtest_cointegration(
+                ticker1, ticker2, capital, start_date, end_date, 
+                seuil_achat, seuil_vente, seuil_sortie
+            )
+        
+        if df is None:
+            st.error("Erreur lors du backtest de cointégration.")
+            st.stop()
+        
+        # TESTS STATISTIQUES
+        st.markdown("### 🔬 TESTS STATISTIQUES")
+        
+        col_test1, col_test2, col_test3 = st.columns(3)
+        
+        with col_test1:
+            st.metric(f"{ticker1} Ordre", 
+                     f"I({test_results['ordre1']})" if test_results['ordre1'] >= 0 else "❌",
+                     "✅" if test_results['ordre1'] == 1 else "❌")
+        
+        with col_test2:
+            st.metric(f"{ticker2} Ordre", 
+                     f"I({test_results['ordre2']})" if test_results['ordre2'] >= 0 else "❌",
+                     "✅" if test_results['ordre2'] == 1 else "❌")
+        
+        with col_test3:
+            if test_results['cointegre'] is not None:
+                st.metric("Cointégration", 
+                         "✅ OUI" if test_results['cointegre'] else "❌ NON",
+                         f"p={test_results['p_value_residus']:.4f}")
+        
+        st.info(f"📊 Seuils utilisés: Achat < -{seuil_achat} | Vente > +{seuil_vente} | Sortie ±{seuil_sortie}")
+        
+        # STATISTIQUES
+        st.markdown("### 📊 STATISTIQUES DE PERFORMANCE")
+        
+        capital_initial_coint = capital
+        valeur_finale = df['capital'].iloc[-1]
+        perf = ((valeur_finale - capital_initial_coint) / capital_initial_coint) * 100
+        
+        col_stat1, col_stat2, col_stat3 = st.columns(3)
+        
+        with col_stat1:
+            st.metric("Capital Initial", f"${capital_initial_coint:,.2f}")
+        
+        with col_stat2:
+            st.metric("Capital Final", f"${valeur_finale:,.2f}", f"{perf:+.2f}%")
+        
+        with col_stat3:
+            st.metric("Nombre de Trades", f"{len(journal)}")
+        
+        # GRAPHIQUES
+        st.markdown("### 📈 GRAPHIQUES D'ANALYSE")
+        
+        # Graph 1: Prix normalisés
+        fig1 = go.Figure()
+        df_pct = df[[ticker1, ticker2]] / df[[ticker1, ticker2]].iloc[0] * 100
+        fig1.add_trace(go.Scatter(x=df_pct.index, y=df_pct[ticker1], 
+                                 name=ticker1, line=dict(color='blue', width=2)))
+        fig1.add_trace(go.Scatter(x=df_pct.index, y=df_pct[ticker2], 
+                                 name=ticker2, line=dict(color='orange', width=2)))
+        
+        fig1.update_layout(title="Prix normalisés (%)", height=400,
+                          paper_bgcolor='#000', plot_bgcolor='#111',
+                          font=dict(color='#FFAA00', size=10), hovermode='x unified',
+                          xaxis=dict(gridcolor='#333', showgrid=True),
+                          yaxis=dict(gridcolor='#333', showgrid=True))
+        
+        st.plotly_chart(fig1, use_container_width=True)
+        
+        # Graph 2: Résidus avec seuils
+        fig2 = go.Figure()
+        fig2.add_trace(go.Scatter(x=df.index, y=df['residuals'], 
+                                 name='Résidus', line=dict(color='blue', width=2)))
+        fig2.add_hline(y=0, line_dash="solid", line_color="red", opacity=0.5)
+        fig2.add_hline(y=seuil_vente, line_dash="dash", line_color="red", opacity=0.7)
+        fig2.add_hline(y=-seuil_achat, line_dash="dash", line_color="green", opacity=0.7)
+        fig2.add_hline(y=seuil_sortie, line_dash="dot", line_color="yellow", opacity=0.5)
+        fig2.add_hline(y=-seuil_sortie, line_dash="dot", line_color="yellow", opacity=0.5)
+        
+        fig2.add_hrect(y0=seuil_vente, y1=df['residuals'].max(), fillcolor="red", opacity=0.1)
+        fig2.add_hrect(y0=df['residuals'].min(), y1=-seuil_achat, fillcolor="green", opacity=0.1)
+        
+        fig2.update_layout(title="Résidus avec seuils de trading", height=400,
+                          paper_bgcolor='#000', plot_bgcolor='#111',
+                          font=dict(color='#FFAA00', size=10), hovermode='x unified',
+                          xaxis=dict(gridcolor='#333', showgrid=True),
+                          yaxis=dict(gridcolor='#333', showgrid=True, title='Résidus'))
+        
+        st.plotly_chart(fig2, use_container_width=True)
+        
+        # Graph 3: Capital
+        if len(journal) > 0:
+            fig3 = go.Figure()
+            fig3.add_trace(go.Scatter(x=df.index, y=df['capital'], 
+                                     name='Capital', line=dict(color='purple', width=3)))
+            fig3.add_hline(y=capital_initial_coint, line_dash="dash", line_color="gray", opacity=0.5)
+            
+            fig3.update_layout(title="Évolution du capital", height=400,
+                              paper_bgcolor='#000', plot_bgcolor='#111',
+                              font=dict(color='#FFAA00', size=10), hovermode='x unified',
+                              xaxis=dict(gridcolor='#333', showgrid=True),
+                              yaxis=dict(gridcolor='#333', showgrid=True, title='Capital ($)'))
+            
+            st.plotly_chart(fig3, use_container_width=True)
+        
+        # Journal
+        if journal:
+            st.markdown("### 📋 JOURNAL DE TRADING")
+            
+            pnls = [t['PnL'] for t in journal]
+            nb_gagnants = sum(1 for p in pnls if p > 0)
+            nb_perdants = sum(1 for p in pnls if p < 0)
+            
+            col_t1, col_t2, col_t3, col_t4 = st.columns(4)
+            
+            with col_t1:
+                win_rate = (nb_gagnants/len(journal)*100) if len(journal) > 0 else 0
+                st.metric("Trades Gagnants", f"{nb_gagnants}", f"{win_rate:.1f}%")
+            
+            with col_t2:
+                loss_rate = (nb_perdants/len(journal)*100) if len(journal) > 0 else 0
+                st.metric("Trades Perdants", f"{nb_perdants}", f"{loss_rate:.1f}%")
+            
+            with col_t3:
+                st.metric("PnL Moyen", f"${np.mean(pnls):,.2f}")
+            
+            with col_t4:
+                st.metric("Meilleur Trade", f"${max(pnls):,.2f}")
+            
+            journal_df = pd.DataFrame(journal)
+            journal_df['Entry Date'] = pd.to_datetime(journal_df['Entry Date']).dt.strftime('%Y-%m-%d')
+            journal_df['Exit Date'] = pd.to_datetime(journal_df['Exit Date']).dt.strftime('%Y-%m-%d')
+            
+            for col in ['Entry X', 'Exit X', 'Entry Y', 'Exit Y', 'PnL', 'Exit Residual']:
+                if col in journal_df.columns:
+                    journal_df[col] = journal_df[col].apply(lambda x: f"{x:,.2f}")
+            
+            st.dataframe(journal_df, use_container_width=True, height=300)
+        else:
+            st.info(f"⚠️ Aucun trade avec ces seuils. Essayez: Achat={seuil_achat-1}, Vente={seuil_vente-1}")
+    
+    # =============================================
+    # EXÉCUTION RSI
+    # =============================================
+    elif strategy == "RSI (Momentum)":
+        
+        with st.spinner(f"📊 Analyse RSI de {ticker1} et {ticker2}..."):
+            merged, journal, tickers = run_backtest_rsi(
+                ticker1, ticker2, weight1, weight2, capital,
+                start_date, end_date, rsi_buy, rsi_sell
+            )
+        
+        if merged is None:
+            st.error("Erreur lors du backtest RSI.")
+            st.stop()
+        
+        st.success(f"✅ Backtest RSI terminé ! Période: {merged.index[0].strftime('%Y-%m-%d')} → {merged.index[-1].strftime('%Y-%m-%d')}")
+        
+        # STATISTIQUES
+        st.markdown("### 📊 STATISTIQUES DE PERFORMANCE")
+        
+        valeur_finale_bh = merged['valeur_buy_hold'].iloc[-1]
+        perf_bh = ((valeur_finale_bh / capital) - 1) * 100
+        
+        valeur_finale_strat = merged['valeur_strategie'].iloc[-1]
+        perf_strat = ((valeur_finale_strat / capital) - 1) * 100
+        
+        diff_perf = perf_strat - perf_bh
+        diff_valeur = valeur_finale_strat - valeur_finale_bh
+        
+        col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
+        
+        with col_stat1:
+            st.metric("Buy & Hold", f"${valeur_finale_bh:,.2f}", f"{perf_bh:+.2f}%")
+        
+        with col_stat2:
+            st.metric("Stratégie RSI", f"${valeur_finale_strat:,.2f}", f"{perf_strat:+.2f}%")
+        
+        with col_stat3:
+            st.metric("Différence", f"${diff_valeur:+,.2f}", f"{diff_perf:+.2f}%")
+        
+        with col_stat4:
+            nb_trades = len([j for j in journal if 'VENTE' in j['Action']])
+            st.metric("Trades Complétés", f"{nb_trades}")
+        
+        # GRAPHIQUES RSI
+        st.markdown("### 📈 GRAPHIQUES D'ANALYSE")
+        
+        # Graph 1: Ticker 1
+        fig1 = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05,
+                            row_heights=[0.7, 0.3], subplot_titles=(f'{ticker1} - Prix', 'RSI'))
+        
+        fig1.add_trace(go.Scatter(x=merged.index, y=merged[f'close_{ticker1}'], 
+                                 name=ticker1, line=dict(color='blue', width=2)), row=1, col=1)
+        fig1.add_trace(go.Scatter(x=merged.index, y=merged[f'rsi_{ticker1}'], 
+                                 name='RSI', line=dict(color='blue', width=2)), row=2, col=1)
+        fig1.add_hline(y=70, line_dash="dash", line_color="red", opacity=0.5, row=2, col=1)
+        fig1.add_hline(y=30, line_dash="dash", line_color="green", opacity=0.5, row=2, col=1)
+        
+        fig1.update_layout(height=500, paper_bgcolor='#000', plot_bgcolor='#111',
+                          font=dict(color='#FFAA00', size=10), hovermode='x unified')
+        fig1.update_xaxes(gridcolor='#333', showgrid=True)
+        fig1.update_yaxes(gridcolor='#333', showgrid=True)
+        
+        st.plotly_chart(fig1, use_container_width=True)
+        
+        # Graph 2: Ticker 2 avec signaux
+        fig2 = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05,
+                            row_heights=[0.7, 0.3], subplot_titles=(f'{ticker2} - Prix et Signaux', 'RSI'))
+        
+        fig2.add_trace(go.Scatter(x=merged.index, y=merged[f'close_{ticker2}'], 
+                                 name=ticker2, line=dict(color='red', width=2)), row=1, col=1)
+        
+        achats = [j for j in journal if 'ACHAT' in j['Action']]
+        ventes = [j for j in journal if 'VENTE' in j['Action']]
+        
+        if achats:
+            fig2.add_trace(go.Scatter(x=[j['Date'] for j in achats], y=[j['Prix'] for j in achats],
+                                     mode='markers', name='Achat', 
+                                     marker=dict(color='green', size=10, symbol='triangle-up')), row=1, col=1)
+        
+        if ventes:
+            fig2.add_trace(go.Scatter(x=[j['Date'] for j in ventes], y=[j['Prix'] for j in ventes],
+                                     mode='markers', name='Vente', 
+                                     marker=dict(color='red', size=10, symbol='triangle-down')), row=1, col=1)
+        
+        fig2.add_trace(go.Scatter(x=merged.index, y=merged[f'rsi_{ticker2}'], 
+                                 name='RSI', line=dict(color='red', width=2)), row=2, col=1)
+        fig2.add_hline(y=rsi_sell, line_dash="dash", line_color="red", opacity=0.7, row=2, col=1)
+        fig2.add_hline(y=rsi_buy, line_dash="dash", line_color="green", opacity=0.7, row=2, col=1)
+        
+        fig2.update_layout(height=500, paper_bgcolor='#000', plot_bgcolor='#111',
+                          font=dict(color='#FFAA00', size=10), hovermode='x unified')
+        fig2.update_xaxes(gridcolor='#333', showgrid=True)
+        fig2.update_yaxes(gridcolor='#333', showgrid=True)
+        
+        st.plotly_chart(fig2, use_container_width=True)
+        
+        # Graph 3: Comparaison
+        fig3 = go.Figure()
+        fig3.add_trace(go.Scatter(x=merged.index, y=merged['pct_buy_hold'],
+                                 name='Buy&Hold', line=dict(color='orange', width=2)))
+        fig3.add_trace(go.Scatter(x=merged.index, y=merged['pct_strategie'],
+                                 name='Stratégie RSI', line=dict(color='purple', width=3)))
+        fig3.add_hline(y=100, line_dash="dash", line_color="gray", opacity=0.5)
+        
+        fig3.update_layout(title="Comparaison Performance", height=400,
+                          paper_bgcolor='#000', plot_bgcolor='#111',
+                          font=dict(color='#FFAA00', size=10), hovermode='x unified',
+                          xaxis=dict(gridcolor='#333', showgrid=True),
+                          yaxis=dict(gridcolor='#333', showgrid=True, title='Evolution (%)'))
+        
+        st.plotly_chart(fig3, use_container_width=True)
+        
+        # Journal
+        if journal:
+            st.markdown("### 📋 JOURNAL DE TRADING")
+            trades_vente = [t for t in journal if 'VENTE' in t['Action']]
+            if trades_vente:
+                profits = [t['Profit %'] for t in trades_vente]
+                nb_gagnants = sum(1 for p in profits if p > 0)
+                nb_perdants = sum(1 for p in profits if p < 0)
+                
+                col_t1, col_t2, col_t3, col_t4 = st.columns(4)
+                with col_t1:
+                    st.metric("Trades Gagnants", f"{nb_gagnants}", f"{nb_gagnants/len(trades_vente)*100:.1f}%")
+                with col_t2:
+                    st.metric("Trades Perdants", f"{nb_perdants}", f"{nb_perdants/len(trades_vente)*100:.1f}%")
+                with col_t3:
+                    st.metric("Profit Moyen", f"{np.mean(profits):+.2f}%")
+                with col_t4:
+                    st.metric("Meilleur Trade", f"{max(profits):+.2f}%")
+            
+            journal_df = pd.DataFrame(journal)
+            journal_df['Date'] = journal_df['Date'].dt.strftime('%Y-%m-%d')
+            for col in ['Prix', 'Quantité', 'RSI', 'Capital investi', 'Prix achat', 'Profit', 'Profit %', 'Capital après vente']:
+                if col in journal_df.columns:
+                    journal_df[col] = journal_df[col].apply(lambda x: f"{x:,.2f}" if pd.notna(x) else "")
+            
+            st.dataframe(journal_df, use_container_width=True, height=300)
+    
+    # =============================================
     # EXÉCUTION ML V3.7
     # =============================================
-    if strategy == "Machine Learning v3.7 (Optimisée)":
+    else:  # Machine Learning v3.7
         
         with st.spinner(f"📊 Téléchargement des données {ticker_ml}..."):
             data_ml = get_historical_data(ticker_ml, start_date, end_date)
@@ -1188,11 +1475,6 @@ if st.button("🚀 LANCER LE BACKTEST", use_container_width=True):
             st.write("Types de données dans X_train:", X_train.dtypes.value_counts())
             st.write("Valeurs infinies:", np.isinf(X_train).sum().sum())
             st.stop()
-            
-        # Normalisation
-        scaler = StandardScaler()
-        X_train_sc = scaler.fit_transform(X_train)
-        X_test_sc = scaler.transform(X_test)
         
         # Entraînement
         with st.spinner("🤖 Entraînement Ensemble (RF + GB + XGB)..."):
@@ -1229,12 +1511,12 @@ if st.button("🚀 LANCER LE BACKTEST", use_container_width=True):
                 base_tp=base_tp,
                 adaptive_sl=adaptive_sl,
                 adaptive_tp=adaptive_tp,
-                use_filters=use_filters if use_filters else False,
-                rsi_min=rsi_min if use_filters else 25,
-                rsi_max=rsi_max if use_filters else 75,
-                min_volume_ratio=min_volume_ratio if use_filters else 0.8,
-                min_momentum=min_momentum if use_filters else 0.3,
-                avoid_consolidation=avoid_consolidation if use_filters else True,
+                use_filters=use_filters if 'use_filters' in locals() else False,
+                rsi_min=rsi_min if 'use_filters' in locals() and use_filters else 25,
+                rsi_max=rsi_max if 'use_filters' in locals() and use_filters else 75,
+                min_volume_ratio=min_volume_ratio if 'use_filters' in locals() and use_filters else 0.8,
+                min_momentum=min_momentum if 'use_filters' in locals() and use_filters else 0.3,
+                avoid_consolidation=avoid_consolidation if 'use_filters' in locals() and use_filters else True,
                 max_holding=max_holding,
                 use_ensemble=use_ensemble,
                 min_models_agree=min_models_agree if use_ensemble else 1
@@ -1423,18 +1705,6 @@ if st.button("🚀 LANCER LE BACKTEST", use_container_width=True):
             st.dataframe(journal_df, use_container_width=True, height=400)
         else:
             st.warning("⚠️ Aucun trade généré. Ajustez les paramètres (seuil, filtres).")
-    
-    # =============================================
-    # AUTRES STRATÉGIES (code identique)
-    # =============================================
-    
-    elif strategy == "Cointégration (Pairs Trading)":
-        # [Code cointégration identique à avant...]
-        pass
-    
-    else:  # RSI
-        # [Code RSI identique à avant...]
-        pass
 
 # =============================================
 # FOOTER
