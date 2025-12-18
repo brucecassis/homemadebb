@@ -348,17 +348,40 @@ def run_backtest_cointegration(ticker1, ticker2, capital, start_date, end_date,
                                seuil_achat, seuil_vente, seuil_sortie):
     """Exécute le backtest de la stratégie de cointégration avec seuils personnalisés"""
     
-    data1 = get_historical_data(ticker1, start_date, end_date)
-    data2 = get_historical_data(ticker2, start_date, end_date)
-    
-    if data1 is None or data2 is None or len(data1) == 0 or len(data2) == 0:
+    # MODIFIER ICI : Créer une fonction spéciale pour la cointégration
+    try:
+        # Télécharger en données JOURNALIÈRES pour la cointégration
+        stock1 = yf.Ticker(ticker1)
+        data1 = stock1.history(start=start_date, end=end_date, interval='1d')
+        
+        stock2 = yf.Ticker(ticker2)
+        data2 = stock2.history(start=start_date, end=end_date, interval='1d')
+        
+        if data1 is None or len(data1) == 0:
+            st.error(f"❌ Aucune donnée trouvée pour {ticker1}")
+            return None, None, None, None
+        
+        if data2 is None or len(data2) == 0:
+            st.error(f"❌ Aucune donnée trouvée pour {ticker2}")
+            return None, None, None, None
+        
+        # Réinitialiser l'index et normaliser les colonnes
+        data1 = data1.reset_index()
+        data2 = data2.reset_index()
+        data1.columns = data1.columns.str.lower()
+        data2.columns = data2.columns.str.lower()
+        
+        # Créer les DataFrames avec Date comme index
+        df1 = data1.set_index('date')[['close']]
+        df2 = data2.set_index('date')[['close']]
+        
+    except Exception as e:
+        st.error(f"❌ Erreur lors du téléchargement: {str(e)}")
         return None, None, None, None
     
-    df1 = nettoyer_donnees(data1[['close']])
-    df2 = nettoyer_donnees(data2[['close']])
-    
-    df1.columns = [ticker1]
-    df2.columns = [ticker2]
+    # Nettoyer
+    df1 = nettoyer_donnees(df1, 'close')
+    df2 = nettoyer_donnees(df2, 'close')
     
     df = pd.merge(df1, df2, left_index=True, right_index=True, how="inner")
     
