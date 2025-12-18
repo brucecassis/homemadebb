@@ -267,15 +267,17 @@ with st.expander("CONFIGURE TICKER TAPE", expanded=False):
 
 # ...
 
+# ...
+
 # Construire la liste des symboles pour TradingView
 if ticker_tape_options:
     import json
     symbols_tv1 = []
     symbols_tv2 = [
         {"proName": "INDEX:IXIC", "title": "Nasdaq"},
-        {"proName": "INDEX:SPX", "title": "SP500"},
+        {"proName": "NYSE:SPY", "title": "S&P 500"},
         {"proName": "INDEX:YM=F", "title": "Dow Jones"},
-        {"proName": "INDEX:VIX", "title": "VIX"}
+        {"proName": "CBOE:VIX", "title": "VIX"}
     ]
     for i, ticker in enumerate(ticker_tape_options[:20]):  # Limite à 20
         if i < 10:
