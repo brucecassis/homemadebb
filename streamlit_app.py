@@ -297,7 +297,7 @@ if ticker_tape_options:
         elif ticker == "QQQ":
             symbol_entry = {"proName": "NASDAQ:QQQ", "title": ticker}
         elif ticker == "VIX":
-            symbol_entry = {"proName": "CBOE:VIX", "title": "VIX"}
+            symbol_entry = {"proName": "INDEX:VIX", "title": "VIX"}
         else:
             # Par défaut, utiliser NASDAQ
             symbol_entry = {"proName": f"NASDAQ:{ticker}", "title": ticker}
