@@ -297,7 +297,7 @@ if ticker_tape_options:
         elif ticker == "QQQ":
             symbol_entry = {"proName": "NASDAQ:QQQ", "title": ticker}
         elif ticker == "VIX":
-            symbol_entry = {"proName": "INDEX:VIX", "title": "VIX"}
+            symbol_entry = {"proName": "TVC:VIX", "title": "VIX"}
         else:
             # Par défaut, utiliser NASDAQ
             symbol_entry = {"proName": f"NASDAQ:{ticker}", "title": ticker}
@@ -314,7 +314,7 @@ if ticker_tape_options:
         {"proName": "INDEX:IXIC", "title": "Nasdaq"},
         {"proName": "CAPITALCOM:US500", "title": "S&P 500"},  # ✅ CORRECTION ICI
         {"proName": "CAPITALCOM:US30", "title": "Dow Jones"},  # ✅ CORRECTION ICI
-        {"proName": "INDEX:VIX", "title": "VIX"}
+        {"proName": "TVC:VIX", "title": "VIX"}
     ])
 
     symbols_json1 = json.dumps(symbols_tv1)
