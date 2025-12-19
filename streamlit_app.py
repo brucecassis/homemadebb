@@ -314,7 +314,7 @@ if ticker_tape_options:
         {"proName": "INDEX:IXIC", "title": "Nasdaq"},
         {"proName": "CAPITALCOM:US500", "title": "S&P 500"},  # ✅ CORRECTION ICI
         {"proName": "CAPITALCOM:US30", "title": "Dow Jones"},  # ✅ CORRECTION ICI
-        {"proName": "CBOE:VIX", "title": "VIX"}
+        {"proName": "INDEX:VIX", "title": "VIX"}
     ])
 
     symbols_json1 = json.dumps(symbols_tv1)
