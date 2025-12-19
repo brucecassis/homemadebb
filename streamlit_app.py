@@ -229,113 +229,136 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =============================================
-# WIDGET TRADINGVIEW - SYMBOL OVERVIEW (2 lignes)
+# WIDGET TRADINGVIEW - TICKER TAPE
 # =============================================
-st.markdown("### MARKET OVERVIEW")
+st.markdown("### MARKET TICKER TAPE")
 
 # Interface discrète pour sélectionner les tickers
-with st.expander("CONFIGURE MARKET OVERVIEW", expanded=False):
-    ticker_overview_options = st.multiselect(
-        "Sélectionnez les tickers à afficher",
+with st.expander("CONFIGURE TICKER TAPE", expanded=False):
+    ticker_tape_options = st.multiselect(
+        "Sélectionnez les tickers à afficher dans le bandeau",
         options=[
             "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "JPM", "V", "WMT",
             "DIS", "NFLX", "BA", "GE", "GM", "F", "T", "VZ", "INTC", "AMD",
-            "BTCUSD", "ETHUSD", "XOM", "QQQ", "EURUSD", "GOLD", "SLHN", "HSBC"
+            "BTCUSD", "ETHUSD", "XOM","QQQ","EURUSD", "GOLD", "SLHN", "HSBC", 
+                "VIX","EURUSD", "GBPUSD", "USDJPY", "GOLD", "SILVER", "CRUDE_OIL"
         ],
-        default=["AAPL", "MSFT", "GOOGL", "TSLA", "BTCUSD"],
-        help="Choisissez jusqu'à 10 tickers"
+        default=["XOM","QQQ","BTCUSD", "EURUSD", "GOLD", "SLHN", "HSBC"],
+        help="Choisissez jusqu'à 20 tickers"
     )
 
-    color_theme_overview = st.selectbox(
-        "Thème",
-        options=["dark", "light"],
-        index=0,
-        key="overview_theme"
-    )
+    # Options d'affichage
+    col_widget1, col_widget2 = st.columns(2)
+    with col_widget1:
+        show_market = st.selectbox(
+            "Marché",
+            options=["stocks", "forex", "crypto", "futures"],
+            index=0,
+            key="widget_market"
+        )
 
-# Construire les symboles
-if ticker_overview_options:
+    with col_widget2:
+        color_theme = st.selectbox(
+            "Thème",
+            options=["dark", "light"],
+            index=0,
+            key="widget_theme"
+        )
+
+# Construire la liste des symboles pour TradingView
+if ticker_tape_options:
     import json
+    symbols_tv1 = []
+    symbols_tv2 = []
     
-    symbols_overview = []
-    for ticker in ticker_overview_options[:10]:
+    for i, ticker in enumerate(ticker_tape_options[:20]):  # Limite à 20
+        symbol_entry = None
+        
+        # Déterminer le format du symbole selon le ticker
         if ticker in ["BTCUSD", "ETHUSD"]:
-            symbols_overview.append(f"BINANCE:{ticker}")
+            symbol_entry = {"proName": f"BINANCE:{ticker}", "title": ticker}
         elif ticker in ["EURUSD", "GBPUSD", "USDJPY"]:
-            symbols_overview.append(f"FX_IDC:{ticker}")
+            symbol_entry = {"proName": f"FX_IDC:{ticker}", "title": ticker}
         elif ticker in ["GOLD", "SILVER"]:
-            symbols_overview.append(f"TVC:{ticker}")
-        elif ticker == "XOM":
-            symbols_overview.append("NYSE:XOM")
+            symbol_entry = {"proName": f"TVC:{ticker}", "title": ticker}
+        elif ticker == "CRUDE_OIL":
+            symbol_entry = {"proName": "TVC:USOIL", "title": "OIL"}
         elif ticker == "SLHN":
-            symbols_overview.append("SWX:SLHN")
+            symbol_entry = {"proName": "SWX:SLHN", "title": ticker}
+        elif ticker == "XOM":
+            symbol_entry = {"proName": "NYSE:XOM", "title": ticker}
         elif ticker == "HSBC":
-            symbols_overview.append("LSE:HSBA")
+            symbol_entry = {"proName": "LSE:HSBA", "title": ticker}
         elif ticker == "QQQ":
-            symbols_overview.append("NASDAQ:QQQ")
+            symbol_entry = {"proName": "NASDAQ:QQQ", "title": ticker}
+        elif ticker == "VIX":
+            symbol_entry = {"proName": "TVC:VIX", "title": "VIX"}
         else:
-            symbols_overview.append(f"NASDAQ:{ticker}")
+            # Par défaut, utiliser NASDAQ
+            symbol_entry = {"proName": f"NASDAQ:{ticker}", "title": ticker}
+        
+        # Ajouter au bon tableau (max 10 par widget)
+        if symbol_entry:
+            if i < 10:
+                symbols_tv1.append(symbol_entry)
+            else:
+                symbols_tv2.append(symbol_entry)
     
-    # Ajouter les indices principaux
-    symbols_overview.extend([
-        "NASDAQ:IXIC",
-        "CAPITALCOM:US500",
-        "CAPITALCOM:US30"
+    # Ajouter les indices principaux au deuxième widget (toujours affichés)
+    symbols_tv2.extend([
+        {"proName": "NASDAQ:IXIC", "title": "Nasdaq"},
+        {"proName": "CAPITALCOM:US500", "title": "S&P 500"},
+        {"proName": "CAPITALCOM:US30", "title": "Dow Jones"},
+        {"proName": "TVC:VIX", "title": "VIX"}
     ])
-    
-    symbols_json_overview = json.dumps(symbols_overview)
-    
-    # Widget Symbol Overview (affichage vertical)
-    overview_widget = f"""
+
+    symbols_json1 = json.dumps(symbols_tv1)
+    symbols_json2 = json.dumps(symbols_tv2)
+
+    tradingview_widget1 = f"""
     <!-- TradingView Widget BEGIN -->
-    <div class="tradingview-widget-container" style="margin-bottom: 20px;">
+    <div class="tradingview-widget-container" style="margin-bottom: 0px;">
       <div class="tradingview-widget-container__widget"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
       {{
-      "symbols": {symbols_json_overview},
-      "chartOnly": false,
-      "width": "100%",
-      "height": "400",
-      "locale": "fr",
-      "colorTheme": "{color_theme_overview}",
-      "autosize": false,
-      "showVolume": false,
-      "showMA": false,
-      "hideDateRanges": false,
-      "hideMarketStatus": false,
-      "hideSymbolLogo": false,
-      "scalePosition": "right",
-      "scaleMode": "Normal",
-      "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, Ubuntu, sans-serif",
-      "fontSize": "10",
-      "noTimeScale": false,
-      "valuesTracking": "1",
-      "changeMode": "price-and-percent",
-      "chartType": "area",
-      "maLineColor": "#2962FF",
-      "maLineWidth": 1,
-      "maLength": 9,
-      "lineWidth": 2,
-      "lineType": 0,
-      "dateRanges": [
-        "1d|1",
-        "1m|30",
-        "3m|60",
-        "12m|1D",
-        "60m|1W",
-        "all|1M"
-      ]
+      "symbols": {symbols_json1},
+      "showSymbolLogo": true,
+      "colorTheme": "{color_theme}",
+      "isTransparent": false,
+      "displayMode": "adaptive",
+      "locale": "fr"
       }}
       </script>
     </div>
     <!-- TradingView Widget END -->
     """
-    
-    st.components.v1.html(overview_widget, height=420)
+
+    tradingview_widget2 = f"""
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container" style="margin-top: 0px; margin-bottom: 20px;">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
+      {{
+      "symbols": {symbols_json2},
+      "showSymbolLogo": true,
+      "colorTheme": "{color_theme}",
+      "isTransparent": false,
+      "displayMode": "adaptive",
+      "locale": "fr"
+      }}
+      </script>
+    </div>
+    <!-- TradingView Widget END -->
+    """
+
+    st.components.v1.html(tradingview_widget1, height=80)
+    st.components.v1.html(tradingview_widget2, height=80)
 else:
-    st.info("Sélectionnez des tickers pour afficher le market overview")
+    st.info("Sélectionnez des tickers pour afficher le bandeau TradingView")
 
 st.markdown('<hr style="border-color: #333; margin: 15px 0;">', unsafe_allow_html=True)
+
+
 # =============================================
 # BARRE DE COMMANDE BLOOMBERG
 # À ajouter après le header, avant les données de marché
