@@ -270,7 +270,7 @@ def get_historical_data(ticker, start_date, end_date):
     """Récupère les données historiques d'un ticker"""
     try:
         stock = yf.Ticker(ticker)
-        hist = stock.history(start=start_date, end=end_date, interval='1h')  # 1h pour plus de données
+        hist = stock.history(start=start_date, end=end_date, interval='1d')  # 1d pour plus de données
         if len(hist) == 0:
             st.error(f"Aucune donnée trouvée pour {ticker}")
             return None
