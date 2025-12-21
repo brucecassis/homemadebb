@@ -349,59 +349,65 @@ def run_backtest_rsi(ticker1, ticker2, weight1, weight2, capital, start_date, en
     valeur_portefeuille = []
     valeur_buy_hold = []
     
-    for i in range(len(merged)):
-        date = merged.index[i]
-        prix_asset1 = merged[f'close_{ticker1}'].iloc[i]
-        prix_asset2 = merged[f'close_{ticker2}'].iloc[i]
-        rsi_asset2 = merged[f'rsi_{ticker2}'].iloc[i]
-        
-        valeur_asset1 = nb_actions_asset1 * prix_asset1
-        
-        if pd.notna(rsi_asset2):
-            if rsi_asset2 <= rsi_buy and not asset2_position:
-                nb_actions_asset2 = capital_asset2_cash / prix_asset2
-                prix_achat_asset2 = prix_asset2
-                asset2_position = True
-                journal.append({
-                    'Date': date,
-                    'Action': f'ACHAT {ticker2}',
-                    'Prix': prix_asset2,
-                    'Quantité': nb_actions_asset2,
-                    'RSI': rsi_asset2,
-                    'Capital investi': capital_asset2_cash
-                })
-            
-            elif rsi_asset2 >= rsi_sell and asset2_position:
-                valeur_vente = nb_actions_asset2 * prix_asset2
-                profit = valeur_vente - capital_asset2_cash
-                profit_pct = (profit / capital_asset2_cash) * 100
-                capital_asset2_cash = valeur_vente
-                journal.append({
-                    'Date': date,
-                    'Action': f'VENTE {ticker2}',
-                    'Prix': prix_asset2,
-                    'Quantité': nb_actions_asset2,
-                    'RSI': rsi_asset2,
-                    'Prix achat': prix_achat_asset2,
-                    'Profit': profit,
-                    'Profit %': profit_pct,
-                    'Capital après vente': capital_asset2_cash
-                })
-                nb_actions_asset2 = 0
-                asset2_position = False
-        
-        if asset2_position:
-            valeur_asset2 = nb_actions_asset2 * prix_asset2
-        else:
-            valeur_asset2 = capital_asset2_cash
-        
-        valeur_totale = valeur_asset1 + valeur_asset2
-        valeur_portefeuille.append(valeur_totale)
-        
-        valeur_a1_bh = (capital * weight1 / 100 / merged[f'close_{ticker1}'].iloc[0]) * prix_asset1
-        valeur_a2_bh = (capital * weight2 / 100 / merged[f'close_{ticker2}'].iloc[0]) * prix_asset2
-        valeur_buy_hold.append(valeur_a1_bh + valeur_a2_bh)
+    # Dans la fonction run_backtest_rsi, remplacez la boucle de trading par :
+
+for i in range(len(merged)):
+    date = merged.index[i]
+    prix_asset1 = merged[f'close_{ticker1}'].iloc[i]
+    prix_asset2 = merged[f'close_{ticker2}'].iloc[i]
+    rsi_asset2 = merged[f'rsi_{ticker2}'].iloc[i]
     
+    valeur_asset1 = nb_actions_asset1 * prix_asset1
+    
+    # Vérifier que le RSI n'est pas NaN et gérer les signaux
+    if pd.notna(rsi_asset2) and i > 0:  # Ajouter i > 0 pour éviter les erreurs
+        # Signal d'achat : RSI croise au-dessus de oversold ET pas déjà en position
+        if not asset2_position and rsi_asset2 > rsi_buy and merged[f'rsi_{ticker2}'].iloc[i-1] <= rsi_buy:
+            nb_actions_asset2 = capital_asset2_cash / prix_asset2
+            prix_achat_asset2 = prix_asset2
+            asset2_position = True
+            journal.append({
+                'Date': date,
+                'Action': f'ACHAT {ticker2}',
+                'Prix': prix_asset2,
+                'Quantité': nb_actions_asset2,
+                'RSI': rsi_asset2,
+                'Capital investi': capital_asset2_cash
+            })
+        
+        # Signal de vente : RSI croise au-dessous de overbought ET en position
+        elif asset2_position and rsi_asset2 < rsi_sell and merged[f'rsi_{ticker2}'].iloc[i-1] >= rsi_sell:
+            valeur_vente = nb_actions_asset2 * prix_asset2
+            profit = valeur_vente - capital_asset2_cash
+            profit_pct = (profit / capital_asset2_cash) * 100
+            capital_asset2_cash = valeur_vente
+            journal.append({
+                'Date': date,
+                'Action': f'VENTE {ticker2}',
+                'Prix': prix_asset2,
+                'Quantité': nb_actions_asset2,
+                'RSI': rsi_asset2,
+                'Prix achat': prix_achat_asset2,
+                'Profit': profit,
+                'Profit %': profit_pct,
+                'Capital après vente': capital_asset2_cash
+            })
+            nb_actions_asset2 = 0
+            asset2_position = False
+    
+    # Calculer la valeur totale du portefeuille
+    if asset2_position:
+        valeur_asset2 = nb_actions_asset2 * prix_asset2
+    else:
+        valeur_asset2 = capital_asset2_cash
+    
+    valeur_totale = valeur_asset1 + valeur_asset2
+    valeur_portefeuille.append(valeur_totale)
+    
+    # Buy & Hold
+    valeur_a1_bh = (capital * weight1 / 100 / merged[f'close_{ticker1}'].iloc[0]) * prix_asset1
+    valeur_a2_bh = (capital * weight2 / 100 / merged[f'close_{ticker2}'].iloc[0]) * prix_asset2
+    valeur_buy_hold.append(valeur_a1_bh + valeur_a2_bh)    
     merged['valeur_strategie'] = valeur_portefeuille
     merged['valeur_buy_hold'] = valeur_buy_hold
     merged['pct_strategie'] = (merged['valeur_strategie'] / capital) * 100
