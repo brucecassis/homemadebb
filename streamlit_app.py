@@ -1,34 +1,85 @@
 import streamlit as st
+
 import pandas as pd
+
 import plotly.graph_objects as go
+
 from datetime import datetime
+
 import yfinance as yf
+
 import time
+
 import requests
-# On a supprimé les lignes "from auth_utils..." et "from login..."
 
-# On garde streamlit_autorefresh si vous l'utilisez, sinon laissez commenté
-# from streamlit_autorefresh import st_autorefresh
+
+
+from auth_utils import init_session_state, logout
+
+from login import show_login_page
+
+
+
+from adsense_utils import add_header_ad, add_footer_ad
+
+# =================================
+
+
+
+from auth_utils import init_session_state, logout
+
+from login import show_login_page
+
+
+
+init_session_state()
+
+
+
+if not st.session_state.get('authenticated', False):
+
+    show_login_page()
+
+    st.stop()
+
+
+
+# Votre code existant continue ici...
+
+
 
 # =============================================
-# FONCTIONS UTILITAIRES (Pour remplacer les fichiers supprimés)
-# =============================================
-# Si vous avez aussi supprimé adsense_utils.py, on définit des fonctions vides ici
-# pour éviter que le code plante plus bas quand il appelle add_header_ad()
-def add_header_ad():
-    pass
 
-def add_footer_ad():
-    pass
+# AUTO-REFRESH TOUTES LES 3 SECONDES
 
 # =============================================
+
+#from streamlit_autorefresh import st_autorefresh
+
+
+
+#Rafraîchissement automatique toutes les 3000ms (3 secondes)
+
+#count = st_autorefresh(interval=3000, limit=None, key="market_refresh")
+
+
+
+# =============================================
+
 # PAGE CONFIG
+
 # =============================================
+
 st.set_page_config(
+
     page_title="Bloomberg Terminal - Markets",
+
     page_icon="📊",
+
     layout="wide",
+
     initial_sidebar_state="collapsed"
+
 )
 
 
